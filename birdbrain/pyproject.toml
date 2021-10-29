@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "birdbrain"
+version = "0.1.0"
+description = "The database driver for Sparrow"
+authors = ["Daven Quinn <dev@davenquinn.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+SQLAlchemy = "^1.4.26"
+SQLAlchemy-Utils = "^0.37.9"
+sqlparse = "^0.4.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

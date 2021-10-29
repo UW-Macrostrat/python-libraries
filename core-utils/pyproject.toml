@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "macrostrat.core_utils"
+version = "0.1.0"
+description = "Core utilities for Macrostrat projects"
+authors = ["Daven Quinn <dev@davenquinn.com>"]
+packages = [
+    { include = "macrostrat" }  # only use from="src" if that is how you've structured your code.
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+colorlog = "^6.5.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
