@@ -4,11 +4,11 @@ from schemainspect import get_inspector
 from migra import Migration
 from migra.statements import check_for_drop
 import sys
-from sparrow_utils import get_logger, cmd
 from sqlalchemy import text
 import os
 from rich import print
 
+from macrostrat.core_utils import get_logger, cmd
 from .util import _exec_raw_sql, run_sql, temp_database, connection_args
 
 
