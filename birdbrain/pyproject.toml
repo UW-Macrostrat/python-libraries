@@ -11,6 +11,8 @@ SQLAlchemy-Utils = "^0.37.0"
 "macrostrat.core_utils" = ""
 python = "^3.8"
 sqlparse = "^0.4.0"
+schemainspect = "^3.0.1616029793"
+migra = "^3.0.1621480950"
 
 [tool.poetry.dev-dependencies]
 "macrostrat.core_utils" = {path = "../core-utils", develop = true}
