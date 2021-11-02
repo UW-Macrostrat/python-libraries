@@ -1,4 +1,4 @@
-from click import secho
+from click import echo, secho
 from sqlalchemy.exc import ProgrammingError, IntegrityError
 from sqlparse import split, format
 from sqlalchemy.sql import ClauseElement
@@ -6,9 +6,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
-from sparrow_utils import cmd, get_logger
+from macrostrat.core_utils import cmd, get_logger
 from time import sleep
-from click import echo
 
 log = get_logger(__name__)
 

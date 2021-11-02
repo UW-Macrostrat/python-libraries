@@ -9,18 +9,13 @@ from sqlalchemy.schema import ForeignKey, Column
 from sqlalchemy.types import Integer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import FlushError
-from marshmallow.exceptions import ValidationError
+from macrostrat.core_utils import get_logger, relative_path
 
 from .util import run_sql_file, run_query, get_or_create, run_sql_query_file
-from .models import User, Project, Session, DatumType
 from .mapper import SparrowDatabaseMapper
-from ..logs import get_logger
-from ..util import relative_path
-from ..interface import ModelSchema, model_interface
-from ..exceptions import DatabaseMappingError
 from .postgresql import on_conflict
 from .migration import SparrowDatabaseMigrator
-from ..settings import ECHO_SQL
+
 
 metadata = MetaData()
 
@@ -31,7 +26,7 @@ class Database:
     mapper: Optional[SparrowDatabaseMapper] = None
     __inspector__ = None
 
-    def __init__(self, db_conn, app=None):
+    def __init__(self, db_conn, app=None, echo_sql=False):
         """
         We can pass a connection string, a **Flask** application object
         with the appropriate configuration, or nothing, in which
@@ -39,10 +34,9 @@ class Database:
         the SPARROW_BACKEND_CONFIG file, if available.
         """
         log.info(f"Setting up database connection '{db_conn}'")
-        self.engine = create_engine(db_conn, executemany_mode="batch", echo=ECHO_SQL)
+        self.engine = create_engine(db_conn, executemany_mode="batch", echo=echo_sql)
         metadata.create_all(bind=self.engine)
         self.meta = metadata
-        self.app = app
 
         # Scoped session for database
         # https://docs.sqlalchemy.org/en/13/orm/contextual.html#unitofwork-contextual
@@ -54,27 +48,6 @@ class Database:
     def automap(self):
         log.info("Automapping the database")
         self.mapper = SparrowDatabaseMapper(self)
-
-        # Database models we have extended with our own functions
-        # (we need to add these to the automapped classes since
-        #  they are not included by default)
-        # TODO: there is probably a way to do this without having to
-        # manually register the models
-        self.mapper.register_models(User, Project, Session, DatumType)
-        log.info("Registered core model overrides")
-
-        # Register a new class
-        # Automap the core_view.datum relationship
-        cls = self.mapper.automap_view(
-            "datum",
-            Column("datum_id", Integer, primary_key=True),
-            Column("analysis_id", Integer, ForeignKey(self.table.analysis.c.id)),
-            Column("session_id", Integer, ForeignKey(self.table.session.c.id)),
-            schema="core_view",
-        )
-        self.mapper.register_models(cls)
-        self.app.run_hook("database-mapped")
-        log.info("Finished automapping database")
 
     @contextmanager
     def session_scope(self, commit=True):
@@ -92,18 +65,6 @@ class Database:
         finally:
             session.close()
 
-    def model_schema(self, model_name) -> ModelSchema:
-        """
-        Create a SQLAlchemy instance from data conforming to an import schema
-        """
-        try:
-            iface = getattr(self.interface, model_name)
-            return iface()
-        except AttributeError as err:
-            raise DatabaseMappingError(
-                f"Could not find schema interface for model '{model_name}'"
-            )
-
     def _flush_nested_objects(self, session):
         """
         Flush objects remaining in a session (generally these are objects loaded
@@ -116,15 +77,6 @@ class Database:
             except IntegrityError as err:
                 session.rollback()
                 log.debug(err)
-
-    def get_existing_instance(self, model_name, filter_params):
-        schema = self.model_schema(model_name)
-        return schema.load(filter_params, session=self.session)
-
-    def get_instance(self, model_name, filter_params):
-        schema = self.model_schema(model_name)
-        res = schema.load(filter_params, session=self.session, partial=True)
-        return res
 
     def exec_sql_text(self, statement):
         """
@@ -188,13 +140,6 @@ class Database:
 
         for fn in filenames:
             self.exec_sql(fn)
-
-        try:
-            self.app.run_hook("core-tables-initialized", self)
-            self.app.run_hook("finalize-database-schema", self)
-        except AttributeError as err:
-            secho("Could not load plugins", fg="red", dim=True)
-            secho(str(err))
 
     def update_schema(self, **kwargs):
         # Might be worth creating an interactive upgrader
