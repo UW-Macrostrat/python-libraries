@@ -127,29 +127,10 @@ class Database:
             model = getattr(self.model, model)
         return get_or_create(self.session, model, **kwargs)
 
-    def initialize(self, drop=False, quiet=False):
-        secho("Creating core schema...", bold=True)
-
-        if drop:
-            fp = relative_path(__file__, "procedures", "drop-all-tables.sql")
-            self.exec_sql(fp)
-
-        p = Path(relative_path(__file__, "fixtures"))
-        filenames = list(p.glob("*.sql"))
-        filenames.sort()
-
-        for fn in filenames:
-            self.exec_sql(fn)
-
-    def update_schema(self, **kwargs):
+    def update_schema(self, migrations=[], **kwargs):
         # Might be worth creating an interactive upgrader
-        from sparrow import migrations
-
         migrator = SparrowDatabaseMigrator(self)
         migrator.add_module(migrations)
-        self.app.run_hook("prepare-database-migrations", migrator)
-        # TODO: deprecate this hook
-        self.app.run_hook("prepare-database-upgrade", migrator)
         migrator.run_migration(**kwargs)
 
     @property
