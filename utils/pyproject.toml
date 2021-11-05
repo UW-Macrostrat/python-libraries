@@ -3,7 +3,7 @@ authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Core utilities for Sparrow"
 name = "sparrow.utils"
 packages = [
-  {include = "sparrow"}, # only use from="src" if that is how you've structured your code.
+  {include = "sparrow"},
 ]
 version = "0.1.0"
 

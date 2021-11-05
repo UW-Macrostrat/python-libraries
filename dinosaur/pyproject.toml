@@ -1,7 +1,7 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Diff-based database migrations"
-name = "dinosaur"
+name = "sparrow.dinosaur"
 packages = [
   {include = "sparrow"},
 ]
