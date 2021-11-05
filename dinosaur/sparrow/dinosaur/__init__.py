@@ -237,6 +237,10 @@ class Dinosaur:
 
         # Migrating to the new version should now be "safe"
         m = _create_migration(engine, target)
+
+        for s in m.statements:
+            print(s, file=sys.stderr)
+
         try:
             assert m.is_safe
         except AssertionError as err:
