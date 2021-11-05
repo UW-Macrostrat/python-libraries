@@ -3,7 +3,7 @@ authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Diff-based database migrations"
 name = "dinosaur"
 packages = [
-  {include = "sparrow"}, # only use from="src" if that is how you've structured your code.
+  {include = "sparrow"},
 ]
 version = "0.1.0"
 
@@ -19,8 +19,8 @@ schemainspect = "^3.0.1616029793"
 sqlparse = "^0.4.0"
 
 [tool.poetry.dev-dependencies]
-"birdbrain" = {path = "../birdbrain", develop = true}
-"macrostrat.core_utils" = {path = "../core-utils", develop = true}
+"sparrow.birdbrain" = {path = "../birdbrain", develop = true}
+"sparrow.utils" = {path = "../utils", develop = true}
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
