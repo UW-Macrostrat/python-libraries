@@ -44,22 +44,6 @@ python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
 docs = ["sphinx"]
 
 [[package]]
-name = "macrostrat.core-utils"
-version = "0.1.0"
-description = "Core utilities for Macrostrat projects"
-category = "main"
-optional = false
-python-versions = "^3.8"
-develop = true
-
-[package.dependencies]
-colorlog = "^6.5.0"
-
-[package.source]
-type = "directory"
-url = "../core-utils"
-
-[[package]]
 name = "migra"
 version = "3.0.1621480950"
 description = "Like `diff` but for PostgreSQL schemas"
@@ -121,6 +105,22 @@ description = "Python 2 and 3 compatibility utilities"
 category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
+name = "sparrow.utils"
+version = "0.1.0"
+description = "Core utilities for Sparrow"
+category = "main"
+optional = false
+python-versions = "^3.8"
+develop = true
+
+[package.dependencies]
+colorlog = "^6.5.0"
+
+[package.source]
+type = "directory"
+url = "../utils"
 
 [[package]]
 name = "sqlalchemy"
@@ -209,7 +209,7 @@ python-versions = ">=3.5"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "40a2c80da8746cab6efbc0f1c6eafa31b20d9ac60120646cde3d113fc806bdf4"
+content-hash = "fad66752cf77d2485931f80660a6b626bb67e96ef42d44388e714c4be9c0da44"
 
 [metadata.files]
 colorama = [
@@ -276,7 +276,6 @@ greenlet = [
     {file = "greenlet-1.1.2-cp39-cp39-win_amd64.whl", hash = "sha256:013d61294b6cd8fe3242932c1c5e36e5d1db2c8afb58606c5a67efce62c1f5fd"},
     {file = "greenlet-1.1.2.tar.gz", hash = "sha256:e30f5ea4ae2346e62cedde8794a56858a67b878dd79f7df76a0767e356b1744a"},
 ]
-"macrostrat.core-utils" = []
 migra = [
     {file = "migra-3.0.1621480950-py3-none-any.whl", hash = "sha256:157a40fff99ecadbec389b8972b42eac93f43eb82f4ae8f485adc87fcd7800d6"},
     {file = "migra-3.0.1621480950.tar.gz", hash = "sha256:5fdce56fe7de79b17b7875250c1e90c645117cc8d358c5a43b38b815390a4445"},
@@ -328,6 +327,7 @@ six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
 ]
+"sparrow.utils" = []
 sqlalchemy = [
     {file = "SQLAlchemy-1.4.26-cp27-cp27m-macosx_10_14_x86_64.whl", hash = "sha256:c2f2114b0968a280f94deeeaa31cfbac9175e6ac7bd3058b3ce6e054ecd762b3"},
     {file = "SQLAlchemy-1.4.26-cp27-cp27m-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:91efbda4e6d311812f23996242bad7665c1392209554f8a31ec6db757456db5c"},
