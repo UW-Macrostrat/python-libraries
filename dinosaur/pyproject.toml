@@ -1,9 +1,9 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
-description = "The database driver for Sparrow"
-name = "sparrow.birdbrain"
+description = "Diff-based database migrations"
+name = "dinosaur"
 packages = [
-  {include = "sparrow"},
+  {include = "sparrow"}, # only use from="src" if that is how you've structured your code.
 ]
 version = "0.1.0"
 
@@ -11,15 +11,16 @@ version = "0.1.0"
 GeoAlchemy2 = "^0.9.4"
 SQLAlchemy = "^1.4.26"
 SQLAlchemy-Utils = "^0.37.0"
-migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
 python = "^3.8"
 schemainspect = "^3.0.1616029793"
+"sparrow.birdbrain" = ""
 "sparrow.utils" = ""
 sqlparse = "^0.4.0"
 
 [tool.poetry.dev-dependencies]
-"sparrow.utils" = {path = "../core-utils", develop = true}
+"birdbrain" = {path = "../birdbrain", develop = true}
+"macrostrat.core_utils" = {path = "../core-utils", develop = true}
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

@@ -1,5 +1,5 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
-description = "Macrostrat Python modules"
-name = "macrostrat-python"
+description = "Sparrow supporting libraries"
+name = "sparrow-python"
 version = "0.1.0"

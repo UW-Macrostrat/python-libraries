@@ -53,24 +53,28 @@ class SparrowDatabaseMapper:
         self.db = db
 
         # This stuff should be placed outside of core (one likely extension point).
-        reflection_kwargs = dict(
+        self.reflection_kwargs = dict(
             name_for_scalar_relationship=name_for_scalar_relationship,
             name_for_collection_relationship=name_for_collection_relationship,
             classname_for_table=_classname_for_table,
             generate_relationship=_gen_relationship,
         )
 
-        for schema in ("vocabulary", "core_view", "tags"):
-            # Reflect tables in schemas we care about
-            # Note: this will not reflect views because they don't have
-            # primary keys.
-            log.info(f"Reflecting schema {schema}")
-            BaseModel.metadata.reflect(bind=self.db.engine, schema=schema)
-        log.info("Reflecting core tables")
-        BaseModel.prepare(self.db.engine, reflect=True, **reflection_kwargs)
-
         self.automap_base = BaseModel
 
+        self._models = ModelCollection(self.automap_base.classes)
+        self._tables = TableCollection(self._models)
+
+    def reflect_schema(self, schema):
+        if schema == "public":
+            self.automap_base.prepare(
+                self.db.engine, reflect=True, **self.reflection_kwargs
+            )
+        else:
+            # Reflect tables in schemas we care about
+            # Note: this will not reflect views because they don't have primary keys.
+            log.info(f"Reflecting schema {schema}")
+            self.automap_base.metadata.reflect(bind=self.db.engine, schema=schema)
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
 

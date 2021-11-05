@@ -1,15 +1,22 @@
+import os
+import sys
 from contextlib import contextmanager, redirect_stdout
+
 from sqlalchemy.exc import ProgrammingError, IntegrityError
 from schemainspect import get_inspector
 from migra import Migration
 from migra.statements import check_for_drop
-import sys
 from sqlalchemy import text
-import os
 from rich import print
 
-from macrostrat.core_utils import get_logger, cmd
-from .util import _exec_raw_sql, run_sql, temp_database, connection_args
+from sparrow.utils import get_logger, cmd
+from sparrow.birdbrain import Database
+from sparrow.birdbrain.util import (
+    _exec_raw_sql,
+    run_sql,
+    temp_database,
+    connection_args,
+)
 
 
 log = get_logger(__name__)
@@ -80,23 +87,25 @@ def _create_migration(db_engine, target, safe=True):
 
 
 @contextmanager
-def _target_db(url, quiet=False, redirect=sys.stderr):
-    from sparrow.app import Sparrow
+def _target_db(url, initialize, quiet=False, redirect=sys.stderr):
+    from . import Database
 
     if quiet:
         redirect = open(os.devnull, "w")
 
     log.debug("Creating migration target")
     with temp_database(url) as engine:
-        app = Sparrow(database=url)
+        db = Database(url)
         with redirect_stdout(redirect):
-            app.init_database()
+            initialize(db)
         yield engine
 
 
-def create_migration(db, safe=True, redirect=sys.stderr):
+def create_migration(db, initialize, safe=True, redirect=sys.stderr):
     url = "postgresql://postgres@db:5432/sparrow_temp_migration"
-    with _target_db(url, redirect=redirect) as target, redirect_stdout(redirect):
+    with _target_db(url, initialize, redirect=redirect) as target, redirect_stdout(
+        redirect
+    ):
         return _create_migration(db.engine, target)
 
 
@@ -105,9 +114,9 @@ def needs_migration(db):
     return len(migration.statements) == 0
 
 
-def db_migration(db, safe=True, apply=False, hide_view_changes=False):
+def db_migration(db, initialize, safe=True, apply=False, hide_view_changes=False):
     """Create a database migration against the idealized schema"""
-    m = create_migration(db, safe=safe, redirect=sys.stderr)
+    m = create_migration(db, initialize, safe=safe, redirect=sys.stderr)
     stmts = m.statements
     if hide_view_changes:
         stmts = m.changes_omitting_views()
@@ -170,12 +179,14 @@ class SparrowMigration:
         pass
 
 
-class SparrowDatabaseMigrator:
+class Dinosaur:
     target_url = "postgresql://postgres@db:5432/sparrow_temp_migration"
     dry_run_url = "postgresql://postgres@db:5432/sparrow_schema_clone"
 
-    def __init__(self, db, migrations=[]):
+    def __init__(self, db, _init_function, migrations=[]):
         self.db = db
+
+        self._init_function = _init_function
         self._migrations = migrations
 
     def add_migration(self, migration):
@@ -246,7 +257,7 @@ class SparrowDatabaseMigrator:
         log.info("Migration dry run successful")
 
     def run_migration(self, dry_run=True, apply=True):
-        with _target_db(self.target_url) as target:
+        with _target_db(self.target_url, self._init_function) as target:
             if dry_run:
                 self.dry_run_migration(target)
             if not apply:
@@ -254,3 +265,9 @@ class SparrowDatabaseMigrator:
             log.info("Running migration")
             self._run_migration(self.db.engine, target)
             log.info("Finished running migration")
+
+
+def update_schema(db: Database, initializer, migrations=[], **kwargs):
+    # Might be worth creating an interactive upgrader
+    migrator = Dinosaur(db, initializer, migrations=migrations)
+    migrator.run_migration(**kwargs)

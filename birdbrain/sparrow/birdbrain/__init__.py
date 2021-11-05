@@ -14,7 +14,6 @@ from macrostrat.core_utils import get_logger, relative_path
 from .util import run_sql_file, run_query, get_or_create, run_sql_query_file
 from .mapper import SparrowDatabaseMapper
 from .postgresql import on_conflict
-from .migration import SparrowDatabaseMigrator
 
 
 metadata = MetaData()
@@ -126,12 +125,6 @@ class Database:
         if isinstance(model, str):
             model = getattr(self.model, model)
         return get_or_create(self.session, model, **kwargs)
-
-    def update_schema(self, migrations=[], **kwargs):
-        # Might be worth creating an interactive upgrader
-        migrator = SparrowDatabaseMigrator(self)
-        migrator.add_module(migrations)
-        migrator.run_migration(**kwargs)
 
     @property
     def table(self):
