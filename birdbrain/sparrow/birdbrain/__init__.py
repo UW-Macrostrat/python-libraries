@@ -9,7 +9,7 @@ from sqlalchemy.schema import ForeignKey, Column
 from sqlalchemy.types import Integer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import FlushError
-from macrostrat.core_utils import get_logger, relative_path
+from sparrow.utils import get_logger, relative_path
 
 from .util import run_sql_file, run_query, get_or_create, run_sql_query_file
 from .mapper import SparrowDatabaseMapper

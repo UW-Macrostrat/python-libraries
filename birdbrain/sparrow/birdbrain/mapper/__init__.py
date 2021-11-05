@@ -1,7 +1,7 @@
 from sqlalchemy.schema import Table
 from sqlalchemy import MetaData
 from sqlalchemy.ext.automap import generate_relationship
-from macrostrat.core_utils import get_logger
+from sparrow.utils import get_logger
 
 # Drag in geographic types for database reflection
 from geoalchemy2 import Geometry, Geography
