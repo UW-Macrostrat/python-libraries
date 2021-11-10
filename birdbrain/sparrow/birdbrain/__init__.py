@@ -25,7 +25,7 @@ class Database:
     mapper: Optional[SparrowDatabaseMapper] = None
     __inspector__ = None
 
-    def __init__(self, db_conn, app=None, echo_sql=False):
+    def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
         """
         We can pass a connection string, a **Flask** application object
         with the appropriate configuration, or nothing, in which
@@ -33,7 +33,9 @@ class Database:
         the SPARROW_BACKEND_CONFIG file, if available.
         """
         log.info(f"Setting up database connection '{db_conn}'")
-        self.engine = create_engine(db_conn, executemany_mode="batch", echo=echo_sql)
+        self.engine = create_engine(
+            db_conn, executemany_mode="batch", echo=echo_sql, **kwargs
+        )
         metadata.create_all(bind=self.engine)
         self.meta = metadata
 
@@ -77,13 +79,13 @@ class Database:
                 session.rollback()
                 log.debug(err)
 
-    def exec_sql_text(self, statement):
+    def exec_sql_text(self, statement, *args, **kwargs):
         """
         Executes a sql command, in string on the database
         Easy way to load data into a test database instance
         """
         connection = self.engine.connect()
-        connection.execute(text(statement))
+        connection.execute(text(statement), *args, **kwargs)
 
     def exec_sql(self, fn, params=None):
         """Executes SQL files passed"""
