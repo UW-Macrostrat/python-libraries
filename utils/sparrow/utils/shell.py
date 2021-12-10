@@ -6,13 +6,13 @@ from .logs import get_logger
 log = get_logger(__name__)
 
 
-def split_args(*args):
-    return split(" ".join(args))
+def split_args(*arguments):
+    return split(" ".join(arguments))
 
 
-def cmd(*v, **kwargs):
+def cmd(*arguments, **kwargs):
     logger = kwargs.pop("logger", log)
-    val = " ".join(v)
+    val = " ".join([str(v) for v in arguments])
     logger.debug(val)
     return run(split(val), **kwargs)
 
