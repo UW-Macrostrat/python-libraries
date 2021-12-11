@@ -75,11 +75,12 @@ class AutoMigration(Migration):
         print(statements, file=sys.stderr)
 
 
-def _create_migration(db_engine, target, safe=True):
+def _create_migration(db_engine, target, safe=True, **kwargs):
     # For some reason we need to patch this...
     log.info("Creating an automatic migration")
     target.dialect.server_version_info = db_engine.dialect.server_version_info
-    m = AutoMigration(db_engine, target)  # , exclude_schema="core_view")
+    m = AutoMigration(db_engine, target, **kwargs)  # , exclude_schema="core_view")
+    
     m.set_safety(safe)
     # Not sure what this does
     m.add_all_changes()
@@ -182,12 +183,14 @@ class SparrowMigration:
 class Dinosaur:
     target_url = "postgresql://postgres@db:5432/sparrow_temp_migration"
     dry_run_url = "postgresql://postgres@db:5432/sparrow_schema_clone"
+    schema=None
 
-    def __init__(self, db, _init_function, migrations=[]):
+    def __init__(self, db, _init_function, migrations=[], schema=None):
         self.db = db
 
         self._init_function = _init_function
         self._migrations = migrations
+        self.schema = schema
 
     def add_migration(self, migration):
         assert issubclass(migration, SparrowMigration)
@@ -223,7 +226,7 @@ class Dinosaur:
             migrations = [m for m in migrations if m.should_apply(engine, target, self)]
 
     def _run_migration(self, engine, target, check=False):
-        m = _create_migration(engine, target)
+        m = _create_migration(engine, target, schema=self.schema)
         if len(m.statements) == 0:
             log.info("No automatic migration necessary")
             return
