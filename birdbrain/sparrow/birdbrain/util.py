@@ -124,10 +124,7 @@ def get_db_model(db, model_name: str):
 def temp_database(conn_string, drop=True, ensure_empty=False):
     """Create a temporary database and tear it down after tests."""
     if ensure_empty:
-        try:
-            drop_database(conn_string)
-        except Exception:
-            pass
+        drop_database(conn_string)
     if not database_exists(conn_string):
         create_database(conn_string)
     try:
