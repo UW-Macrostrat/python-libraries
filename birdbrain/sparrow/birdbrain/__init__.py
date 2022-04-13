@@ -10,19 +10,20 @@ from sqlalchemy.types import Integer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import FlushError
 from sparrow.utils import get_logger, relative_path
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import Insert
 
 from .util import run_sql_file, run_query, get_or_create, run_sql_query_file
-from .mapper import SparrowDatabaseMapper
-from .postgresql import on_conflict
+from .mapper import DatabaseMapper
+from .postgresql import on_conflict, prefix_inserts
 
 
 metadata = MetaData()
 
 log = get_logger(__name__)
 
-
-class Database:
-    mapper: Optional[SparrowDatabaseMapper] = None
+class Database(object):
+    mapper: Optional[DatabaseMapper] = None
     __inspector__ = None
 
     def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
@@ -32,6 +33,12 @@ class Database:
         case we will try to infer the correct database from
         the SPARROW_BACKEND_CONFIG file, if available.
         """
+
+
+
+        compiles(Insert, "postgresql")(prefix_inserts)
+
+
         log.info(f"Setting up database connection '{db_conn}'")
         self.engine = create_engine(
             db_conn, executemany_mode="batch", echo=echo_sql, **kwargs
@@ -48,7 +55,8 @@ class Database:
 
     def automap(self):
         log.info("Automapping the database")
-        self.mapper = SparrowDatabaseMapper(self)
+        self.mapper = DatabaseMapper(self)
+        self.mapper.automap_database()
 
     @contextmanager
     def session_scope(self, commit=True):
