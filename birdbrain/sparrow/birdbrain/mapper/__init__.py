@@ -12,8 +12,6 @@ from .base import ModelHelperMixins
 # Drag in geographic types for database reflection
 from geoalchemy2 import Geometry, Geography
 
-
-from .shims import _is_many_to_many
 from .util import (
     ModelCollection,
     TableCollection,
@@ -110,7 +108,7 @@ class DatabaseMapper:
     _models = None
     _tables = None
 
-    def __init__(self, db, use_cache=True, reflect=True):
+    def __init__(self, db):
         # https://docs.sqlalchemy.org/en/13/orm/extensions/automap.html#sqlalchemy.ext.automap.AutomapBase.prepare
         # TODO: add the process flow described below:
         # https://docs.sqlalchemy.org/en/13/orm/extensions/automap.html#generating-mappings-from-an-existing-metadata
