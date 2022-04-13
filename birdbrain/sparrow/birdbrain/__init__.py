@@ -13,7 +13,7 @@ from sparrow.utils import get_logger, relative_path
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert
 
-from .util import run_sql_file, run_query, get_or_create, run_sql_query_file
+from .utils import run_sql_file, run_query, get_or_create, run_sql_query_file
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts
 

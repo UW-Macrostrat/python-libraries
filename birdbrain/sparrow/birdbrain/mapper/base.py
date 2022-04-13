@@ -1,4 +1,4 @@
-from .util import primary_key
+from .utils import primary_key
 
 
 class ModelHelperMixins:

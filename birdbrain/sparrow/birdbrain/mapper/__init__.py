@@ -8,7 +8,7 @@ from .cache import DatabaseModelCache
 # Drag in geographic types for database reflection
 from geoalchemy2 import Geometry, Geography
 
-from .util import (
+from .utils import (
     ModelCollection,
     TableCollection,
     classname_for_table,
@@ -64,41 +64,22 @@ class DatabaseMapper:
             return
         self.automap_base.builder._cache_database_map(self.automap_base.metadata)
 
-    def _reflect_schema(self):
-        if use_cache and self.automap_base.loaded_from_cache:
-            log.info("Database models have been loaded from cache")
-            for schema in schemas:
-                self.automap_base.prepare(
-                    self.db.engine, schema=schema, **self.reflection_kwargs
-                )
-        else:
-            for schema in schemas:
-                # Reflect tables in schemas we care about
-                # Note: this will not reflect views because they don't have
-                # primary keys.
-                log.info(f"Reflecting schema {schema}")
-                if schema is not None:
-                    self.automap_base.metadata.reflect(
-                        bind=self.db.engine, schema=schema
-                    )
-            log.info("Reflecting core tables")
-            self.automap_base.prepare(self.db.engine, reflect=True, **self.reflection_kwargs)
-
     def reflect_schema(self, schema, use_cache=True):
         if use_cache and self.automap_base.loaded_from_cache:
+            log.info("Database models for %s have been loaded from cache", schema)
             self.automap_base.prepare(
                 self.db.engine, schema=schema, **self.reflection_kwargs
             )
             return
+        log.info(f"Reflecting schema {schema}")
         if schema == "public":
             self.automap_base.prepare(
-                self.db.engine, reflect=True, **self.reflection_kwargs
+                self.db.engine, reflect=True, schema=None, **self.reflection_kwargs
             )
         else:
             # Reflect tables in schemas we care about
             # Note: this will not reflect views because they don't have primary keys.
-            log.info(f"Reflecting schema {schema}")
-            self.automap_base.metadata.reflect(bind=self.db.engine, schema=schema)
+            self.automap_base.metadata.reflect(bind=self.db.engine, schema=schema, **self.reflection_kwargs)
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
 

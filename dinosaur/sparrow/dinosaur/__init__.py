@@ -11,7 +11,7 @@ from rich import print
 
 from sparrow.utils import get_logger, cmd
 from sparrow.birdbrain import Database
-from sparrow.birdbrain.util import (
+from sparrow.birdbrain.utils import (
     _exec_raw_sql,
     run_sql,
     temp_database,
