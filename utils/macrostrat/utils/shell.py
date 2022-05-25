@@ -12,7 +12,7 @@ def split_args(*args):
 
 def run(*args, **kwargs):
     logger = kwargs.pop("logger", log)
-    logger.debug(args)
+    logger.debug(" ".join(args))
     return _run(args, **kwargs)
 
 
@@ -30,3 +30,8 @@ def git_revision_info(**kwargs):
     return cmd(
         "git describe --match=NOT-EVER-A-TAG --always --abbrev --dirty", **kwargs
     )
+
+def git_has_changes():
+    """Check if there are uncommitted changes in the current git repository."""
+    res = cmd("git diff-index --quiet HEAD --")
+    return res.returncode != 0

@@ -9,10 +9,10 @@ from .logs import setup_stderr_logs, get_logger
 from .shell import cmd, split_args
 
 
-def relative_path(base, *parts):
-    if not os.path.isdir(base):
+def relative_path(base, *parts)->Path:
+    if not os.path.isdir(str(base)):
         base = os.path.dirname(base)
-    return os.path.join(base, *parts)
+    return Path(os.path.join(base, *parts))
 
 
 @contextmanager
