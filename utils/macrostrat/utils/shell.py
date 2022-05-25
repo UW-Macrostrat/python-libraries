@@ -1,20 +1,25 @@
 from shlex import split
-from subprocess import run
+from subprocess import run as _run
 
 from .logs import get_logger
 
 log = get_logger(__name__)
 
 
-def split_args(*arguments):
-    return split(" ".join(arguments))
+def split_args(*args):
+    return split(" ".join(args))
 
 
-def cmd(*arguments, **kwargs):
+def run(*args, **kwargs):
     logger = kwargs.pop("logger", log)
-    val = " ".join([str(v) for v in arguments])
-    logger.debug(val)
-    return run(split(val), **kwargs)
+    logger.debug(args)
+    return _run(args, **kwargs)
+
+
+def cmd(*args, **kwargs):
+    if kwargs.pop("collect_args", True):
+        args = split_args(*args)
+    return run(*args, **kwargs)
 
 
 def git_revision_info(**kwargs):

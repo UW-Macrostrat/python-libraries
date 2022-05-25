@@ -22,6 +22,7 @@ metadata = MetaData()
 
 log = get_logger(__name__)
 
+
 class Database(object):
     mapper: Optional[DatabaseMapper] = None
     __inspector__ = None
@@ -34,10 +35,7 @@ class Database(object):
         the SPARROW_BACKEND_CONFIG file, if available.
         """
 
-
-
         compiles(Insert, "postgresql")(prefix_inserts)
-
 
         log.info(f"Setting up database connection '{db_conn}'")
         self.engine = create_engine(

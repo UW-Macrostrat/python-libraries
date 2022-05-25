@@ -1,21 +1,21 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
-description = "The database driver for Sparrow"
-name = "sparrow.birdbrain"
+description = "A small library based on SQLAlchemy to assist with common database tasks."
+name = "macrostrat.database"
 packages = [
-  {include = "sparrow"},
+  {include = "macrostrat"},
 ]
-version = "0.1.0"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 GeoAlchemy2 = "^0.9.4"
 SQLAlchemy = "^1.4.26"
 SQLAlchemy-Utils = "^0.37.0"
+"macrostrat.utils" = "^1.0.0"
 migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
 python = "^3.8"
 schemainspect = "^3.0.1616029793"
-"sparrow.utils" = ""
 sqlparse = "^0.4.0"
 
 [tool.poetry.dev-dependencies]

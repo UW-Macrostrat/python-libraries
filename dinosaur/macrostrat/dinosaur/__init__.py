@@ -9,9 +9,9 @@ from migra.statements import check_for_drop
 from sqlalchemy import text
 from rich import print
 
-from sparrow.utils import get_logger, cmd
-from sparrow.birdbrain import Database
-from sparrow.birdbrain.utils import (
+from macrostrat.utils import get_logger, cmd
+from macrostrat.database import Database
+from macrostrat.database.utils import (
     _exec_raw_sql,
     run_sql,
     temp_database,
@@ -80,7 +80,7 @@ def _create_migration(db_engine, target, safe=True, **kwargs):
     log.info("Creating an automatic migration")
     target.dialect.server_version_info = db_engine.dialect.server_version_info
     m = AutoMigration(db_engine, target, **kwargs)  # , exclude_schema="core_view")
-    
+
     m.set_safety(safe)
     # Not sure what this does
     m.add_all_changes()
@@ -166,11 +166,11 @@ def has_column(engine, table, column):
     return False
 
 
-class SparrowMigrationError(Exception):
+class SchemaMigrationError(Exception):
     pass
 
 
-class SparrowMigration:
+class SchemaMigration:
     name = None
 
     def should_apply(self, source, target, migrator):
@@ -180,10 +180,10 @@ class SparrowMigration:
         pass
 
 
-class Dinosaur:
+class MigrationManager:
     target_url = "postgresql://postgres@db:5432/sparrow_temp_migration"
     dry_run_url = "postgresql://postgres@db:5432/sparrow_schema_clone"
-    schema=None
+    schema = None
 
     def __init__(self, db, _init_function, migrations=[], schema=None):
         self.db = db
@@ -276,5 +276,5 @@ class Dinosaur:
 
 def update_schema(db: Database, initializer, migrations=[], **kwargs):
     # Might be worth creating an interactive upgrader
-    migrator = Dinosaur(db, initializer, migrations=migrations)
+    migrator = MigrationManager(db, initializer, migrations=migrations)
     migrator.run_migration(**kwargs)

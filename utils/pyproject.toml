@@ -1,11 +1,11 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Core utilities for Sparrow"
-name = "sparrow.utils"
+name = "macrostrat.utils"
 packages = [
-  {include = "sparrow"},
+  {include = "macrostrat"},
 ]
-version = "0.1.0"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 colorlog = "^6.5.0"
