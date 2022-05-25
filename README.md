@@ -1,4 +1,5 @@
-# python-tools
+# Macrostrat Python libraries
+
 A monorepo containing Python-based tools and libraries for Earth data projects
 
 - This is still very early-stage.
