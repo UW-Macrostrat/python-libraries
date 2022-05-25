@@ -17,7 +17,8 @@ def run(*args, **kwargs):
 
 
 def cmd(*args, **kwargs):
-    if kwargs.pop("collect_args", True):
+    is_shell_command = kwargs.get("shell", False)
+    if kwargs.pop("collect_args", not is_shell_command):
         args = split_args(*args)
     return run(*args, **kwargs)
 
