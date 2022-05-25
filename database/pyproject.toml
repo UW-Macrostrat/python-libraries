@@ -19,7 +19,7 @@ schemainspect = "^3.0.1616029793"
 sqlparse = "^0.4.0"
 
 [tool.poetry.dev-dependencies]
-"sparrow.utils" = {path = "../utils", develop = true}
+"macrostrat.utils" = {path = "../utils", develop = true}
 
 [build-system]
 build-backend = "poetry.core.masonry.api"

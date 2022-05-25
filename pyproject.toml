@@ -2,3 +2,12 @@
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Macrostrat Python libraries"
 name = "macrostrat-python-libraries"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+"macrostrat.database" = {path = "./database", develop = true}
+"macrostrat.dinosaur" = {path = "./dinosaur", develop = true}
+"macrostrat.utils" = {path = "./utils", develop = true}
