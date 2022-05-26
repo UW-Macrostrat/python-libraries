@@ -2,7 +2,7 @@ from typing_extensions import Self
 from sqlalchemy.schema import Table
 from sqlalchemy import MetaData
 from sqlalchemy.ext.automap import generate_relationship
-from sparrow.utils.logs import get_logger
+from macrostrat.utils.logs import get_logger
 from .cache import DatabaseModelCache
 
 # Drag in geographic types for database reflection
