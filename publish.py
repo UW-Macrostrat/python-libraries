@@ -16,15 +16,15 @@ setup_stderr_logs("macrostrat")
 
 environ["POETRY_VIRTUALENVS_CREATE"] = "False"
 
-def process_module(fp: Path):
-    chdir(fp)
-    cmd("poetry lock")
-    cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
-
+def prepare_module(fp: Path):
+    with working_directory(fp):
+        cmd("poetry lock")
+        #cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
+        cmd("poetry build")
 
 def publish_module(fp):
     with working_directory(fp):
-        res = cmd("poetry publish --build")
+        res = cmd("poetry publish")
         if res.returncode != 0:
             print(f"Failed to publish {module_version_string(fp)}")
             return
@@ -66,23 +66,20 @@ def module_version_string(fp: Path, long: bool = False):
 if __name__ == "__main__":
     module_dirs = [relative_path(__file__, module) for module in modules]
 
-    modules_to_publish =  modules_to_publish(module_dirs)
-    if len(modules_to_publish) == 0:
+    module_dirs = modules_to_publish(module_dirs)
+    if len(module_dirs) == 0:
         print("[green]All modules are already published.")
     elif git_has_changes():
         print("[red]You have uncommitted changes in your git repository. Please commit or stash them before continuing.")
         exit(1)
 
     for fp in module_dirs:
-        process_module(fp)
+        prepare_module(fp)
 
-    if len(modules_to_publish) == 0:
-        exit(0)
-
-    if git_has_changes():
+    if len(module_dirs) > 0:
         msg = "Synced lock files for updated dependencies."
         cmd(f"git add .")
         cmd(f"git commit -m '{msg}'", shell=True)
         
-    for fp in modules_to_publish:
+    for fp in module_dirs:
         publish_module(fp)
