@@ -5,7 +5,7 @@ name = "macrostrat.utils"
 packages = [
   {include = "macrostrat"},
 ]
-version = "1.0.0"
+version = "1.0.1"
 
 [tool.poetry.dependencies]
 colorlog = "^6.5.0"

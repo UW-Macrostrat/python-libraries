@@ -74,8 +74,11 @@ if __name__ == "__main__":
     for fp in module_dirs:
         process_module(fp)
 
+    if len(modules_to_publish) == 0:
+        exit(0)
+
     if git_has_changes():
-        msg = ", ".join([module_version_string(fp, long=True) for fp in modules_to_publish])
+        msg = "Synced lock files for updated dependencies."
         cmd(f"git add .")
         cmd(f"git commit -m '{msg}'", shell=True)
         
