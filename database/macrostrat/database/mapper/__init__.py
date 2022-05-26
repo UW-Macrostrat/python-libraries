@@ -1,4 +1,3 @@
-from typing_extensions import Self
 from sqlalchemy.schema import Table
 from sqlalchemy import MetaData
 from sqlalchemy.ext.automap import generate_relationship
