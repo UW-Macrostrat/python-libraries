@@ -10,7 +10,7 @@ from rich import print
 
 modules = ["database", "dinosaur", "utils"]
 
-from macrostrat.utils import cmd, relative_path, setup_stderr_logs
+from macrostrat.utils import cmd, relative_path, setup_stderr_logs, working_directory
 
 setup_stderr_logs("macrostrat")
 
@@ -20,15 +20,17 @@ def process_module(fp: Path):
     chdir(fp)
     cmd("poetry lock")
     cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
-    cmd("poetry build")
 
 
 def publish_module(fp):
-    chdir(fp)
-    cmd("poetry publish")
-    tag = module_version_string(fp)
-    msg = module_version_string(fp, long=True)
-    cmd(f"git tag -a {tag} -m '{msg}'", shell=True)
+    with working_directory(fp):
+        res = cmd("poetry publish --build")
+        if res.returncode != 0:
+            print(f"Failed to publish {module_version_string(fp)}")
+            return
+        tag = module_version_string(fp)
+        msg = module_version_string(fp, long=True)
+        cmd(f"git tag -a {tag} -m '{msg}'", shell=True)
 
 
 def get_package_data(fp: Path = Path(".")):

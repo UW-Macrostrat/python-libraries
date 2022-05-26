@@ -68,7 +68,7 @@ url = "../database"
 
 [[package]]
 name = "macrostrat.utils"
-version = "1.0.0"
+version = "1.0.1"
 description = "Core utilities for Sparrow"
 category = "main"
 optional = false
