@@ -1,0 +1,26 @@
+[tool.poetry]
+authors = ["Daven Quinn <dev@davenquinn.com>"]
+description = "A small library based on SQLAlchemy to assist with common database tasks."
+name = "macrostrat.database"
+packages = [
+  {include = "macrostrat"},
+]
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+GeoAlchemy2 = "^0.9.4"
+SQLAlchemy = "^1.4.26"
+SQLAlchemy-Utils = "^0.37.0"
+"macrostrat.utils" = "^1.0.0"
+migra = "^3.0.1621480950"
+psycopg2-binary = "^2.9.1"
+python = "^3.8"
+schemainspect = "^3.0.1616029793"
+sqlparse = "^0.4.0"
+
+[tool.poetry.dev-dependencies]
+"macrostrat.utils" = {path = "../utils", develop = true}
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]

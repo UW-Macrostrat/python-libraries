@@ -1,15 +1,22 @@
+import os
+import sys
 from contextlib import contextmanager, redirect_stdout
+
 from sqlalchemy.exc import ProgrammingError, IntegrityError
 from schemainspect import get_inspector
 from migra import Migration
 from migra.statements import check_for_drop
-import sys
-from sparrow_utils import get_logger, cmd
 from sqlalchemy import text
-import os
 from rich import print
 
-from .util import _exec_raw_sql, run_sql, temp_database, connection_args
+from macrostrat.utils import get_logger, cmd
+from macrostrat.database import Database
+from macrostrat.database.utils import (
+    _exec_raw_sql,
+    run_sql,
+    temp_database,
+    connection_args,
+)
 
 
 log = get_logger(__name__)
@@ -68,11 +75,12 @@ class AutoMigration(Migration):
         print(statements, file=sys.stderr)
 
 
-def _create_migration(db_engine, target, safe=True):
+def _create_migration(db_engine, target, safe=True, **kwargs):
     # For some reason we need to patch this...
     log.info("Creating an automatic migration")
     target.dialect.server_version_info = db_engine.dialect.server_version_info
-    m = AutoMigration(db_engine, target)  # , exclude_schema="core_view")
+    m = AutoMigration(db_engine, target, **kwargs)  # , exclude_schema="core_view")
+
     m.set_safety(safe)
     # Not sure what this does
     m.add_all_changes()
@@ -80,23 +88,25 @@ def _create_migration(db_engine, target, safe=True):
 
 
 @contextmanager
-def _target_db(url, quiet=False, redirect=sys.stderr):
-    from sparrow.app import Sparrow
+def _target_db(url, initialize, quiet=False, redirect=sys.stderr):
+    from . import Database
 
     if quiet:
         redirect = open(os.devnull, "w")
 
     log.debug("Creating migration target")
     with temp_database(url) as engine:
-        app = Sparrow(database=url)
+        db = Database(url)
         with redirect_stdout(redirect):
-            app.init_database()
+            initialize(db)
         yield engine
 
 
-def create_migration(db, safe=True, redirect=sys.stderr):
+def create_migration(db, initialize, safe=True, redirect=sys.stderr):
     url = "postgresql://postgres@db:5432/sparrow_temp_migration"
-    with _target_db(url, redirect=redirect) as target, redirect_stdout(redirect):
+    with _target_db(url, initialize, redirect=redirect) as target, redirect_stdout(
+        redirect
+    ):
         return _create_migration(db.engine, target)
 
 
@@ -105,9 +115,9 @@ def needs_migration(db):
     return len(migration.statements) == 0
 
 
-def db_migration(db, safe=True, apply=False, hide_view_changes=False):
+def db_migration(db, initialize, safe=True, apply=False, hide_view_changes=False):
     """Create a database migration against the idealized schema"""
-    m = create_migration(db, safe=safe, redirect=sys.stderr)
+    m = create_migration(db, initialize, safe=safe, redirect=sys.stderr)
     stmts = m.statements
     if hide_view_changes:
         stmts = m.changes_omitting_views()
@@ -156,11 +166,11 @@ def has_column(engine, table, column):
     return False
 
 
-class SparrowMigrationError(Exception):
+class SchemaMigrationError(Exception):
     pass
 
 
-class SparrowMigration:
+class SchemaMigration:
     name = None
 
     def should_apply(self, source, target, migrator):
@@ -170,13 +180,17 @@ class SparrowMigration:
         pass
 
 
-class SparrowDatabaseMigrator:
+class MigrationManager:
     target_url = "postgresql://postgres@db:5432/sparrow_temp_migration"
     dry_run_url = "postgresql://postgres@db:5432/sparrow_schema_clone"
+    schema = None
 
-    def __init__(self, db, migrations=[]):
+    def __init__(self, db, _init_function, migrations=[], schema=None):
         self.db = db
+
+        self._init_function = _init_function
         self._migrations = migrations
+        self.schema = schema
 
     def add_migration(self, migration):
         assert issubclass(migration, SparrowMigration)
@@ -212,7 +226,7 @@ class SparrowDatabaseMigrator:
             migrations = [m for m in migrations if m.should_apply(engine, target, self)]
 
     def _run_migration(self, engine, target, check=False):
-        m = _create_migration(engine, target)
+        m = _create_migration(engine, target, schema=self.schema)
         if len(m.statements) == 0:
             log.info("No automatic migration necessary")
             return
@@ -226,6 +240,10 @@ class SparrowDatabaseMigrator:
 
         # Migrating to the new version should now be "safe"
         m = _create_migration(engine, target)
+
+        for s in m.statements:
+            print(s, file=sys.stderr)
+
         try:
             assert m.is_safe
         except AssertionError as err:
@@ -246,7 +264,7 @@ class SparrowDatabaseMigrator:
         log.info("Migration dry run successful")
 
     def run_migration(self, dry_run=True, apply=True):
-        with _target_db(self.target_url) as target:
+        with _target_db(self.target_url, self._init_function) as target:
             if dry_run:
                 self.dry_run_migration(target)
             if not apply:
@@ -254,3 +272,9 @@ class SparrowDatabaseMigrator:
             log.info("Running migration")
             self._run_migration(self.db.engine, target)
             log.info("Finished running migration")
+
+
+def update_schema(db: Database, initializer, migrations=[], **kwargs):
+    # Might be worth creating an interactive upgrader
+    migrator = MigrationManager(db, initializer, migrations=migrations)
+    migrator.run_migration(**kwargs)

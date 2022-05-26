@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
-from macrostrat.core_utils import cmd, get_logger
+from macrostrat.utils import cmd, get_logger
 from time import sleep
 
 log = get_logger(__name__)
@@ -121,8 +121,10 @@ def get_db_model(db, model_name: str):
 
 
 @contextmanager
-def temp_database(conn_string, drop=True):
+def temp_database(conn_string, drop=True, ensure_empty=False):
     """Create a temporary database and tear it down after tests."""
+    if ensure_empty:
+        drop_database(conn_string)
     if not database_exists(conn_string):
         create_database(conn_string)
     try:

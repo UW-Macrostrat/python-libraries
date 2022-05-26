@@ -9,12 +9,13 @@ from sqlalchemy.schema import ForeignKey, Column
 from sqlalchemy.types import Integer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import FlushError
-from macrostrat.core_utils import get_logger, relative_path
+from sparrow.utils import get_logger, relative_path
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.expression import Insert
 
-from .util import run_sql_file, run_query, get_or_create, run_sql_query_file
-from .mapper import SparrowDatabaseMapper
-from .postgresql import on_conflict
-from .migration import SparrowDatabaseMigrator
+from .utils import run_sql_file, run_query, get_or_create, run_sql_query_file
+from .mapper import DatabaseMapper
+from .postgresql import on_conflict, prefix_inserts
 
 
 metadata = MetaData()
@@ -22,19 +23,24 @@ metadata = MetaData()
 log = get_logger(__name__)
 
 
-class Database:
-    mapper: Optional[SparrowDatabaseMapper] = None
+class Database(object):
+    mapper: Optional[DatabaseMapper] = None
     __inspector__ = None
 
-    def __init__(self, db_conn, app=None, echo_sql=False):
+    def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
         """
         We can pass a connection string, a **Flask** application object
         with the appropriate configuration, or nothing, in which
         case we will try to infer the correct database from
         the SPARROW_BACKEND_CONFIG file, if available.
         """
+
+        compiles(Insert, "postgresql")(prefix_inserts)
+
         log.info(f"Setting up database connection '{db_conn}'")
-        self.engine = create_engine(db_conn, executemany_mode="batch", echo=echo_sql)
+        self.engine = create_engine(
+            db_conn, executemany_mode="batch", echo=echo_sql, **kwargs
+        )
         metadata.create_all(bind=self.engine)
         self.meta = metadata
 
@@ -47,7 +53,8 @@ class Database:
 
     def automap(self):
         log.info("Automapping the database")
-        self.mapper = SparrowDatabaseMapper(self)
+        self.mapper = DatabaseMapper(self)
+        self.mapper.automap_database()
 
     @contextmanager
     def session_scope(self, commit=True):
@@ -78,13 +85,13 @@ class Database:
                 session.rollback()
                 log.debug(err)
 
-    def exec_sql_text(self, statement):
+    def exec_sql_text(self, statement, *args, **kwargs):
         """
         Executes a sql command, in string on the database
         Easy way to load data into a test database instance
         """
         connection = self.engine.connect()
-        connection.execute(text(statement))
+        connection.execute(text(statement), *args, **kwargs)
 
     def exec_sql(self, fn, params=None):
         """Executes SQL files passed"""
@@ -126,31 +133,6 @@ class Database:
         if isinstance(model, str):
             model = getattr(self.model, model)
         return get_or_create(self.session, model, **kwargs)
-
-    def initialize(self, drop=False, quiet=False):
-        secho("Creating core schema...", bold=True)
-
-        if drop:
-            fp = relative_path(__file__, "procedures", "drop-all-tables.sql")
-            self.exec_sql(fp)
-
-        p = Path(relative_path(__file__, "fixtures"))
-        filenames = list(p.glob("*.sql"))
-        filenames.sort()
-
-        for fn in filenames:
-            self.exec_sql(fn)
-
-    def update_schema(self, **kwargs):
-        # Might be worth creating an interactive upgrader
-        from sparrow import migrations
-
-        migrator = SparrowDatabaseMigrator(self)
-        migrator.add_module(migrations)
-        self.app.run_hook("prepare-database-migrations", migrator)
-        # TODO: deprecate this hook
-        self.app.run_hook("prepare-database-upgrade", migrator)
-        migrator.run_migration(**kwargs)
 
     @property
     def table(self):

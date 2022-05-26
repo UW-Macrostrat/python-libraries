@@ -1,5 +1,16 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
-description = "Macrostrat Python modules"
-name = "macrostrat-python"
-version = "0.1.0"
+description = "Macrostrat Python libraries"
+name = "macrostrat"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+"macrostrat.database" = {path = "./database", develop = true}
+"macrostrat.dinosaur" = {path = "./dinosaur", develop = true}
+"macrostrat.utils" = {path = "./utils", develop = true}
+requests = "^2.27.1"
+rich = "^12.4.4"
+toml = "^0.10.2"
