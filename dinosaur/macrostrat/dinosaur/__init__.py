@@ -8,6 +8,7 @@ from migra import Migration
 from migra.statements import check_for_drop
 from sqlalchemy import text
 from rich import print
+from typing import Callable
 
 from macrostrat.utils import get_logger, cmd
 from macrostrat.database import Database
@@ -20,6 +21,8 @@ from macrostrat.database.utils import (
 
 
 log = get_logger(__name__)
+
+DatabaseInitializer = Callable[[Database], None]
 
 
 class AutoMigration(Migration):
@@ -88,45 +91,57 @@ def _create_migration(db_engine, target, safe=True, **kwargs):
 
 
 @contextmanager
-def _target_db(url, initialize, quiet=False, redirect=sys.stderr):
-    from . import Database
-
+def _target_db(
+    url: str, initializer: DatabaseInitializer, quiet: bool = False, redirect=sys.stderr
+):
     if quiet:
         redirect = open(os.devnull, "w")
 
     log.debug("Creating migration target")
     with temp_database(url) as engine:
-        db = Database(url)
+        database = Database(url)
         with redirect_stdout(redirect):
-            initialize(db)
+            initializer(database)
         yield engine
 
 
-def create_migration(db, initialize, safe=True, redirect=sys.stderr):
-    url = "postgresql://postgres@db:5432/sparrow_temp_migration"
-    with _target_db(url, initialize, redirect=redirect) as target, redirect_stdout(
-        redirect
-    ):
-        return _create_migration(db.engine, target)
+def create_migration(
+    database: Database,
+    initializer: DatabaseInitializer,
+    target_url: str = "postgresql://postgres@db:5432/sparrow_temp_migration",
+    safe: bool = True,
+    redirect=sys.stderr,
+    **kwargs,
+):
+    with _target_db(
+        target_url, initializer, redirect=redirect
+    ) as target, redirect_stdout(redirect):
+        return _create_migration(database.engine, target, safe=safe, **kwargs)
 
 
-def needs_migration(db):
-    migration = create_migration(db)
+def needs_migration(database: Database, initializer: DatabaseInitializer):
+    migration = create_migration(database, initializer)
     return len(migration.statements) == 0
 
 
-def db_migration(db, initialize, safe=True, apply=False, hide_view_changes=False):
+def db_migration(
+    database: Database,
+    initializer: DatabaseInitializer,
+    safe=True,
+    apply=False,
+    hide_view_changes=False,
+):
     """Create a database migration against the idealized schema"""
-    m = create_migration(db, initialize, safe=safe, redirect=sys.stderr)
+    m = create_migration(database, initializer, safe=safe, redirect=sys.stderr)
     stmts = m.statements
     if hide_view_changes:
         stmts = m.changes_omitting_views()
     print("===MIGRATION BELOW THIS LINE===", file=sys.stderr)
-    for s in stmts:
+    for stmt in stmts:
         if apply:
-            run_sql(db.session, s)
+            run_sql(database.session, stmt)
         else:
-            print(s, file=sys.stdout)
+            print(stmt, file=sys.stdout)
 
 
 def dump_schema(engine):
@@ -185,24 +200,24 @@ class MigrationManager:
     dry_run_url = "postgresql://postgres@db:5432/sparrow_schema_clone"
     schema = None
 
-    def __init__(self, db, _init_function, migrations=[], schema=None):
-        self.db = db
+    def __init__(self, database, _init_function, migrations=None, schema=None):
+        self.db = database
 
         self._init_function = _init_function
-        self._migrations = migrations
+        self._migrations = migrations or []
         self.schema = schema
 
     def add_migration(self, migration):
-        assert issubclass(migration, SparrowMigration)
+        assert issubclass(migration, SchemaMigration)
         self._migrations.append(migration())
 
     def add_module(self, module):
         for _, obj in module.__dict__.items():
             try:
-                assert issubclass(obj, SparrowMigration)
+                assert issubclass(obj, SchemaMigration)
             except (TypeError, AssertionError):
                 continue
-            if obj is SparrowMigration:
+            if obj is SchemaMigration:
                 continue
             self.add_migration(obj)
 
@@ -214,7 +229,7 @@ class MigrationManager:
         ]
         log.info("Applying manual migrations")
         if len(migrations) == 0:
-            log.info(f"Found no migrations to apply")
+            log.info("Found no migrations to apply")
         while len(migrations) > 0:
             n = len(migrations)
             log.info(f"Found {n} migrations to apply")
@@ -264,6 +279,7 @@ class MigrationManager:
         log.info("Migration dry run successful")
 
     def run_migration(self, dry_run=True, apply=True):
+        log.info("Setting up target database")
         with _target_db(self.target_url, self._init_function) as target:
             if dry_run:
                 self.dry_run_migration(target)
