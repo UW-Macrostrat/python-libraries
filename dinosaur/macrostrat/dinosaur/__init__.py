@@ -82,12 +82,14 @@ def _create_migration(db_engine, target, safe=True, **kwargs):
     # For some reason we need to patch this...
     log.info("Creating an automatic migration")
     target.dialect.server_version_info = db_engine.dialect.server_version_info
-    m = AutoMigration(db_engine, target, **kwargs)  # , exclude_schema="core_view")
+    migration = AutoMigration(
+        db_engine, target, **kwargs
+    )  # , exclude_schema="core_view")
 
-    m.set_safety(safe)
+    migration.set_safety(safe)
     # Not sure what this does
-    m.add_all_changes()
-    return m
+    migration.add_all_changes()
+    return migration
 
 
 @contextmanager
