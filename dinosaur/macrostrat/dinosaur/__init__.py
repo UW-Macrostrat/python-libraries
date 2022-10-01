@@ -2,7 +2,7 @@ import os
 import sys
 from contextlib import contextmanager, redirect_stdout
 
-from sqlalchemy.exc import ProgrammingError, IntegrityError
+from sqlalchemy.exc import ProgrammingError, IntegrityError, DataError
 from schemainspect import get_inspector
 from migra import Migration
 from migra.statements import check_for_drop
@@ -236,26 +236,30 @@ class MigrationManager:
             n = len(migrations)
             log.info(f"Found {n} migrations to apply")
             for m in migrations:
-                log.info(f"Applying migration {m.name}")
+                log.info(f"Applying manual migration {m.name}")
                 m.apply(engine)
                 # We have applied this migration and should not do it again.
                 migrations.remove(m)
             migrations = [m for m in migrations if m.should_apply(engine, target, self)]
 
     def _run_migration(self, engine, target, check=False):
-        m = _create_migration(engine, target, schema=self.schema)
-        if len(m.statements) == 0:
-            log.info("No automatic migration necessary")
-            return
+        try:
+            # First, try an automatic migration
+            m = _create_migration(engine, target, schema=self.schema)
+            if len(m.statements) == 0:
+                log.info("No automatic migration necessary")
+                return
 
-        if m.is_safe:
-            log.info("Applying automatic migration")
-            m.apply(quiet=True)
-            return
+            if m.is_safe:
+                log.info("Applying automatic migration")
+                m.apply(quiet=True)
+                return
+        except Exception as exc:
+            log.warning(f"Automatic migration failed: {exc}")
 
         self.apply_migrations(engine, target)
 
-        # Migrating to the new version should now be "safe"
+        # Migrating to the new version should now be possible using a "safe" automatic migration
         m = _create_migration(engine, target)
 
         for s in m.statements:
