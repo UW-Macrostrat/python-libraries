@@ -5,17 +5,22 @@ from click import secho
 
 from sqlalchemy import create_engine, inspect, MetaData, text
 from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.schema import ForeignKey, Column
-from sqlalchemy.types import Integer
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm.exc import FlushError
-from macrostrat.utils import get_logger, relative_path
+from macrostrat.utils import get_logger
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert
 
-from .utils import run_sql_file, run_query, get_or_create, run_sql_query_file
+from .utils import (
+    run_sql_file,
+    run_query,
+    run_sql,
+    get_or_create,
+    run_sql_query_file,
+    reflect_table,
+    get_dataframe,
+)
 from .mapper import DatabaseMapper
-from .postgresql import on_conflict, prefix_inserts
+from .postgresql import prefix_inserts
 
 
 metadata = MetaData()
@@ -25,6 +30,7 @@ log = get_logger(__name__)
 
 class Database(object):
     mapper: Optional[DatabaseMapper] = None
+    metadata: MetaData
     __inspector__ = None
 
     def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
@@ -41,8 +47,8 @@ class Database(object):
         self.engine = create_engine(
             db_conn, executemany_mode="batch", echo=echo_sql, **kwargs
         )
+        self.metadata = kwargs.get("metadata", metadata)
         metadata.create_all(bind=self.engine)
-        self.meta = metadata
 
         # Scoped session for database
         # https://docs.sqlalchemy.org/en/13/orm/contextual.html#unitofwork-contextual
@@ -50,6 +56,12 @@ class Database(object):
         self._session_factory = sessionmaker(bind=self.engine)
         self.session = scoped_session(self._session_factory)
         # Use the self.session_scope function to more explicitly manage sessions.
+
+    def create_tables(self):
+        """
+        Create all tables described by the database's metadata instance.
+        """
+        metadata.create_all(bind=self.engine)
 
     def automap(self):
         log.info("Automapping the database")
@@ -85,26 +97,13 @@ class Database(object):
                 session.rollback()
                 log.debug(err)
 
-    def exec_sql_text(self, statement, *args, **kwargs):
-        """
-        Executes a sql command, in string on the database
-        Easy way to load data into a test database instance
-        """
-        connection = self.engine.connect()
-        connection.execute(text(statement), *args, **kwargs)
-
-    def exec_sql(self, fn, params=None):
+    def run_sql(self, fn, **kwargs):
         """Executes SQL files passed"""
-        # TODO: refactor this to exec_sql_file
-        secho(Path(fn).name, fg="cyan", bold=True)
-        run_sql_file(self.session, str(fn), params)
+        yield from run_sql(self.session, fn, **kwargs)
 
-    def exec_sql_query(self, fn, params=None):
-        return run_sql_query_file(self.session, fn, params)
-
-    def exec_query(self, *args):
+    def get_dataframe(self, *args):
         """Returns a Pandas DataFrame from a SQL query"""
-        return run_query(self.engine, *args)
+        return get_dataframe(self.engine, *args)
 
     @property
     def inspector(self):
@@ -133,6 +132,21 @@ class Database(object):
         if isinstance(model, str):
             model = getattr(self.model, model)
         return get_or_create(self.session, model, **kwargs)
+
+    def reflect_table(self, *args, **kwargs):
+        """
+        One-off reflection of a database table or view. Note: for most purposes,
+        it will be better to use the database tables automapped at runtime using
+        `self.automap()`. Then, tables can be accessed using the
+        `self.table` object. However, this function can be useful for views (which
+        are not reflected automatically), or to customize type definitions for mapped
+        tables.
+
+        A set of `column_args` can be used to pass columns to override with the mapper, for
+        instance to set up foreign and primary key constraints.
+        https://docs.sqlalchemy.org/en/13/core/reflection.html#reflecting-views
+        """
+        return reflect_table(self.engine, *args, **kwargs)
 
     @property
     def table(self):

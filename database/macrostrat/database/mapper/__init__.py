@@ -1,12 +1,13 @@
-from sqlalchemy.schema import Table
-from sqlalchemy import MetaData
+from distutils.log import warn
+from macrostrat.database.utils import reflect_table
 from sqlalchemy.ext.automap import generate_relationship
 from macrostrat.utils.logs import get_logger
-from .cache import DatabaseModelCache
+from warnings import warn
 
 # Drag in geographic types for database reflection
 from geoalchemy2 import Geometry, Geography
 
+from .cache import DatabaseModelCache
 from .utils import (
     ModelCollection,
     TableCollection,
@@ -18,11 +19,14 @@ from .utils import (
 
 log = get_logger(__name__)
 
+
 class AutomapError(Exception):
     pass
 
+
 model_builder = DatabaseModelCache()
 BaseModel = model_builder.automap_base()
+
 
 class DatabaseMapper:
     automap_base = BaseModel
@@ -38,10 +42,16 @@ class DatabaseMapper:
 
         # This stuff should be placed outside of core (one likely extension point).
         self.reflection_kwargs = dict(
-            name_for_scalar_relationship=kwargs.get("name_for_scalar_relationship", name_for_scalar_relationship),
-            name_for_collection_relationship=kwargs.get("name_for_collection_relationship", name_for_collection_relationship),
+            name_for_scalar_relationship=kwargs.get(
+                "name_for_scalar_relationship", name_for_scalar_relationship
+            ),
+            name_for_collection_relationship=kwargs.get(
+                "name_for_collection_relationship", name_for_collection_relationship
+            ),
             classname_for_table=kwargs.get("classname_for_table", _classname_for_table),
-            generate_relationship=kwargs.get("generate_relationship", generate_relationship),
+            generate_relationship=kwargs.get(
+                "generate_relationship", generate_relationship
+            ),
         )
 
         self._models = ModelCollection(self.automap_base.classes)
@@ -78,33 +88,19 @@ class DatabaseMapper:
         else:
             # Reflect tables in schemas we care about
             # Note: this will not reflect views because they don't have primary keys.
-            self.automap_base.metadata.reflect(bind=self.db.engine, schema=schema, **self.reflection_kwargs)
+            self.automap_base.metadata.reflect(
+                bind=self.db.engine, schema=schema, **self.reflection_kwargs
+            )
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
 
     def reflect_table(self, tablename, *column_args, **kwargs):
-        """
-        One-off reflection of a database table or view. Note: for most purposes,
-        it will be better to use the database tables automapped at runtime in the
-        `self.tables` object. However, this function can be useful for views (which
-        are not reflected automatically), or to customize type definitions for mapped
-        tables.
-
-        A set of `column_args` can be used to pass columns to override with the mapper, for
-        instance to set up foreign and primary key constraints.
-        https://docs.sqlalchemy.org/en/13/core/reflection.html#reflecting-views
-        """
-        schema = kwargs.pop("schema", "public")
-        meta = MetaData(schema=schema)
-        tables = Table(
-            tablename,
-            meta,
-            *column_args,
-            autoload=True,
-            autoload_with=self.db.engine,
-            **kwargs,
+        # Warn that this method is deprecated
+        warn(
+            "DatabaseMapper.reflect_table is deprecated. Use Database.reflect_table instead",
+            DeprecationWarning,
         )
-        return tables
+        return reflect_table(self.db.engine, tablename, *column_args, **kwargs)
 
     def reflect_view(self, tablename, *column_args, **kwargs):
         pass
