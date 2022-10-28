@@ -1,7 +1,5 @@
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Optional
-from click import secho
 
 from sqlalchemy import create_engine, inspect, MetaData, text
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -11,11 +9,8 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert
 
 from .utils import (
-    run_sql_file,
-    run_query,
     run_sql,
     get_or_create,
-    run_sql_query_file,
     reflect_table,
     get_dataframe,
 )
@@ -48,7 +43,6 @@ class Database(object):
             db_conn, executemany_mode="batch", echo=echo_sql, **kwargs
         )
         self.metadata = kwargs.get("metadata", metadata)
-        metadata.create_all(bind=self.engine)
 
         # Scoped session for database
         # https://docs.sqlalchemy.org/en/13/orm/contextual.html#unitofwork-contextual
