@@ -93,17 +93,21 @@ def run_sql(
     params=None,
     stop_on_error=False,
     interpret_as_file=None,
+    yield_results=False,
 ):
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
-            yield from run_sql(
+            res = run_sql(
                 conn,
                 sql,
                 params=params,
                 stop_on_error=stop_on_error,
                 interpret_as_file=interpret_as_file,
             )
-            return
+            if yield_results:
+                yield from res
+            else:
+                return res
 
     if interpret_as_file:
         sql = Path(sql).read_text()
@@ -125,7 +129,9 @@ def run_sql(
             continue
         try:
             connectable.begin()
-            yield connectable.execute(text(sql), params=params)
+            res = connectable.execute(text(sql), params=params)
+            if yield_results:
+                yield res
             if hasattr(connectable, "commit"):
                 connectable.commit()
             pretty_print(sql, dim=True)
@@ -143,6 +149,9 @@ def run_sql(
         finally:
             if hasattr(connectable, "close"):
                 connectable.close()
+    # Return the last result if a generator wasn't requested
+    if not yield_results:
+        return res
 
 
 def execute(connectable, sql, params=None, stop_on_error=False):
