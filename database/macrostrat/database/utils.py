@@ -2,12 +2,17 @@ from click import echo, secho
 from sqlalchemy.exc import ProgrammingError, IntegrityError
 from sqlparse import split, format
 from sqlalchemy.sql import ClauseElement
-from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import Engine, Connection
+from sqlalchemy.schema import Table
+from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
 from macrostrat.utils import cmd, get_logger
 from time import sleep
+from typing import Union, IO
+from pathlib import Path
+
 
 log = get_logger(__name__)
 
@@ -17,7 +22,35 @@ def db_session(engine):
     return factory()
 
 
-def run_query(db, filename_or_query, **kwargs):
+def infer_is_sql_text(string: str) -> bool:
+    """
+    Return True if the string is a valid SQL query,
+    false if it should be interpreted as a file path.
+    """
+    keywords = ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]
+    lines = string.split("\n")
+    if len(lines) > 1:
+        return True
+    _string = string.lowercase()
+    for i in keywords:
+        if _string.strip().startswith(i):
+            return True
+    return False
+
+
+def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
+    if isinstance(file_or_text, Path):
+        return file_or_text
+    # If it's a file-like object, read it
+    if hasattr(file_or_text, "read"):
+        return file_or_text.read()
+    # Otherwise, assume it's a string
+    if infer_is_sql_text(file_or_text):
+        return file_or_text
+    return Path(file_or_text)
+
+
+def get_dataframe(db, filename_or_query, **kwargs):
     """
     Run a query on a SQL database (represented by
     a SQLAlchemy database object) and turn it into a
@@ -25,13 +58,7 @@ def run_query(db, filename_or_query, **kwargs):
     """
     from pandas import read_sql
 
-    if "SELECT" in str(filename_or_query):
-        # We are working with a query string instead of
-        # an SQL file.
-        sql = filename_or_query
-    else:
-        with open(filename_or_query) as f:
-            sql = f.read()
+    sql = get_sql_text(filename_or_query)
 
     return read_sql(sql, db, **kwargs)
 
@@ -46,52 +73,112 @@ def pretty_print(sql, **kwargs):
             return
 
 
-def run_sql(session, sql, params=None, stop_on_error=False):
+def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
+    if interpret_as_file:
+        sql = Path(sql).read_text()
+    elif interpret_as_file is None:
+        sql = canonicalize_query(sql)
+
+    if isinstance(sql, Path):
+        if echo_file_name:
+            secho(sql.name, fg="cyan", bold=True)
+        sql = sql.read_text()
+
+    return sql
+
+
+def run_sql(
+    connectable,
+    sql,
+    params=None,
+    stop_on_error=False,
+    interpret_as_file=None,
+    yield_results=False,
+):
+    if isinstance(connectable, Engine):
+        with connectable.connect() as conn:
+            res = run_sql(
+                conn,
+                sql,
+                params=params,
+                stop_on_error=stop_on_error,
+                interpret_as_file=interpret_as_file,
+            )
+            if yield_results:
+                yield from res
+            else:
+                return res
+
+    if interpret_as_file:
+        sql = Path(sql).read_text()
+    elif interpret_as_file is None:
+        sql = canonicalize_query(sql)
+
+    if isinstance(sql, Path):
+        sql = sql.read_text()
+
     queries = split(sql)
-    for q in queries:
-        sql = format(q, strip_comments=True).strip()
+
+    # check if parameters is a list of the same length as the number of queries
+    if not isinstance(params, list) or not len(params) == len(queries):
+        params = [params] * len(queries)
+
+    for query, params in zip(queries, params):
+        sql = format(query, strip_comments=True).strip()
         if sql == "":
             continue
         try:
-            session.execute(text(sql), params=params)
-            if hasattr(session, "commit"):
-                session.commit()
+            connectable.begin()
+            res = connectable.execute(text(sql), params=params)
+            if yield_results:
+                yield res
+            if hasattr(connectable, "commit"):
+                connectable.commit()
             pretty_print(sql, dim=True)
         except (ProgrammingError, IntegrityError) as err:
             err = str(err.orig).strip()
             dim = "already exists" in err
-            if hasattr(session, "rollback"):
-                session.rollback()
+            if hasattr(connectable, "rollback"):
+                connectable.rollback()
             pretty_print(sql, fg=None if dim else "red", dim=True)
             if dim:
                 err = "  " + err
             secho(err, fg="red", dim=dim)
             if stop_on_error:
                 return
+        finally:
+            if hasattr(connectable, "close"):
+                connectable.close()
+    # Return the last result if a generator wasn't requested
+    if not yield_results:
+        return res
 
 
-def _exec_raw_sql(engine, sql):
-    """Execute SQL unsafely on an sqlalchemy Engine"""
+def execute(connectable, sql, params=None, stop_on_error=False):
+    sql = format(sql, strip_comments=True).strip()
+    if sql == "":
+        return
     try:
-        engine.execute(text(sql))
+        connectable.begin()
+        res = connectable.execute(text(sql), params=params)
+        if hasattr(connectable, "commit"):
+            connectable.commit()
         pretty_print(sql, dim=True)
+        return res
     except (ProgrammingError, IntegrityError) as err:
         err = str(err.orig).strip()
         dim = "already exists" in err
+        if hasattr(connectable, "rollback"):
+            connectable.rollback()
         pretty_print(sql, fg=None if dim else "red", dim=True)
         if dim:
             err = "  " + err
         secho(err, fg="red", dim=dim)
-
-
-def run_sql_file(session, sql_file, params=None):
-    sql = open(sql_file).read()
-    run_sql(session, sql, params=params)
-
-
-def run_sql_query_file(session, sql_file, params=None):
-    sql = open(sql_file).read()
-    return session.execute(sql, params)
+        if stop_on_error:
+            return
+    finally:
+        if hasattr(connectable, "close"):
+            connectable.close()
 
 
 def get_or_create(session, model, defaults=None, **kwargs):
@@ -135,7 +222,7 @@ def temp_database(conn_string, drop=True, ensure_empty=False):
 
 
 def connection_args(engine):
-    """Get PostgreSQL connection arguments for a engine"""
+    """Get PostgreSQL connection arguments for an engine"""
     _psql_flags = {"-U": "username", "-h": "host", "-p": "port", "-P": "password"}
 
     if isinstance(engine, str):
@@ -162,3 +249,27 @@ def wait_for_database(engine_or_url, quiet=False):
             echo(msg, err=True)
         log.info(msg)
         sleep(1)
+
+
+def reflect_table(engine, tablename, *column_args, **kwargs):
+    """
+    One-off reflection of a database table or view. Note: for most purposes,
+    it will be better to use the database tables automapped at runtime in the
+    `self.tables` object. However, this function can be useful for views (which
+    are not reflected automatically), or to customize type definitions for mapped
+    tables.
+
+    A set of `column_args` can be used to pass columns to override with the mapper, for
+    instance to set up foreign and primary key constraints.
+    https://docs.sqlalchemy.org/en/13/core/reflection.html#reflecting-views
+    """
+    schema = kwargs.pop("schema", "public")
+    meta = MetaData(schema=schema)
+    return Table(
+        tablename,
+        meta,
+        *column_args,
+        autoload=True,
+        autoload_with=engine,
+        **kwargs,
+    )

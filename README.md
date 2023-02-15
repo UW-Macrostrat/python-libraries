@@ -18,7 +18,7 @@ Make sure to keep development dependencies (e.g., for testing) separate from cor
 ## Releasing on PyPI
 
 This repository is designed to facilitate rapid iteration of its components
-and release to PyPI. All modules are namespaced under the `macrostrat` package:
+and release to PyPI. All modules are part of the `macrostrat` namespace package:
 `macrostrat.database`, `macrostrat.dinosaur`, `macrostrat.utils`, etc.
 
 To release a new version of a module, increment its `pyproject.toml` file and
