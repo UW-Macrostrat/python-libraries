@@ -18,11 +18,14 @@ from .utils import (
 
 log = get_logger(__name__)
 
+
 class AutomapError(Exception):
     pass
 
+
 model_builder = DatabaseModelCache()
 BaseModel = model_builder.automap_base()
+
 
 class DatabaseMapper:
     automap_base = BaseModel
@@ -38,22 +41,47 @@ class DatabaseMapper:
 
         # This stuff should be placed outside of core (one likely extension point).
         self.reflection_kwargs = dict(
-            name_for_scalar_relationship=kwargs.get("name_for_scalar_relationship", name_for_scalar_relationship),
-            name_for_collection_relationship=kwargs.get("name_for_collection_relationship", name_for_collection_relationship),
+            name_for_scalar_relationship=kwargs.get(
+                "name_for_scalar_relationship", name_for_scalar_relationship
+            ),
+            name_for_collection_relationship=kwargs.get(
+                "name_for_collection_relationship", name_for_collection_relationship
+            ),
             classname_for_table=kwargs.get("classname_for_table", _classname_for_table),
-            generate_relationship=kwargs.get("generate_relationship", generate_relationship),
+            generate_relationship=kwargs.get(
+                "generate_relationship", generate_relationship
+            ),
         )
 
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
 
     def reflect_database(self, schemas=["public"], use_cache=True):
-        # This stuff should be placed outside of core (one likely extension point).
+        schemas = ["vocabulary", "core_view", "tags", None]
 
-        for schema in schemas:
-            self.reflect_schema(schema, use_cache=use_cache)
+        if use_cache and self.automap_base.loaded_from_cache:
+            log.info("Database models have been loaded from cache")
+            for schema in schemas:
+                self.automap_base.prepare(
+                    self.db.engine, schema=schema, **self.reflection_kwargs
+                )
+        else:
+            for schema in schemas:
+                # Reflect tables in schemas we care about
+                # Note: this will not reflect views because they don't have
+                # primary keys.
+                log.info(f"Reflecting schema {schema}")
+                if schema is not None:
+                    self.automap_base.metadata.reflect(
+                        bind=self.db.engine, schema=schema
+                    )
+            log.info("Reflecting core tables")
+            self.automap_base.prepare(
+                self.db.engine, reflect=True, **self.reflection_kwargs
+            )
 
-        self._cache_database_map()
+        if not self.automap_base.loaded_from_cache:
+            self._cache_database_map()
 
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
@@ -78,7 +106,9 @@ class DatabaseMapper:
         else:
             # Reflect tables in schemas we care about
             # Note: this will not reflect views because they don't have primary keys.
-            self.automap_base.metadata.reflect(bind=self.db.engine, schema=schema, **self.reflection_kwargs)
+            self.automap_base.metadata.reflect(
+                bind=self.db.engine, schema=schema, **self.reflection_kwargs
+            )
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
 
