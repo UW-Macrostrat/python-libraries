@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Run tests with a dockerized database
+port=54313
+
+docker run --name=macrostrat_library_test_db --rm -d -p $port:5432 -e POSTGRES_PASSWORD=postgres "postgis/postgis:15-3.3"
+
+export TESTING_DATABASE="postgresql://postgres:postgres@localhost:$port/postgres"
+
+# Wait for the database to start
+while ! pg_isready -h localhost -p $port; do
+  sleep 1
+done
+
+poetry run pytest
+
+echo "Stopping database"
+docker stop macrostrat_library_test_db
