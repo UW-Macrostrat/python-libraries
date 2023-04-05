@@ -3,3 +3,6 @@ all:
 
 publish:
 	poetry run publish.py
+
+test:
+	poetry run pytest
