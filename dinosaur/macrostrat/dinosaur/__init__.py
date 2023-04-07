@@ -237,6 +237,10 @@ class MigrationManager:
                 migrations.remove(m)
             migrations = [m for m in migrations if m.should_apply(engine, target, self)]
 
+    def _pre_auto_migration(self, engine, target):
+        """This is a hook for subclasses to do things before the automatic migration"""
+        pass
+
     def _run_migration(self, engine, target, check=False):
         try:
             # First, try an automatic migration
@@ -254,16 +258,18 @@ class MigrationManager:
 
         self.apply_migrations(engine, target)
 
+        log.info("Running scripts before automatic migrations")
+        self._pre_auto_migration(engine, target)
+
         # Migrating to the new version should now be possible using a "safe" automatic migration
         m = _create_migration(engine, target)
-
-        for s in m.statements:
-            print(s, file=sys.stderr)
 
         try:
             assert m.is_safe
         except AssertionError as err:
-            print("[bold red]Manual migration needed! Unsafe changes:[/bold red]")
+            print("[bold red]Manual migration needed!")
+            print("Run [bold cyan]sparrow db migration[/bold cyan] to see the changes")
+            print("[bold red]Unsafe changes:[/bold red]")
             for s in m.unsafe_changes():
                 print(s, file=sys.stderr)
             raise err
