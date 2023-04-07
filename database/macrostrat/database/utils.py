@@ -53,6 +53,7 @@ def run_sql(session, sql, params=None, stop_on_error=False):
         if sql == "":
             continue
         try:
+            log.debug("Executing SQL: \n" + sql)
             session.execute(text(sql), params=params)
             if hasattr(session, "commit"):
                 session.commit()
@@ -66,6 +67,7 @@ def run_sql(session, sql, params=None, stop_on_error=False):
             if dim:
                 err = "  " + err
             secho(err, fg="red", dim=dim)
+            log.error(err)
             if stop_on_error:
                 return
 

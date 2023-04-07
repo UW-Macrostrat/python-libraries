@@ -37,12 +37,7 @@ class AutoMigration(Migration):
 
     def _exec(self, sql, quiet=False):
         """Execute SQL unsafely on an sqlalchemy Engine"""
-        if not quiet:
-            return _exec_raw_sql(self.s_from, sql)
-        try:
-            self.s_from.execute(text(sql))
-        except (ProgrammingError, IntegrityError) as err:
-            log.debug(err)
+        run_sql(self.s_from, sql)
 
     def apply(self, quiet=False):
         n = len(self.statements)
