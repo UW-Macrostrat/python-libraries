@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+if [ $1 = "--no-teardown" ]; then
+  teardown=false
+  shift
+else
+  teardown=true
+fi
+
+# Run tests with a dockerized database
+port=54313
+
+# Check if the database is already running
+if docker ps | grep -q macrostrat_library_test_db; then
+  echo "Database already running"
+else
+  docker run --name=macrostrat_library_test_db --rm -d -p $port:5432 -e POSTGRES_PASSWORD=postgres "postgis/postgis:15-3.3"
+fi
+
+export TESTING_DATABASE="postgresql://postgres:postgres@localhost:$port/postgres"
+
+# Wait for the database to start
+while ! pg_isready -h localhost -p $port; do
+  sleep 1
+done
+
+poetry run pytest -s $@
+
+if [ $teardown = true ]; then
+  echo "Stopping database"
+  docker stop macrostrat_library_test_db
+else
+  echo "Skipping teardown"
+fi

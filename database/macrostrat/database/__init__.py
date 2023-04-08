@@ -51,10 +51,10 @@ class Database(object):
         self.session = scoped_session(self._session_factory)
         # Use the self.session_scope function to more explicitly manage sessions.
 
-    def automap(self):
+    def automap(self, **kwargs):
         log.info("Automapping the database")
         self.mapper = DatabaseMapper(self)
-        self.mapper.automap_database()
+        self.mapper.reflect_database(**kwargs)
 
     @contextmanager
     def session_scope(self, commit=True):
