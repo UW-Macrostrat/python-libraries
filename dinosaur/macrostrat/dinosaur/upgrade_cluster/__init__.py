@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from docker.client import DockerClient
 from macrostrat.utils import get_logger
-from rich import Console
+from rich.console import Console
 from typing import List
 
 from .utils import database_cluster, ensure_empty_docker_volume, replace_docker_volume
@@ -65,9 +65,6 @@ def upgrade_database_cluster(
     ) as target:
         # Dump the database
         time.sleep(2)
-
-        # Check if the database exists
-        dbname = "sparrow"
 
         print("Dumping database...")
 

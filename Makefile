@@ -5,4 +5,4 @@ publish:
 	poetry run publish.py
 
 test:
-	poetry run pytest
+	poetry run pytest -s

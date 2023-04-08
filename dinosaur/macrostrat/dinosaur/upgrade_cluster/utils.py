@@ -5,6 +5,9 @@ import socket
 import docker
 from docker.client import DockerClient
 from docker.models.containers import Container
+from macrostrat.utils import get_logger
+
+log = get_logger(__name__)
 
 
 @contextmanager
@@ -13,29 +16,43 @@ def database_cluster(
     image: str,
     data_volume: str,
     remove=True,
-    environment=None,
-    port=5432,
-) -> Container:
+    environment={},
+    port=None,
+):
     """
     Start a database cluster in a Docker volume
     under a managed installation of Sparrow.
     """
     print("Starting database cluster...")
+    env = dict(
+        POSTGRES_HOST_AUTH_METHOD="trust",
+        POSTGRES_DB="postgres",
+        PGUSER="postgres",
+        **environment,
+    )
+    ports = None
+    if port is not None:
+        ports = {f"5432/tcp": port}
+
     try:
         container = client.containers.run(
             image,
             detach=True,
-            remove=remove,
-            environment=environment,
+            remove=False,
+            auto_remove=False,
+            environment=env,
             volumes={data_volume: {"bind": "/var/lib/postgresql/data", "mode": "rw"}},
             user="postgres",
-            ports={f"5432/tcp": port},
+            ports=ports,
         )
+        log.info(f"Started container {container.name} ({image})")
         wait_for_cluster(container)
         yield container
     finally:
-        print(f"Stopping database cluster {image}...")
+        log.debug(container.logs())
+        log.info(f"Stopping container {container.name} ({image})...")
         container.stop()
+        # container.remove()
 
 
 def wait_for_cluster(container: Container):
@@ -53,9 +70,11 @@ def wait_for_cluster(container: Container):
     while not is_ready:
         time.sleep(0.1)
         # log_step(container)
-        res = container.exec_run("pg_isready", user="postgres")
+        log.debug("Waiting for database to be ready...")
+        res = container.exec_run("pg_isready -U postgres -d postgres", user="postgres")
         is_ready = res.exit_code == 0
     time.sleep(1)
+    log.debug("Database cluster is ready")
     # log_step(container)
     return
 
