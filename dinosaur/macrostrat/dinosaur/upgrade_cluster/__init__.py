@@ -124,4 +124,6 @@ def upgrade_database_cluster(
     client.volumes.get(cluster_new_name).remove(force=True)
 
     console.print("Done!", style="bold green")
-    raise
+
+
+# In-place upgrade
