@@ -3,6 +3,25 @@ from pathlib import Path
 from macrostrat.utils import relative_path
 from macrostrat.database import Database
 
+from pytest import fixture
+from os import environ
+from macrostrat.database.utils import wait_for_database, temp_database, create_database
+from macrostrat.database import Database
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@fixture(scope="session")
+def engine(database_url, pytestconfig):
+    with temp_database(database_url, drop=pytestconfig.option.teardown) as engine:
+        yield engine
+
+
+@fixture(scope="session")
+def db(engine):
+    return Database(engine.url)
+
 
 def test_database(db):
     # Get schema files

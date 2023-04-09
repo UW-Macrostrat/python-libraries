@@ -15,7 +15,7 @@ log = get_logger(__name__)
 def database_cluster(
     client: DockerClient,
     image: str,
-    data_volume: str,
+    data_volume: str = None,
     remove=True,
     environment={},
     port=None,
@@ -32,6 +32,10 @@ def database_cluster(
     if port is not None:
         ports = {f"5432/tcp": port}
 
+    volumes = None
+    if data_volume is not None:
+        volumes = {data_volume: {"bind": "/var/lib/postgresql/data", "mode": "rw"}}
+
     try:
         container = client.containers.run(
             image,
@@ -39,7 +43,7 @@ def database_cluster(
             remove=False,
             auto_remove=False,
             environment=environment,
-            volumes={data_volume: {"bind": "/var/lib/postgresql/data", "mode": "rw"}},
+            volumes=volumes,
             user="postgres",
             ports=ports,
         )
