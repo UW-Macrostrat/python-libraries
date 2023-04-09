@@ -129,6 +129,7 @@ def run_sql(
             continue
         try:
             connectable.begin()
+            log.debug("Executing SQL: \n" + sql)
             res = connectable.execute(text(sql), params=params)
             if yield_results:
                 yield res
@@ -144,6 +145,7 @@ def run_sql(
             if dim:
                 err = "  " + err
             secho(err, fg="red", dim=dim)
+            log.error(err)
             if stop_on_error:
                 return
         finally:

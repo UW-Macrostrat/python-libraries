@@ -57,10 +57,10 @@ class Database(object):
         """
         metadata.create_all(bind=self.engine)
 
-    def automap(self):
+    def automap(self, **kwargs):
         log.info("Automapping the database")
         self.mapper = DatabaseMapper(self)
-        self.mapper.automap_database()
+        self.mapper.reflect_database(**kwargs)
 
     @contextmanager
     def session_scope(self, commit=True):

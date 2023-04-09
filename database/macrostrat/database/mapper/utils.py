@@ -6,6 +6,7 @@ def primary_key(instance):
     prop_list = [mapper.get_property_by_column(column) for column in mapper.primary_key]
     return {prop.key: getattr(instance, prop.key) for prop in prop_list}
 
+
 def classname_for_table(table):
     if table.schema is not None:
         return f"{table.schema}_{table.name}"
@@ -82,6 +83,14 @@ class ModelCollection(BaseCollection):
 
     def keys(self):
         return [k for k in self.__models.keys()]
+
+    # Support for dict-like access
+    def __getitem__(self, key):
+        return self.__models[key]
+
+    # Support 'in' operator
+    def __contains__(self, key):
+        return key in self.__models
 
 
 class TableCollection(BaseCollection):
