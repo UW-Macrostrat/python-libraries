@@ -7,7 +7,12 @@ from macrostrat.utils import get_logger
 from rich.console import Console
 from typing import List
 
-from .utils import database_cluster, ensure_empty_docker_volume, replace_docker_volume
+from .utils import (
+    database_cluster,
+    ensure_empty_docker_volume,
+    replace_docker_volume,
+    get_unused_port,
+)
 from .restore import pg_restore
 from .describe import (
     check_database_exists,
@@ -55,33 +60,33 @@ def upgrade_database_cluster(
         f"Upgrading database cluster from version {current_version} to {target_version}..."
     )
 
+    source_port = get_unused_port()
+    target_port = get_unused_port()
+
     with database_cluster(
-        client, version_images[current_version], cluster_volume_name
+        client, version_images[current_version], cluster_volume_name, port=source_port
     ) as source, database_cluster(
         client,
         version_images[target_version],
         dest_volume.name,
-        environment={"POSTGRES_HOST_AUTH_METHOD": "trust"},
+        port=target_port,
     ) as target:
         # Dump the database
-        time.sleep(2)
-
-        print("Dumping database...")
+        log.info("Dumping database...")
 
         # Run PG_Restore asynchronously
         for dbname in databases:
             if check_database_exists(source, dbname):
-                print(f"Database {dbname} exists in source cluster")
+                log.info(f"Database {dbname} exists in source cluster")
             else:
-                print(f"Database {dbname} does not exist in source, skipping dump.")
+                log.info(f"Database {dbname} does not exist in source, skipping dump.")
                 return
 
             n_tables = count_database_tables(source, dbname)
 
-            print("Creating database")
+            log.info("Creating database")
 
-            res = target.exec_run("createdb -U postgres sparrow", user="postgres")
-            print(res)
+            target.exec_run(f"createdb -U postgres {dbname}", user="postgres")
 
             if not check_database_exists(target, dbname):
                 raise DatabaseUpgradeError("Database not created")
@@ -92,23 +97,19 @@ def upgrade_database_cluster(
         new_n_tables = count_database_tables(target, dbname)
 
         if db_exists:
-            print(f"Database {dbname} exists in target cluster.")
+            log.info(f"Database {dbname} exists in target cluster.")
         else:
-            print(f"Database {dbname} does not exist in target, dump failed.")
+            log.info(f"Database {dbname} does not exist in target, dump failed.")
             dest_volume.remove()
             return
 
         if new_n_tables >= n_tables:
-            print(f"{new_n_tables} tables were restored.")
+            log.info(f"{new_n_tables} tables were restored.")
         else:
-            print(f"Expected {n_tables} tables, got {new_n_tables}")
-            console.print("The migration failed.", style="bold red")
             dest_volume.remove()
-            return
-
-    time.sleep(1)
-
-    client = cfg.docker_client
+            raise DatabaseUpgradeError(
+                f"Expected {n_tables} tables, got {new_n_tables}"
+            )
 
     # Remove the old volume
     backup_volume_name = cluster_volume_name + "_backup"
@@ -123,3 +124,4 @@ def upgrade_database_cluster(
     client.volumes.get(cluster_new_name).remove(force=True)
 
     console.print("Done!", style="bold green")
+    raise

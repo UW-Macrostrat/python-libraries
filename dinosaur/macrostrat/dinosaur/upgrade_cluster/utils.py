@@ -6,6 +6,7 @@ import docker
 from docker.client import DockerClient
 from docker.models.containers import Container
 from macrostrat.utils import get_logger
+from sqlalchemy import create_engine
 
 log = get_logger(__name__)
 
@@ -24,12 +25,9 @@ def database_cluster(
     under a managed installation of Sparrow.
     """
     print("Starting database cluster...")
-    env = dict(
-        POSTGRES_HOST_AUTH_METHOD="trust",
-        POSTGRES_DB="postgres",
-        PGUSER="postgres",
-        **environment,
-    )
+    environment.setdefault("POSTGRES_HOST_AUTH_METHOD", "trust")
+    environment.setdefault("POSTGRES_DB", "postgres")
+    environment.setdefault("PGUSER", "postgres")
     ports = None
     if port is not None:
         ports = {f"5432/tcp": port}
@@ -40,26 +38,31 @@ def database_cluster(
             detach=True,
             remove=False,
             auto_remove=False,
-            environment=env,
+            environment=environment,
             volumes={data_volume: {"bind": "/var/lib/postgresql/data", "mode": "rw"}},
             user="postgres",
             ports=ports,
         )
         log.info(f"Started container {container.name} ({image})")
-        wait_for_cluster(container)
+
+        url = f"postgresql://postgres@localhost:{port}/postgres"
+
+        wait_for_cluster(container, url)
         yield container
     finally:
-        log.debug(container.logs())
+        log.debug(container.logs().decode("utf-8"))
         log.info(f"Stopping container {container.name} ({image})...")
         container.stop()
-        # container.remove()
+        container.remove()
 
 
-def wait_for_cluster(container: Container):
+def wait_for_cluster(container: Container, url: str):
     """
     Wait for a database to be ready.
     """
     print("Waiting for database to be ready...")
+    log.debug("Waiting for database to be ready...")
+
     # is_running = False
     # while not is_running:
     #     print(container.status)
@@ -67,16 +70,19 @@ def wait_for_cluster(container: Container):
     #     is_running = container.status == "created"
 
     is_ready = False
+    engine = create_engine(url)
     while not is_ready:
-        time.sleep(0.1)
         # log_step(container)
-        log.debug("Waiting for database to be ready...")
-        res = container.exec_run("pg_isready -U postgres -d postgres", user="postgres")
-        is_ready = res.exit_code == 0
-    time.sleep(1)
+        try:
+            engine.connect()
+        except Exception:
+            pass
+        else:
+            is_ready = True
+        time.sleep(0.1)
+    print("Database cluster is ready")
     log.debug("Database cluster is ready")
     # log_step(container)
-    return
 
 
 def replace_docker_volume(client: DockerClient, old_name: str, new_name: str):
