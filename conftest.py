@@ -1,7 +1,5 @@
 from pytest import fixture
 from os import environ
-from macrostrat.database.utils import wait_for_database, temp_database, create_database
-from macrostrat.database import Database
 from macrostrat.dinosaur.upgrade_cluster.utils import database_cluster, get_unused_port
 from dotenv import load_dotenv
 from docker.client import DockerClient
