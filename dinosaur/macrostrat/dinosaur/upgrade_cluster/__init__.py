@@ -29,7 +29,7 @@ class DatabaseUpgradeError(Exception):
     pass
 
 
-version_images = {11: "mdillon/postgis:11", 14: "postgis/postgis:14-3.3"}
+default_version_images = {11: "mdillon/postgis:11", 14: "postgis/postgis:14-3.3"}
 
 
 def upgrade_database_cluster(
@@ -37,6 +37,7 @@ def upgrade_database_cluster(
     cluster_volume_name: str,
     target_version: int,
     databases: List[str],
+    version_images: dict = default_version_images,
 ):
     """
     Upgrade a PostgreSQL cluster in a Docker volume
