@@ -75,7 +75,13 @@ class AutoMigration(Migration):
 def _create_migration(db_engine, target, safe=True, **kwargs):
     # For some reason we need to patch this...
     log.info("Creating an automatic migration")
-    target.dialect.server_version_info = db_engine.dialect.server_version_info
+
+    # Populate server_version_info if it's not already populated
+    if db_engine.dialect.server_version_info is None:
+        db_engine.connect()
+    if target.dialect.server_version_info is None:
+        target.connect()
+
     migration = AutoMigration(
         db_engine, target, **kwargs
     )  # , exclude_schema="core_view")

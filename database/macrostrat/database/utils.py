@@ -8,6 +8,7 @@ from sqlalchemy.schema import Table
 from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
+from sqlalchemy.exc import InvalidRequestError
 from macrostrat.utils import cmd, get_logger
 from time import sleep
 from typing import Union, IO
@@ -31,9 +32,9 @@ def infer_is_sql_text(string: str) -> bool:
     lines = string.split("\n")
     if len(lines) > 1:
         return True
-    _string = string.lowercase()
+    _string = string.lower()
     for i in keywords:
-        if _string.strip().startswith(i):
+        if _string.strip().startswith(i.lower()):
             return True
     return False
 
@@ -113,21 +114,29 @@ def _run_sql(connectable, sql, **kwargs):
 
     for query, params in zip(queries, params):
         sql = format(query, strip_comments=True).strip()
-        log.debug("Executing SQL: \n" + sql)
         if sql == "":
             continue
         trans = None
         try:
             trans = connectable.begin()
-            log.debug("Executing SQL: \n" + sql)
+        except InvalidRequestError:
+            trans = None
+        try:
+            log.debug("Executing SQL: \n %s", sql)
             res = connectable.execute(text(sql), params=params)
             yield res
-            trans.commit()
+            if trans is not None:
+                trans.commit()
+            elif hasattr(connectable, "commit"):
+                connectable.commit()
             pretty_print(sql, dim=True)
         except (ProgrammingError, IntegrityError) as err:
             err = str(err.orig).strip()
             dim = "already exists" in err
-            trans.rollback()
+            if trans is not None:
+                trans.rollback()
+            elif hasattr(connectable, "rollback"):
+                connectable.rollback()
             pretty_print(sql, fg=None if dim else "red", dim=True)
             if dim:
                 err = "  " + err
