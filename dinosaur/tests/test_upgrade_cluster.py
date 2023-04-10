@@ -19,7 +19,6 @@ random_hex = lambda: "%08x" % random.randrange(16**8)
 from macrostrat.dinosaur.upgrade_cluster.utils import (
     database_cluster,
     get_unused_port,
-    wait_for_cluster,
     ensure_empty_docker_volume,
 )
 

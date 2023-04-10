@@ -13,7 +13,6 @@ from typing import Callable
 from macrostrat.utils import get_logger, cmd
 from macrostrat.database import Database
 from macrostrat.database.utils import (
-    _exec_raw_sql,
     run_sql,
     temp_database,
     connection_args,

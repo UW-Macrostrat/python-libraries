@@ -87,27 +87,15 @@ def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
     return sql
 
 
-def run_sql(
-    connectable,
-    sql,
-    params=None,
-    stop_on_error=False,
-    interpret_as_file=None,
-    yield_results=False,
-):
+def _run_sql(connectable, sql, **kwargs):
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
-            res = run_sql(
-                conn,
-                sql,
-                params=params,
-                stop_on_error=stop_on_error,
-                interpret_as_file=interpret_as_file,
-            )
-            if yield_results:
-                yield from res
-            else:
-                return res
+            yield from _run_sql(conn, sql, **kwargs)
+            return
+
+    params = kwargs.pop("params", None)
+    stop_on_error = kwargs.pop("stop_on_error", False)
+    interpret_as_file = kwargs.pop("interpret_as_file", None)
 
     if interpret_as_file:
         sql = Path(sql).read_text()
@@ -125,35 +113,39 @@ def run_sql(
 
     for query, params in zip(queries, params):
         sql = format(query, strip_comments=True).strip()
+        log.debug("Executing SQL: \n" + sql)
         if sql == "":
             continue
+        trans = None
         try:
-            connectable.begin()
+            trans = connectable.begin()
             log.debug("Executing SQL: \n" + sql)
             res = connectable.execute(text(sql), params=params)
-            if yield_results:
-                yield res
-            if hasattr(connectable, "commit"):
-                connectable.commit()
+            yield res
+            trans.commit()
             pretty_print(sql, dim=True)
         except (ProgrammingError, IntegrityError) as err:
             err = str(err.orig).strip()
             dim = "already exists" in err
-            if hasattr(connectable, "rollback"):
-                connectable.rollback()
+            trans.rollback()
             pretty_print(sql, fg=None if dim else "red", dim=True)
             if dim:
                 err = "  " + err
             secho(err, fg="red", dim=dim)
             log.error(err)
             if stop_on_error:
-                return
-        finally:
-            if hasattr(connectable, "close"):
-                connectable.close()
-    # Return the last result if a generator wasn't requested
-    if not yield_results:
+                raise err
+
+
+def run_sql_file(connectable, filename, **kwargs):
+    return run_sql(connectable, filename, interpret_as_file=True, **kwargs)
+
+
+def run_sql(*args, **kwargs):
+    res = _run_sql(*args, **kwargs)
+    if kwargs.pop("yield_results", False):
         return res
+    return list(res)
 
 
 def execute(connectable, sql, params=None, stop_on_error=False):

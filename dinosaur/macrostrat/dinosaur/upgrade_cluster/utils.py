@@ -7,6 +7,7 @@ from docker.client import DockerClient
 from docker.models.containers import Container
 from macrostrat.utils import get_logger
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 
 log = get_logger(__name__)
 
@@ -79,7 +80,7 @@ def wait_for_cluster(container: Container, url: str):
         # log_step(container)
         try:
             engine.connect()
-        except Exception:
+        except OperationalError:
             pass
         else:
             is_ready = True

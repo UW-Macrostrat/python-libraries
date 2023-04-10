@@ -1,15 +1,16 @@
 # Skeletal testing file
 from pathlib import Path
-from macrostrat.utils import relative_path
-from macrostrat.database import Database
-
 from pytest import fixture
-from os import environ
-from macrostrat.database.utils import wait_for_database, temp_database, create_database
-from macrostrat.database import Database
 from dotenv import load_dotenv
 
+from macrostrat.utils import relative_path, get_logger
+from macrostrat.database import Database, run_sql
+from macrostrat.database.utils import temp_database
+
+
 load_dotenv()
+
+log = get_logger(__name__)
 
 
 @fixture(scope="session")
@@ -32,7 +33,8 @@ def test_database(db):
 
     # Create tables
     for sqlfile in file_list:
-        db.exec_sql(sqlfile)
+        res = run_sql(db.engine, sqlfile)
+        assert len(res) == 3
 
     db.automap(schemas=["public", "geology"])
 

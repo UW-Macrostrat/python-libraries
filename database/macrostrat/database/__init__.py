@@ -1,3 +1,4 @@
+import warnings
 from contextlib import contextmanager
 from typing import Optional
 
@@ -93,7 +94,12 @@ class Database(object):
 
     def run_sql(self, fn, **kwargs):
         """Executes SQL files passed"""
-        yield from run_sql(self.session, fn, **kwargs)
+        return iter(run_sql(self.session, fn, **kwargs))
+
+    def exec_sql(self, sql, **kwargs):
+        """Executes SQL files passed"""
+        warnings.warn("exec_sql is deprecated. Use run_sql instead", DeprecationWarning)
+        return self.run_sql(sql, **kwargs)
 
     def get_dataframe(self, *args):
         """Returns a Pandas DataFrame from a SQL query"""
@@ -147,7 +153,7 @@ class Database(object):
         """
         Map of all tables in the database as SQLAlchemy table objects
         """
-        if self.mapper._tables is None:
+        if self.mapper is None or self.mapper._tables is None:
             self.automap()
         return self.mapper._tables
 
@@ -158,7 +164,7 @@ class Database(object):
 
         https://docs.sqlalchemy.org/en/latest/orm/extensions/automap.html
         """
-        if self.mapper._models is None:
+        if self.mapper is None or self.mapper._models is None:
             self.automap()
         return self.mapper._models
 

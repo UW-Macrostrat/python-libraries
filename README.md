@@ -15,6 +15,11 @@ Dependencies can be installed by adding them to the respective `pyproject.toml` 
 Make sure to keep development dependencies (e.g., for testing) separate from core package dependencies.
 `poetry add -D ...` adds dependencies that will only be installed in development, analogous to NPM and Yarn.
 
+## Testing
+
+Tests can be run using `make test`, or, for added control, `poetry run pytest ...`.
+Docker is required to run all tests, as some of them require several containers.
+
 ## Releasing on PyPI
 
 This repository is designed to facilitate rapid iteration of its components
