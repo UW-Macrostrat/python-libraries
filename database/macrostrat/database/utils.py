@@ -50,7 +50,7 @@ def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
     return Path(file_or_text)
 
 
-def get_dataframe(db, filename_or_query, **kwargs):
+def get_dataframe(connectable, filename_or_query, **kwargs):
     """
     Run a query on a SQL database (represented by
     a SQLAlchemy database object) and turn it into a
@@ -60,7 +60,7 @@ def get_dataframe(db, filename_or_query, **kwargs):
 
     sql = get_sql_text(filename_or_query)
 
-    return read_sql(sql, db, **kwargs)
+    return read_sql(sql, connectable, **kwargs)
 
 
 def pretty_print(sql, **kwargs):

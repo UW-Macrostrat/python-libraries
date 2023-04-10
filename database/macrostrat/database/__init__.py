@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from typing import Optional
 
 from sqlalchemy import create_engine, inspect, MetaData, text
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from sqlalchemy.exc import IntegrityError
 from macrostrat.utils import get_logger
 from sqlalchemy.ext.compiler import compiles
@@ -16,7 +16,7 @@ from .utils import (
     get_dataframe,
 )
 from .mapper import DatabaseMapper
-from .postgresql import prefix_inserts
+from .postgresql import prefix_inserts, on_conflict  # noqa
 
 
 metadata = MetaData()
@@ -27,6 +27,7 @@ log = get_logger(__name__)
 class Database(object):
     mapper: Optional[DatabaseMapper] = None
     metadata: MetaData
+    session: Session
     __inspector__ = None
 
     def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
