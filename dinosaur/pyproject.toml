@@ -5,7 +5,7 @@ name = "macrostrat.dinosaur"
 packages = [
   {include = "macrostrat"},
 ]
-version = "0.1.0"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 GeoAlchemy2 = "^0.9.4"

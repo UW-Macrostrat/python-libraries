@@ -1,11 +1,11 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
-description = "A small library based on SQLAlchemy to assist with common database tasks."
+description = "A SQLAlchemy-based database toolkit."
 name = "macrostrat.database"
 packages = [
   {include = "macrostrat"},
 ]
-version = "2.0.0.dev3"
+version = "2.0.0"
 
 [tool.poetry.dependencies]
 GeoAlchemy2 = "^0.9.4"
