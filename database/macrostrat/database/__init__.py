@@ -1,8 +1,9 @@
+import warnings
 from contextlib import contextmanager
 from typing import Optional
 
 from sqlalchemy import create_engine, inspect, MetaData, text
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm import sessionmaker, scoped_session, Session
 from sqlalchemy.exc import IntegrityError
 from macrostrat.utils import get_logger
 from sqlalchemy.ext.compiler import compiles
@@ -15,7 +16,7 @@ from .utils import (
     get_dataframe,
 )
 from .mapper import DatabaseMapper
-from .postgresql import prefix_inserts
+from .postgresql import prefix_inserts, on_conflict  # noqa
 
 
 metadata = MetaData()
@@ -26,6 +27,7 @@ log = get_logger(__name__)
 class Database(object):
     mapper: Optional[DatabaseMapper] = None
     metadata: MetaData
+    session: Session
     __inspector__ = None
 
     def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
@@ -57,10 +59,10 @@ class Database(object):
         """
         metadata.create_all(bind=self.engine)
 
-    def automap(self):
+    def automap(self, **kwargs):
         log.info("Automapping the database")
         self.mapper = DatabaseMapper(self)
-        self.mapper.automap_database()
+        self.mapper.reflect_database(**kwargs)
 
     @contextmanager
     def session_scope(self, commit=True):
@@ -93,7 +95,12 @@ class Database(object):
 
     def run_sql(self, fn, **kwargs):
         """Executes SQL files passed"""
-        yield from run_sql(self.session, fn, **kwargs)
+        return iter(run_sql(self.session, fn, **kwargs))
+
+    def exec_sql(self, sql, **kwargs):
+        """Executes SQL files passed"""
+        warnings.warn("exec_sql is deprecated. Use run_sql instead", DeprecationWarning)
+        return self.run_sql(sql, **kwargs)
 
     def get_dataframe(self, *args):
         """Returns a Pandas DataFrame from a SQL query"""
@@ -147,7 +154,7 @@ class Database(object):
         """
         Map of all tables in the database as SQLAlchemy table objects
         """
-        if self.mapper._tables is None:
+        if self.mapper is None or self.mapper._tables is None:
             self.automap()
         return self.mapper._tables
 
@@ -158,7 +165,7 @@ class Database(object):
 
         https://docs.sqlalchemy.org/en/latest/orm/extensions/automap.html
         """
-        if self.mapper._models is None:
+        if self.mapper is None or self.mapper._models is None:
             self.automap()
         return self.mapper._models
 

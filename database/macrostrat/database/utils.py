@@ -8,6 +8,7 @@ from sqlalchemy.schema import Table
 from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
+from sqlalchemy.exc import InvalidRequestError
 from macrostrat.utils import cmd, get_logger
 from time import sleep
 from typing import Union, IO
@@ -31,9 +32,9 @@ def infer_is_sql_text(string: str) -> bool:
     lines = string.split("\n")
     if len(lines) > 1:
         return True
-    _string = string.lowercase()
+    _string = string.lower()
     for i in keywords:
-        if _string.strip().startswith(i):
+        if _string.strip().startswith(i.lower()):
             return True
     return False
 
@@ -50,7 +51,7 @@ def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
     return Path(file_or_text)
 
 
-def get_dataframe(db, filename_or_query, **kwargs):
+def get_dataframe(connectable, filename_or_query, **kwargs):
     """
     Run a query on a SQL database (represented by
     a SQLAlchemy database object) and turn it into a
@@ -60,7 +61,7 @@ def get_dataframe(db, filename_or_query, **kwargs):
 
     sql = get_sql_text(filename_or_query)
 
-    return read_sql(sql, db, **kwargs)
+    return read_sql(sql, connectable, **kwargs)
 
 
 def pretty_print(sql, **kwargs):
@@ -87,27 +88,15 @@ def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
     return sql
 
 
-def run_sql(
-    connectable,
-    sql,
-    params=None,
-    stop_on_error=False,
-    interpret_as_file=None,
-    yield_results=False,
-):
+def _run_sql(connectable, sql, **kwargs):
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
-            res = run_sql(
-                conn,
-                sql,
-                params=params,
-                stop_on_error=stop_on_error,
-                interpret_as_file=interpret_as_file,
-            )
-            if yield_results:
-                yield from res
-            else:
-                return res
+            yield from _run_sql(conn, sql, **kwargs)
+            return
+
+    params = kwargs.pop("params", None)
+    stop_on_error = kwargs.pop("stop_on_error", False)
+    interpret_as_file = kwargs.pop("interpret_as_file", None)
 
     if interpret_as_file:
         sql = Path(sql).read_text()
@@ -127,31 +116,45 @@ def run_sql(
         sql = format(query, strip_comments=True).strip()
         if sql == "":
             continue
+        trans = None
         try:
-            connectable.begin()
+            trans = connectable.begin()
+        except InvalidRequestError:
+            trans = None
+        try:
+            log.debug("Executing SQL: \n %s", sql)
             res = connectable.execute(text(sql), params=params)
-            if yield_results:
-                yield res
-            if hasattr(connectable, "commit"):
+            yield res
+            if trans is not None:
+                trans.commit()
+            elif hasattr(connectable, "commit"):
                 connectable.commit()
             pretty_print(sql, dim=True)
         except (ProgrammingError, IntegrityError) as err:
             err = str(err.orig).strip()
             dim = "already exists" in err
-            if hasattr(connectable, "rollback"):
+            if trans is not None:
+                trans.rollback()
+            elif hasattr(connectable, "rollback"):
                 connectable.rollback()
             pretty_print(sql, fg=None if dim else "red", dim=True)
             if dim:
                 err = "  " + err
             secho(err, fg="red", dim=dim)
+            log.error(err)
             if stop_on_error:
-                return
-        finally:
-            if hasattr(connectable, "close"):
-                connectable.close()
-    # Return the last result if a generator wasn't requested
-    if not yield_results:
+                raise err
+
+
+def run_sql_file(connectable, filename, **kwargs):
+    return run_sql(connectable, filename, interpret_as_file=True, **kwargs)
+
+
+def run_sql(*args, **kwargs):
+    res = _run_sql(*args, **kwargs)
+    if kwargs.pop("yield_results", False):
         return res
+    return list(res)
 
 
 def execute(connectable, sql, params=None, stop_on_error=False):
