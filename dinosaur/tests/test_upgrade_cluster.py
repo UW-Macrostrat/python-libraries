@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from macrostrat.database import Database
 from macrostrat.database.utils import run_sql_file
 from macrostrat.utils import get_logger
+from macrostrat.dinosaur import dump_schema
 from pathlib import Path
 from os import environ
 import time
@@ -61,6 +62,22 @@ def postgres_11_cluster():
     yield volume_name
 
     client.volumes.get(volume_name).remove(force=True)
+
+
+def test_dump_schema(postgres_11_cluster):
+    """Test dumping of a PostgreSQL schema."""
+
+    port = get_unused_port()
+    with database_cluster(
+        client, "mdillon/postgis:11", postgres_11_cluster, port=port
+    ) as container:
+        # Connect to cluster
+        url = f"postgresql://postgres@localhost:{port}/test_database"
+        db = Database(url)
+
+        schema_sql = dump_schema(db.engine)
+        assert "CREATE EXTENSION IF NOT EXISTS postgis" in schema_sql
+        assert "CREATE TABLE public.sample" in schema_sql
 
 
 def test_upgrade_cluster(postgres_11_cluster):
