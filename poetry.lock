@@ -324,8 +324,8 @@ files = [
 
 [[package]]
 name = "macrostrat-database"
-version = "2.0.0.dev3"
-description = "A small library based on SQLAlchemy to assist with common database tasks."
+version = "2.0.0"
+description = "A SQLAlchemy-based database toolkit."
 category = "dev"
 optional = false
 python-versions = "^3.8"
@@ -349,7 +349,7 @@ url = "database"
 
 [[package]]
 name = "macrostrat-dinosaur"
-version = "0.1.0"
+version = "1.0.0"
 description = "Diff-based database migrations"
 category = "dev"
 optional = false
@@ -359,7 +359,7 @@ develop = true
 
 [package.dependencies]
 GeoAlchemy2 = "^0.9.4"
-"macrostrat.database" = "^1.0.0"
+"macrostrat.database" = "^2.0.0"
 "macrostrat.utils" = "^1.0.0"
 psycopg2-binary = "^2.9.1"
 schemainspect = "^3.0.1616029793"
