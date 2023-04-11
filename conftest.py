@@ -32,11 +32,12 @@ def database_url(docker_client):
     testing_db = environ.get("TESTING_DATABASE")
 
     # Check if testing_db is accessible
-    try:
-        engine = create_engine(testing_db)
-        engine.connect()
-    except OperationalError:
-        testing_db = None
+    if testing_db is not None:
+        try:
+            engine = create_engine(testing_db)
+            engine.connect()
+        except OperationalError:
+            testing_db = None
 
     if testing_db is not None:
         yield testing_db

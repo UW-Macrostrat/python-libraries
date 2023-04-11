@@ -23,16 +23,20 @@ def db_session(engine):
     return factory()
 
 
-def infer_is_sql_text(string: str) -> bool:
+def infer_is_sql_text(_string: str) -> bool:
     """
     Return True if the string is a valid SQL query,
     false if it should be interpreted as a file path.
     """
+    # If it's a byte string, decode it
+    if isinstance(_string, bytes):
+        _string = _string.decode("utf-8")
+
     keywords = ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]
-    lines = string.split("\n")
+    lines = _string.split("\n")
     if len(lines) > 1:
         return True
-    _string = string.lower()
+    _string = _string.lower()
     for i in keywords:
         if _string.strip().startswith(i.lower()):
             return True

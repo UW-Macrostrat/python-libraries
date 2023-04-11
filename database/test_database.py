@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
-from macrostrat.database.utils import temp_database
+from macrostrat.database.utils import temp_database, infer_is_sql_text
 
 
 load_dotenv()
@@ -54,3 +54,15 @@ def test_database_mapper(db):
     s._formation = f
 
     assert isinstance(s._formation, Formation)
+
+
+def test_sql_text_inference():
+    assert infer_is_sql_text("SELECT * FROM sample")
+
+
+def test_sql_text_inference_2():
+    assert infer_is_sql_text(b"SELECT * FROM sample")
+
+
+def test_sql_text_inference_3():
+    assert not infer_is_sql_text("sample.sql")
