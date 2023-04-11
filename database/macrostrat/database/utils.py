@@ -160,16 +160,16 @@ def _run_sql(connectable, sql, **kwargs):
                 connectable.commit()
             pretty_print(sql, dim=True)
         except (ProgrammingError, IntegrityError) as err:
-            err = str(err.orig).strip()
-            dim = "already exists" in err
+            _err = str(err.orig).strip()
+            dim = "already exists" in _err
             if trans is not None:
                 trans.rollback()
             elif hasattr(connectable, "rollback"):
                 connectable.rollback()
             pretty_print(sql, fg=None if dim else "red", dim=True)
             if dim:
-                err = "  " + err
-            secho(err, fg="red", dim=dim)
+                _err = "  " + _err
+            secho(_err, fg="red", dim=dim)
             log.error(err)
             if stop_on_error:
                 raise err
