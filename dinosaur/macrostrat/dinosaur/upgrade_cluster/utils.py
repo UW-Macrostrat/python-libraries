@@ -94,11 +94,14 @@ def replace_docker_volume(client: DockerClient, old_name: str, new_name: str):
     """
     Replace the contents of a Docker volume.
     """
-    print(f"Moving contents of volume {old_name} to {new_name}")
+    print(f"Copying contents of volume {old_name} to {new_name}")
     client.containers.run(
         "bash",
         '-c "cd /old ; cp -av . /new"',
-        volumes={old_name: {"bind": "/old"}, new_name: {"bind": "/new"}},
+        volumes={
+            old_name: {"bind": "/old", "read_only": True},
+            new_name: {"bind": "/new"},
+        },
         remove=True,
     )
 

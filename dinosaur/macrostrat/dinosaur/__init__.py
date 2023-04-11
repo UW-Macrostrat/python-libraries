@@ -159,7 +159,7 @@ def create_schema_clone(
     schema = dump_schema(engine)
     with temp_database(db_url) as clone_engine:
         # Not sure why we have to mess with this, but we do
-        run_sql(clone_engine, schema)
+        run_sql(clone_engine, schema, interpret_as_file=False)
         # Sometimes, we still have some differences, annoyingly
         m = _create_migration(clone_engine, engine)
         m.apply(quiet=True)

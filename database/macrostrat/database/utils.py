@@ -32,7 +32,16 @@ def infer_is_sql_text(_string: str) -> bool:
     if isinstance(_string, bytes):
         _string = _string.decode("utf-8")
 
-    keywords = ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]
+    keywords = [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "CREATE",
+        "DROP",
+        "DELETE",
+        "ALTER",
+        "SET",
+    ]
     lines = _string.split("\n")
     if len(lines) > 1:
         return True
@@ -52,7 +61,10 @@ def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
     # Otherwise, assume it's a string
     if infer_is_sql_text(file_or_text):
         return file_or_text
-    return Path(file_or_text)
+    pth = Path(file_or_text)
+    if pth.exists() and pth.is_file():
+        return pth
+    return file_or_text
 
 
 def get_dataframe(connectable, filename_or_query, **kwargs):
@@ -70,7 +82,15 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 def pretty_print(sql, **kwargs):
     for line in sql.split("\n"):
-        for i in ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]:
+        for i in [
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "CREATE",
+            "DROP",
+            "DELETE",
+            "ALTER",
+        ]:
             if not line.startswith(i):
                 continue
             start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
@@ -98,10 +118,15 @@ def _run_sql(connectable, sql, **kwargs):
             yield from _run_sql(conn, sql, **kwargs)
             return
 
+    log.debug("Preparing to run sql: %s", sql)
+    print(sql)
+
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
     interpret_as_file = kwargs.pop("interpret_as_file", None)
 
+    if sql in [None, ""]:
+        return
     if interpret_as_file:
         sql = Path(sql).read_text()
     elif interpret_as_file is None:

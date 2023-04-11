@@ -50,6 +50,12 @@ def upgrade_database_cluster(
     if target_version not in version_images:
         raise DatabaseUpgradeError("Target PostgreSQL version is not supported")
 
+    if int(current_version) == int(target_version):
+        console.print(
+            f"[bold green]Database cluster is already at version {target_version}."
+        )
+        return
+
     # Create the volume for the new cluster
     dest_volume = ensure_empty_docker_volume(client, cluster_new_name)
 
@@ -117,8 +123,19 @@ def upgrade_database_cluster(
     console.print(
         f"Moving contents of new volume to {cluster_volume_name}", style="bold"
     )
+    # Bring down any containers using the current cluster volume
+    containers = client.containers.list(filters={"volume": cluster_volume_name})
+    # Filter to only running containers
+    restart_containers = [c for c in containers if c.status == "running"]
+    for container in containers:
+        container.stop()
+
     replace_docker_volume(client, cluster_new_name, cluster_volume_name)
     client.volumes.get(cluster_new_name).remove(force=True)
+
+    console.print("Restarting containers", style="bold")
+    for container in restart_containers:
+        container.start()
 
     console.print("Done!", style="bold green")
 
