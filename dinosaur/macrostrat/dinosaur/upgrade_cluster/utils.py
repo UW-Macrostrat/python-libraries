@@ -90,15 +90,16 @@ def wait_for_cluster(container: Container, url: str):
     # log_step(container)
 
 
-def replace_docker_volume(client: DockerClient, old_name: str, new_name: str):
+def replace_docker_volume(client: DockerClient, from_volume: str, to_volume: str):
     """
     Replace the contents of a Docker volume.
     """
-    print(f"Moving contents of volume {old_name} to {new_name}")
+    print(f"Moving contents of volume {from_volume} to {to_volume}")
+
     client.containers.run(
         "bash",
-        '-c "cd /old ; cp -av . /new"',
-        volumes={old_name: {"bind": "/old"}, new_name: {"bind": "/new"}},
+        '-c "cd /from ; cp -av . /to"',
+        volumes={from_volume: {"bind": "/from"}, to_volume: {"bind": "/to"}},
         remove=True,
     )
 
