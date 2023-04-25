@@ -118,9 +118,6 @@ def _run_sql(connectable, sql, **kwargs):
             yield from _run_sql(conn, sql, **kwargs)
             return
 
-    log.debug("Preparing to run sql: %s", sql)
-    print(sql)
-
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
