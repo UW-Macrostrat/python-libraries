@@ -151,6 +151,14 @@ def dump_schema(engine) -> str:
     res = cmd("pg_dump", "--schema-only", flags, dbname, capture_output=True)
     return res.stdout.decode("utf-8")
 
+def dump_schema_containerized(container, dbname) -> str:
+    res = container.exec_run(
+        "pg_dump --schema-only -U postgres -h localhost",
+        dbname,
+        stdout=True
+    )
+    return res.output.decode("utf-8")
+
 
 @contextmanager
 def create_schema_clone(
@@ -159,9 +167,10 @@ def create_schema_clone(
     schema = dump_schema(engine)
     with temp_database(db_url) as clone_engine:
         # Not sure why we have to mess with this, but we do
-        run_sql(clone_engine, schema, interpret_as_file=False)
+        log.info(schema)
+        run_sql(clone_engine, schema)
         # Sometimes, we still have some differences, annoyingly
-        m = _create_migration(clone_engine, engine)
+        m = _create_migration(clone_engine, engine, safe=False)
         m.apply(quiet=True)
         yield clone_engine
 

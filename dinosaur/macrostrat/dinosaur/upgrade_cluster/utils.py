@@ -97,8 +97,8 @@ def replace_docker_volume(client: DockerClient, from_volume: str, to_volume: str
     print(f"Copying contents of volume {from_volume} to {to_volume}")
     client.containers.run(
         "bash",
-        '-c "cd /old ; cp -av . /new"',
-        volumes={from_volume: {"bind": "/from"}, to_volume: {"bind": "/to"}},
+        '-c "cd /from-volume ; cp -av . /to-volume"',
+        volumes={from_volume: {"bind": "/from-volume"}, to_volume: {"bind": "/to-volume"}},
         remove=True,
     )
 

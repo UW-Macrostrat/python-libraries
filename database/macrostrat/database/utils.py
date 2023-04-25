@@ -1,5 +1,5 @@
 from click import echo, secho
-from sqlalchemy.exc import ProgrammingError, IntegrityError
+from sqlalchemy.exc import ProgrammingError, IntegrityError, InternalError
 from sqlparse import split, format
 from sqlalchemy.sql import ClauseElement
 from sqlalchemy.orm import sessionmaker, Session
@@ -260,7 +260,7 @@ def _run_sql(connectable, sql, **kwargs):
             elif hasattr(connectable, "commit"):
                 connectable.commit()
             pretty_print(sql_text, dim=True)
-        except (ProgrammingError, IntegrityError) as err:
+        except (ProgrammingError, IntegrityError, InternalError) as err:
             _err = str(err.orig).strip()
             dim = "already exists" in _err
             if trans is not None:
