@@ -270,7 +270,7 @@ def _run_sql(connectable, sql, **kwargs):
                 trans.rollback()
             elif hasattr(connectable, "rollback"):
                 connectable.rollback()
-            pretty_print(sql, fg=None if dim else "red", dim=True)
+            pretty_print(sql_text, fg=None if dim else "red", dim=True)
             if dim:
                 _err = "  " + _err
             secho(_err, fg="red", dim=dim)
