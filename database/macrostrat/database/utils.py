@@ -13,7 +13,7 @@ from macrostrat.utils import cmd, get_logger
 from time import sleep
 from typing import Union, IO
 from pathlib import Path
-
+from warnings import warn
 
 log = get_logger(__name__)
 
@@ -123,6 +123,11 @@ def _run_sql(connectable, sql, **kwargs):
 
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
+    raise_errors = kwargs.pop("raise_errors", False)
+    if stop_on_error:
+        raise_errors = True
+        warn(DeprecationWarning("stop_on_error is deprecated, use raise_errors"))
+
     interpret_as_file = kwargs.pop("interpret_as_file", None)
 
     if sql in [None, ""]:
@@ -171,7 +176,7 @@ def _run_sql(connectable, sql, **kwargs):
                 _err = "  " + _err
             secho(_err, fg="red", dim=dim)
             log.error(err)
-            if stop_on_error:
+            if raise_errors:
                 raise err
 
 

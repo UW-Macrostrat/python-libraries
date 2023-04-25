@@ -123,5 +123,10 @@ def test_deprecated_keyword(db):
 
 def test_query_error(db):
     sql1 = "SELECT * FROM samplea WHERE name = :name"
-    with raises(ProgrammingError):
+    with raises(ProgrammingError), warns(DeprecationWarning):
         db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
+
+def test_query_error_1(db):
+    sql1 = "SELECT * FROM samplea WHERE name = :name"
+    with raises(ProgrammingError):
+        db.run_sql(sql1, params=dict(name="Test"), raise_errors=True)
