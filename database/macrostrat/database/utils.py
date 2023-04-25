@@ -15,6 +15,7 @@ from typing import Union, IO
 from pathlib import Path
 from warnings import warn
 from psycopg2.sql import SQL, Composable, Composed
+from re import search
 
 log = get_logger(__name__)
 
@@ -158,10 +159,10 @@ def _split_params(params):
         new_bind_params = None
     return new_params, new_bind_params
 
-def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connection]):
-    """Render a query to a SQL string."""
-    if not isinstance(query, (Composed, SQL)):
-        return text(query)
+def _get_cursor(connectable):
+    if isinstance(connectable, Engine):
+        conn = connectable.connect()
+
     # Find a connection or cursor object for the connectable
     conn = connectable
     if hasattr(conn, "raw_connection"):
@@ -174,6 +175,27 @@ def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connec
     if hasattr(conn, "cursor"):
         conn = conn.cursor()
 
+    return conn
+
+def _get_connection(connectable):
+    if isinstance(connectable, Engine):
+        return connectable.connect()
+    if isinstance(connectable, Connection):
+        return connectable
+    if not hasattr(connectable, "connection"):
+        return connectable
+    conn = connectable.connection
+    if callable(conn):
+        return conn()
+    return conn
+    
+
+def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connection]):
+    """Render a query to a SQL string."""
+    if not isinstance(query, (Composed, SQL)):
+        return query
+    # Find a connection or cursor object for the connectable
+    conn = _get_cursor(connectable)
     return query.as_string(conn)
 
             
@@ -205,8 +227,6 @@ def _run_sql(connectable, sql, **kwargs):
         except InvalidRequestError:
             trans = None
         try:
-            sql_text = query
-
             params, pre_bind_params = _split_params(params)
 
             if pre_bind_params is not None:
@@ -215,17 +235,25 @@ def _run_sql(connectable, sql, **kwargs):
                 # Pre-bind the parameters using PsycoPG2
                 query = query.format(**pre_bind_params)
 
-            if isinstance(query, Composable):
+            if isinstance(query, (SQL, Composed)):
                 query = _render_query(query, connectable)
 
+            sql_text = query
+            has_server_binds = False
             if isinstance(query, str):
                 sql_text = format(query, strip_comments=True).strip()
                 if sql_text == "":
                     continue
-                query = text(sql_text)
+                # Check for server-bound parameters in sql native style. If there are none, use
+                # the SQLAlchemy text() function, otherwise use the raw query string
+                has_server_binds = "%s" in sql_text or "%(" in sql_text
 
-            log.debug("Executing SQL: \n %s", sql_text)
-            res = connectable.execute(query, params=params)
+            log.debug("Executing SQL: \n %s", query)
+            if has_server_binds:
+                conn = _get_connection(connectable)
+                res = conn.exec_driver_sql(query, params)
+            else:
+                res = connectable.execute(text(query), params=params)
             yield res
             if trans is not None:
                 trans.commit()

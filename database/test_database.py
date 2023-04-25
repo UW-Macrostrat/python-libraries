@@ -135,15 +135,12 @@ def test_query_error_1(db):
 def test_sql_object(db):
     sql = SQL("SELECT name FROM {table} WHERE name = {name}")
     params = dict(table=Identifier("sample"), name=Literal("Test"))
-    # Check that it prints 'SAMPLE'
     
     res = list(db.run_sql(sql, raise_errors=True, params=params))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
-    #captured = capsys.readouterr()
-    #assert captured.err.strip() == "SELECT"
 
-def test_pre_bound_parameters(db):
+def test_sqlalchemy_bound_parameters(db):
     """Some of the parameters should be pre-bound."""
     sql = "SELECT {column} FROM {table} WHERE {column} = :value"
     params = dict(column=Identifier("name"), table=Identifier("sample"), value="Test")
@@ -153,5 +150,7 @@ def test_server_bound_parameters(db):
     """If we have Postgres-style string bind parameters, make sure we don't try to bind SQLAlchemy parameters."""
     sql = "SELECT name FROM sample WHERE name = %(name)s"
     params = dict(name="Test")
-    db.run_sql(sql, params=params, raise_errors=True)
+    res = list(db.run_sql(sql, params=params, raise_errors=True))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
 
