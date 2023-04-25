@@ -1,9 +1,9 @@
 from click import echo, secho
-from sqlalchemy.exc import ProgrammingError, IntegrityError
+from sqlalchemy.exc import ProgrammingError, IntegrityError, InternalError
 from sqlparse import split, format
 from sqlalchemy.sql import ClauseElement
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.engine import Engine, Connection
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.engine import Engine, Connection, Transaction
 from sqlalchemy.schema import Table
 from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
@@ -13,7 +13,9 @@ from macrostrat.utils import cmd, get_logger
 from time import sleep
 from typing import Union, IO
 from pathlib import Path
-
+from warnings import warn
+from psycopg2.sql import SQL, Composable, Composed
+from re import search
 
 log = get_logger(__name__)
 
@@ -32,7 +34,16 @@ def infer_is_sql_text(_string: str) -> bool:
     if isinstance(_string, bytes):
         _string = _string.decode("utf-8")
 
-    keywords = ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]
+    keywords = [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "CREATE",
+        "DROP",
+        "DELETE",
+        "ALTER",
+        "SET",
+    ]
     lines = _string.split("\n")
     if len(lines) > 1:
         return True
@@ -52,7 +63,10 @@ def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
     # Otherwise, assume it's a string
     if infer_is_sql_text(file_or_text):
         return file_or_text
-    return Path(file_or_text)
+    pth = Path(file_or_text)
+    if pth.exists() and pth.is_file():
+        return pth
+    return file_or_text
 
 
 def get_dataframe(connectable, filename_or_query, **kwargs):
@@ -70,7 +84,15 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 def pretty_print(sql, **kwargs):
     for line in sql.split("\n"):
-        for i in ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]:
+        for i in [
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "CREATE",
+            "DROP",
+            "DELETE",
+            "ALTER",
+        ]:
             if not line.startswith(i):
                 continue
             start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
@@ -91,17 +113,17 @@ def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
 
     return sql
 
+def _get_queries(sql, interpret_as_file=None):
+    if isinstance(sql, (list, tuple)):
+        queries = []
+        for i in sql:
+            queries.extend(_get_queries(i, interpret_as_file=interpret_as_file))
+        return queries
+    if isinstance(sql, SQL):
+        return [sql]
 
-def _run_sql(connectable, sql, **kwargs):
-    if isinstance(connectable, Engine):
-        with connectable.connect() as conn:
-            yield from _run_sql(conn, sql, **kwargs)
-            return
-
-    params = kwargs.pop("params", None)
-    stop_on_error = kwargs.pop("stop_on_error", False)
-    interpret_as_file = kwargs.pop("interpret_as_file", None)
-
+    if sql in [None, ""]:
+        return
     if interpret_as_file:
         sql = Path(sql).read_text()
     elif interpret_as_file is None:
@@ -110,43 +132,150 @@ def _run_sql(connectable, sql, **kwargs):
     if isinstance(sql, Path):
         sql = sql.read_text()
 
-    queries = split(sql)
+    return split(sql)
+
+def _is_prebind_param(param):
+    return isinstance(param, Composable)
+
+def _split_params(params):
+    params = params or []
+    new_params = []
+    new_bind_params = []
+    if isinstance(params, (list, tuple)):
+        for i in params:
+            if _is_prebind_param(i):
+                new_bind_params.append(i)
+            else:
+                new_params.append(i)
+    elif isinstance(params, dict):
+        new_params = {}
+        new_bind_params = {}
+        for k, v in params.items():
+            if _is_prebind_param(v):
+                new_bind_params[k] = v
+            else:
+                new_params[k] = v
+    if len(new_bind_params) == 0:
+        new_bind_params = None
+    return new_params, new_bind_params
+
+def _get_cursor(connectable):
+    if isinstance(connectable, Engine):
+        conn = connectable.connect()
+
+    # Find a connection or cursor object for the connectable
+    conn = connectable
+    if hasattr(conn, "raw_connection"):
+        conn = conn.raw_connection()
+    while hasattr(conn, "connection"):
+        if callable(conn.connection):
+            conn = conn.connection()
+        else:
+            conn = conn.connection
+    if hasattr(conn, "cursor"):
+        conn = conn.cursor()
+
+    return conn
+
+def _get_connection(connectable):
+    if isinstance(connectable, Engine):
+        return connectable.connect()
+    if isinstance(connectable, Connection):
+        return connectable
+    if not hasattr(connectable, "connection"):
+        return connectable
+    conn = connectable.connection
+    if callable(conn):
+        return conn()
+    return conn
+    
+
+def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connection]):
+    """Render a query to a SQL string."""
+    if not isinstance(query, (Composed, SQL)):
+        return query
+    # Find a connection or cursor object for the connectable
+    conn = _get_cursor(connectable)
+    return query.as_string(conn)
+
+            
+def _run_sql(connectable, sql, **kwargs):
+    if isinstance(connectable, Engine):
+        with connectable.connect() as conn:
+            yield from _run_sql(conn, sql, **kwargs)
+            return
+
+    params = kwargs.pop("params", None)
+    stop_on_error = kwargs.pop("stop_on_error", False)
+    raise_errors = kwargs.pop("raise_errors", False)
+    if stop_on_error:
+        raise_errors = True
+        warn(DeprecationWarning("stop_on_error is deprecated, use raise_errors"))
+
+    interpret_as_file = kwargs.pop("interpret_as_file", None)
+
+    queries = _get_queries(sql, interpret_as_file=interpret_as_file)
+
+    if queries is None:
+        return
 
     # check if parameters is a list of the same length as the number of queries
     if not isinstance(params, list) or not len(params) == len(queries):
         params = [params] * len(queries)
 
     for query, params in zip(queries, params):
-        sql = format(query, strip_comments=True).strip()
-        if sql == "":
-            continue
         trans = None
         try:
             trans = connectable.begin()
         except InvalidRequestError:
             trans = None
         try:
-            log.debug("Executing SQL: \n %s", sql)
-            res = connectable.execute(text(sql), params=params)
+            params, pre_bind_params = _split_params(params)
+
+            if pre_bind_params is not None:
+                if not isinstance(query, SQL):
+                    query = SQL(query)
+                # Pre-bind the parameters using PsycoPG2
+                query = query.format(**pre_bind_params)
+
+            if isinstance(query, (SQL, Composed)):
+                query = _render_query(query, connectable)
+
+            sql_text = query
+            has_server_binds = False
+            if isinstance(query, str):
+                sql_text = format(query, strip_comments=True).strip()
+                if sql_text == "":
+                    continue
+                # Check for server-bound parameters in sql native style. If there are none, use
+                # the SQLAlchemy text() function, otherwise use the raw query string
+                has_server_binds = "%s" in sql_text or search(r'%\(\w+\)s', sql_text)
+
+            log.debug("Executing SQL: \n %s", query)
+            if has_server_binds:
+                conn = _get_connection(connectable)
+                res = conn.exec_driver_sql(query, params)
+            else:
+                res = connectable.execute(text(query), params=params)
             yield res
             if trans is not None:
                 trans.commit()
             elif hasattr(connectable, "commit"):
                 connectable.commit()
-            pretty_print(sql, dim=True)
-        except (ProgrammingError, IntegrityError) as err:
-            err = str(err.orig).strip()
-            dim = "already exists" in err
+            pretty_print(sql_text, dim=True)
+        except (ProgrammingError, IntegrityError, InternalError) as err:
+            _err = str(err.orig).strip()
+            dim = "already exists" in _err
             if trans is not None:
                 trans.rollback()
             elif hasattr(connectable, "rollback"):
                 connectable.rollback()
             pretty_print(sql, fg=None if dim else "red", dim=True)
             if dim:
-                err = "  " + err
-            secho(err, fg="red", dim=dim)
+                _err = "  " + _err
+            secho(_err, fg="red", dim=dim)
             log.error(err)
-            if stop_on_error:
+            if raise_errors:
                 raise err
 
 

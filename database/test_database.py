@@ -2,10 +2,13 @@
 from pathlib import Path
 from pytest import fixture
 from dotenv import load_dotenv
+from psycopg2.sql import SQL, Identifier, Literal, Placeholder
+from sqlalchemy.exc import ProgrammingError
 
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
 from macrostrat.database.utils import temp_database, infer_is_sql_text
+from pytest import warns, raises
 
 
 load_dotenv()
@@ -66,3 +69,88 @@ def test_sql_text_inference_2():
 
 def test_sql_text_inference_3():
     assert not infer_is_sql_text("sample.sql")
+
+
+def test_sql_interpolation_psycopg(db):
+    sql = "INSERT INTO sample (name) VALUES (:name)"
+    assert infer_is_sql_text(sql)
+
+    # db.engine.execute(sql, name="Test")
+    db.run_sql(sql, params=dict(name="Test"), stop_on_error=True)
+    db.session.commit()
+
+    sql1 = "SELECT * FROM sample WHERE name = :name"
+    res = list(db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True))[0]
+    assert res.first().name == "Test"
+
+
+def test_extraneous_argument(db):
+    sql = "INSERT INTO sample (name) VALUES (:name)"
+    assert infer_is_sql_text(sql)
+
+    # db.engine.execute(sql, name="Test")
+    db.run_sql(sql, params=dict(name="Test2", extraneous="TestA"))
+
+
+
+def test_sql_identifier(db):
+    sql = SQL("SELECT name FROM {table} WHERE name = {name}").format(
+        table=Identifier("sample"),
+        name=Literal("Test")
+    ).as_string(db.engine.raw_connection().cursor())
+    assert infer_is_sql_text(sql)
+    res = list(db.run_sql(sql, stop_on_error=True))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
+
+def test_partial_identifier(db):
+    """https://www.postgresql.org/docs/current/sql-prepare.html"""
+    conn = db.engine.raw_connection()
+    cursor = conn.cursor()
+    sql = SQL("SELECT name FROM sam{partial_table} WHERE name = {name}").format(
+        name=Placeholder("name"),
+        partial_table=SQL("ple")
+    ).as_string(cursor)
+
+    res = db.engine.execute(sql, name="Test").scalar()
+    assert res == "Test"
+    
+def test_deprecated_keyword(db):
+    sql1 = "SELECT * FROM sample WHERE name = :name"
+    # Check that it raises the appropriate warning
+    with warns(DeprecationWarning):
+        db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
+
+def test_query_error(db):
+    sql1 = "SELECT * FROM samplea WHERE name = :name"
+    with raises(ProgrammingError), warns(DeprecationWarning):
+        db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
+
+def test_query_error_1(db):
+    sql1 = "SELECT * FROM samplea WHERE name = :name"
+    with raises(ProgrammingError):
+        db.run_sql(sql1, params=dict(name="Test"), raise_errors=True)
+
+
+def test_sql_object(db):
+    sql = SQL("SELECT name FROM {table} WHERE name = {name}")
+    params = dict(table=Identifier("sample"), name=Literal("Test"))
+    
+    res = list(db.run_sql(sql, raise_errors=True, params=params))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
+
+def test_sqlalchemy_bound_parameters(db):
+    """Some of the parameters should be pre-bound."""
+    sql = "SELECT {column} FROM {table} WHERE {column} = :value"
+    params = dict(column=Identifier("name"), table=Identifier("sample"), value="Test")
+    db.run_sql(sql, params=params, raise_errors=True)
+
+def test_server_bound_parameters(db):
+    """If we have Postgres-style string bind parameters, make sure we don't try to bind SQLAlchemy parameters."""
+    sql = "SELECT name FROM sample WHERE name = %(name)s"
+    params = dict(name="Test")
+    res = list(db.run_sql(sql, params=params, raise_errors=True))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
+

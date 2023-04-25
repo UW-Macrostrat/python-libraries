@@ -38,10 +38,13 @@ class AutoMigration(Migration):
         """Execute SQL unsafely on an sqlalchemy Engine"""
         run_sql(self.s_from, sql)
 
-    def apply(self, quiet=False):
-        n = len(self.statements)
+    def apply(self, quiet=False, safe_only=False):
+        statements = list(self.statements)
+        if safe_only:
+            statements = list(self.safe_changes())
+        n = len(statements)
         log.debug(f"Applying migration with {n} operations")
-        for stmt in self.statements:
+        for stmt in statements:
             self._exec(stmt, quiet=quiet)
         self.changes.i_from = get_inspector(
             self.s_from, schema=self.schema, exclude_schema=self.exclude_schema
@@ -66,6 +69,17 @@ class AutoMigration(Migration):
         for stmt in self.changes_omitting_views():
             if check_for_drop(stmt):
                 yield stmt
+
+    def safe_changes(self):
+        nsel_drops = self.changes.non_table_selectable_drops()
+        nsel_creations = self.changes.non_table_selectable_creations()
+        for stmt in self.statements:
+            if stmt in nsel_drops or stmt in nsel_creations:
+                # View drops are OK.
+                yield stmt
+            if check_for_drop(stmt):
+                continue
+            yield stmt
 
     def print_changes(self):
         statements = "\n".join(self.statements)
@@ -146,10 +160,18 @@ def db_migration(
             print(stmt, file=sys.stdout)
 
 
-def dump_schema(engine):
+def dump_schema(engine) -> str:
     flags, dbname = connection_args(engine)
     res = cmd("pg_dump", "--schema-only", flags, dbname, capture_output=True)
-    return res.stdout
+    return res.stdout.decode("utf-8")
+
+def dump_schema_containerized(container, dbname) -> str:
+    res = container.exec_run(
+        "pg_dump --schema-only -U postgres -h localhost",
+        dbname,
+        stdout=True
+    )
+    return res.output.decode("utf-8")
 
 
 @contextmanager
@@ -159,11 +181,11 @@ def create_schema_clone(
     schema = dump_schema(engine)
     with temp_database(db_url) as clone_engine:
         # Not sure why we have to mess with this, but we do
-        clone_engine.dialect.server_version_info = engine.dialect.server_version_info
-        run_sql(clone_engine, schema)
+        log.info(schema)
+        run_sql(clone_engine, schema, interpret_as_file=False)
         # Sometimes, we still have some differences, annoyingly
-        m = _create_migration(clone_engine, engine)
-        m.apply(quiet=True)
+        m = _create_migration(clone_engine, engine, safe=False)
+        m.apply(quiet=True, safe_only=True)
         yield clone_engine
 
 
