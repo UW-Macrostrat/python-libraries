@@ -148,26 +148,6 @@ type = "directory"
 url = "../utils"
 
 [[package]]
-name = "migra"
-version = "3.0.1652017683"
-description = "Like `diff` but for PostgreSQL schemas"
-category = "main"
-optional = false
-python-versions = ">=3.7,<4"
-files = [
-    {file = "migra-3.0.1652017683-py3-none-any.whl", hash = "sha256:b3ccade76e70440897c6a76da24f5fb10a7784b5d3e0b220e9c393bbe6d101ab"},
-    {file = "migra-3.0.1652017683.tar.gz", hash = "sha256:8481ee051746ee9e0f5f107d27c61df779ab197712c5d9613c5368fbd53ef4ff"},
-]
-
-[package.dependencies]
-schemainspect = ">=3.1.1652015119"
-six = "*"
-sqlbag = "*"
-
-[package.extras]
-pg = ["psycopg2-binary"]
-
-[[package]]
 name = "packaging"
 version = "21.3"
 description = "Core utilities for Python packages"
@@ -320,21 +300,6 @@ files = [
 diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
-name = "schemainspect"
-version = "3.1.1652015119"
-description = "Schema inspection for PostgreSQL (and possibly others)"
-category = "main"
-optional = false
-python-versions = ">=3.7,<4"
-files = [
-    {file = "schemainspect-3.1.1652015119-py3-none-any.whl", hash = "sha256:b98cf19f76a8e5110c2a81f74bf72e7ae52697895f5910f40c0cd1d64cb7c445"},
-    {file = "schemainspect-3.1.1652015119.tar.gz", hash = "sha256:7eb05190b52e1520c1ea573abc39eac47752b647708b6d7dfc350345737e44a1"},
-]
-
-[package.dependencies]
-sqlalchemy = "*"
-
-[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -447,28 +412,6 @@ timezone = ["python-dateutil"]
 url = ["furl (>=0.4.1)"]
 
 [[package]]
-name = "sqlbag"
-version = "0.1.1617247075"
-description = "various snippets of SQL-related boilerplate"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "sqlbag-0.1.1617247075-py2.py3-none-any.whl", hash = "sha256:ecdef26d661f8640711030ac6ee618deb92b91f9f0fc2efbf8a3b133af13092d"},
-    {file = "sqlbag-0.1.1617247075.tar.gz", hash = "sha256:b9d7862c3b2030356d796ca872907962fd54704066978d7ae89383f5123366ed"},
-]
-
-[package.dependencies]
-packaging = "*"
-six = "*"
-sqlalchemy = "*"
-
-[package.extras]
-maria = ["pymysql"]
-pendulum = ["pendulum", "relativedelta"]
-pg = ["psycopg2"]
-
-[[package]]
 name = "sqlparse"
 version = "0.4.2"
 description = "A non-validating SQL parser."
@@ -495,4 +438,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "4b79a740ac2666bcb0c78c30bd8eb9c092894fe0a8eeb3eda3c5f997848df61c"
+content-hash = "ada21a800d5a951ef18221b956717f4db20eb216cd09a560d34bb12f0fe9f1a9"
