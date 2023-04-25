@@ -246,7 +246,7 @@ def _run_sql(connectable, sql, **kwargs):
                     continue
                 # Check for server-bound parameters in sql native style. If there are none, use
                 # the SQLAlchemy text() function, otherwise use the raw query string
-                has_server_binds = "%s" in sql_text or "%(" in sql_text
+                has_server_binds = "%s" in sql_text or search(r'%\(\w+\)s', sql_text)
 
             log.debug("Executing SQL: \n %s", query)
             if has_server_binds:
