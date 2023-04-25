@@ -85,7 +85,7 @@ def test_schema_clone(postgres_11_cluster):
 
     port = get_unused_port()
     with database_cluster(
-        client, "mdillon/postgis:11", postgres_11_cluster, port=port
+        client, "postgis/postgis:14-3.3", postgres_11_cluster, port=port
     ) as container:
         # Connect to cluster
         url = f"postgresql://postgres@localhost:{port}/test_database"
@@ -105,3 +105,4 @@ def test_upgrade_cluster(postgres_11_cluster):
     upgrade_database_cluster(client, postgres_11_cluster, 14, ["test_database"])
 
     assert check_database_cluster_version(client, postgres_11_cluster) == 14
+

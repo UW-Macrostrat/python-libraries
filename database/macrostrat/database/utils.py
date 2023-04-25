@@ -216,6 +216,9 @@ def _run_sql(connectable, sql, **kwargs):
 
     queries = _get_queries(sql, interpret_as_file=interpret_as_file)
 
+    if queries is None:
+        return
+
     # check if parameters is a list of the same length as the number of queries
     if not isinstance(params, list) or not len(params) == len(queries):
         params = [params] * len(queries)
