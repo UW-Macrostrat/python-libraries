@@ -2,8 +2,8 @@ from click import echo, secho
 from sqlalchemy.exc import ProgrammingError, IntegrityError
 from sqlparse import split, format
 from sqlalchemy.sql import ClauseElement
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.engine import Engine, Connection
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.engine import Engine, Connection, Transaction
 from sqlalchemy.schema import Table
 from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
@@ -14,6 +14,7 @@ from time import sleep
 from typing import Union, IO
 from pathlib import Path
 from warnings import warn
+from psycopg2.sql import SQL, Composable, Composed
 
 log = get_logger(__name__)
 
@@ -111,7 +112,71 @@ def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
 
     return sql
 
+def _get_queries(sql, interpret_as_file=None):
+    if isinstance(sql, (list, tuple)):
+        queries = []
+        for i in sql:
+            queries.extend(_get_queries(i, interpret_as_file=interpret_as_file))
+        return queries
+    if isinstance(sql, SQL):
+        return [sql]
 
+    if sql in [None, ""]:
+        return
+    if interpret_as_file:
+        sql = Path(sql).read_text()
+    elif interpret_as_file is None:
+        sql = canonicalize_query(sql)
+
+    if isinstance(sql, Path):
+        sql = sql.read_text()
+
+    return split(sql)
+
+def _is_prebind_param(param):
+    return isinstance(param, Composable)
+
+def _split_params(params):
+    params = params or []
+    new_params = []
+    new_bind_params = []
+    if isinstance(params, (list, tuple)):
+        for i in params:
+            if _is_prebind_param(i):
+                new_bind_params.append(i)
+            else:
+                new_params.append(i)
+    elif isinstance(params, dict):
+        new_params = {}
+        new_bind_params = {}
+        for k, v in params.items():
+            if _is_prebind_param(v):
+                new_bind_params[k] = v
+            else:
+                new_params[k] = v
+    if len(new_bind_params) == 0:
+        new_bind_params = None
+    return new_params, new_bind_params
+
+def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connection]):
+    """Render a query to a SQL string."""
+    if not isinstance(query, (Composed, SQL)):
+        return text(query)
+    # Find a connection or cursor object for the connectable
+    conn = connectable
+    if hasattr(conn, "raw_connection"):
+        conn = conn.raw_connection()
+    while hasattr(conn, "connection"):
+        if callable(conn.connection):
+            conn = conn.connection()
+        else:
+            conn = conn.connection
+    if hasattr(conn, "cursor"):
+        conn = conn.cursor()
+
+    return query.as_string(conn)
+
+            
 def _run_sql(connectable, sql, **kwargs):
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
@@ -127,40 +192,46 @@ def _run_sql(connectable, sql, **kwargs):
 
     interpret_as_file = kwargs.pop("interpret_as_file", None)
 
-    if sql in [None, ""]:
-        return
-    if interpret_as_file:
-        sql = Path(sql).read_text()
-    elif interpret_as_file is None:
-        sql = canonicalize_query(sql)
-
-    if isinstance(sql, Path):
-        sql = sql.read_text()
-
-    queries = split(sql)
+    queries = _get_queries(sql, interpret_as_file=interpret_as_file)
 
     # check if parameters is a list of the same length as the number of queries
     if not isinstance(params, list) or not len(params) == len(queries):
         params = [params] * len(queries)
 
     for query, params in zip(queries, params):
-        sql = format(query, strip_comments=True).strip()
-        if sql == "":
-            continue
         trans = None
         try:
             trans = connectable.begin()
         except InvalidRequestError:
             trans = None
         try:
-            log.debug("Executing SQL: \n %s", sql)
-            res = connectable.execute(text(sql), params=params)
+            sql_text = query
+
+            params, pre_bind_params = _split_params(params)
+
+            if pre_bind_params is not None:
+                if not isinstance(query, SQL):
+                    query = SQL(query)
+                # Pre-bind the parameters using PsycoPG2
+                query = query.format(**pre_bind_params)
+
+            if isinstance(query, Composable):
+                query = _render_query(query, connectable)
+
+            if isinstance(query, str):
+                sql_text = format(query, strip_comments=True).strip()
+                if sql_text == "":
+                    continue
+                query = text(sql_text)
+
+            log.debug("Executing SQL: \n %s", sql_text)
+            res = connectable.execute(query, params=params)
             yield res
             if trans is not None:
                 trans.commit()
             elif hasattr(connectable, "commit"):
                 connectable.commit()
-            pretty_print(sql, dim=True)
+            pretty_print(sql_text, dim=True)
         except (ProgrammingError, IntegrityError) as err:
             _err = str(err.orig).strip()
             dim = "already exists" in _err
