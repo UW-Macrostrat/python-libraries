@@ -3,10 +3,12 @@ from pathlib import Path
 from pytest import fixture
 from dotenv import load_dotenv
 from psycopg2.sql import SQL, Identifier, Literal, Placeholder
+from sqlalchemy.exc import ProgrammingError
 
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
 from macrostrat.database.utils import temp_database, infer_is_sql_text
+from pytest import warns, raises
 
 
 load_dotenv()
@@ -113,3 +115,13 @@ def test_partial_identifier(db):
     res = db.engine.execute(sql, name="Test").scalar()
     assert res == "Test"
     
+def test_deprecated_keyword(db):
+    sql1 = "SELECT * FROM sample WHERE name = :name"
+    # Check that it raises the appropriate warning
+    with warns(DeprecationWarning):
+        db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
+
+def test_query_error(db):
+    sql1 = "SELECT * FROM samplea WHERE name = :name"
+    with raises(ProgrammingError):
+        db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
