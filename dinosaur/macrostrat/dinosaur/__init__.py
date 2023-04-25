@@ -182,10 +182,9 @@ def create_schema_clone(
     with temp_database(db_url) as clone_engine:
         # Not sure why we have to mess with this, but we do
         log.info(schema)
-        run_sql(clone_engine, schema)
+        run_sql(clone_engine, schema, interpret_as_file=False)
         # Sometimes, we still have some differences, annoyingly
         m = _create_migration(clone_engine, engine, safe=False)
-        m.print_changes()
         m.apply(quiet=True, safe_only=True)
         yield clone_engine
 

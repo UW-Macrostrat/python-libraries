@@ -93,6 +93,7 @@ def test_schema_clone(postgres_11_cluster):
         with create_schema_clone(
             db.engine, f"postgresql://postgres@localhost:{port}/test_schema_clone"
         ) as clone:
+            assert clone.engine.has_table("spatial_ref_sys")
             assert clone.engine.has_table("sample")
 
 
