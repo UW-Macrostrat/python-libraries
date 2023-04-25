@@ -2,6 +2,7 @@
 from pathlib import Path
 from pytest import fixture
 from dotenv import load_dotenv
+from psycopg2.sql import SQL, Identifier, Literal, Placeholder
 
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
@@ -66,3 +67,49 @@ def test_sql_text_inference_2():
 
 def test_sql_text_inference_3():
     assert not infer_is_sql_text("sample.sql")
+
+
+def test_sql_interpolation_psycopg(db):
+    sql = "INSERT INTO sample (name) VALUES (:name)"
+    assert infer_is_sql_text(sql)
+
+    # db.engine.execute(sql, name="Test")
+    db.run_sql(sql, params=dict(name="Test"), stop_on_error=True)
+    db.session.commit()
+
+    sql1 = "SELECT * FROM sample WHERE name = :name"
+    res = list(db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True))[0]
+    assert res.first().name == "Test"
+
+
+def test_extraneous_argument(db):
+    sql = "INSERT INTO sample (name) VALUES (:name)"
+    assert infer_is_sql_text(sql)
+
+    # db.engine.execute(sql, name="Test")
+    db.run_sql(sql, params=dict(name="Test2", extraneous="TestA"))
+
+
+
+def test_sql_identifier(db):
+    sql = SQL("SELECT name FROM {table} WHERE name = {name}").format(
+        table=Identifier("sample"),
+        name=Literal("Test")
+    ).as_string(db.engine.raw_connection().cursor())
+    assert infer_is_sql_text(sql)
+    res = list(db.run_sql(sql, stop_on_error=True))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
+
+def test_partial_identifier(db):
+    """https://www.postgresql.org/docs/current/sql-prepare.html"""
+    conn = db.engine.raw_connection()
+    cursor = conn.cursor()
+    sql = SQL("SELECT name FROM sam{partial_table} WHERE name = {name}").format(
+        name=Placeholder("name"),
+        partial_table=SQL("ple")
+    ).as_string(cursor)
+
+    res = db.engine.execute(sql, name="Test").scalar()
+    assert res == "Test"
+    
