@@ -38,10 +38,13 @@ class AutoMigration(Migration):
         """Execute SQL unsafely on an sqlalchemy Engine"""
         run_sql(self.s_from, sql)
 
-    def apply(self, quiet=False):
-        n = len(self.statements)
+    def apply(self, quiet=False, safe_only=False):
+        statements = list(self.statements)
+        if safe_only:
+            statements = list(self.safe_changes())
+        n = len(statements)
         log.debug(f"Applying migration with {n} operations")
-        for stmt in self.statements:
+        for stmt in statements:
             self._exec(stmt, quiet=quiet)
         self.changes.i_from = get_inspector(
             self.s_from, schema=self.schema, exclude_schema=self.exclude_schema
@@ -66,6 +69,17 @@ class AutoMigration(Migration):
         for stmt in self.changes_omitting_views():
             if check_for_drop(stmt):
                 yield stmt
+
+    def safe_changes(self):
+        nsel_drops = self.changes.non_table_selectable_drops()
+        nsel_creations = self.changes.non_table_selectable_creations()
+        for stmt in self.statements:
+            if stmt in nsel_drops or stmt in nsel_creations:
+                # View drops are OK.
+                yield stmt
+            if check_for_drop(stmt):
+                continue
+            yield stmt
 
     def print_changes(self):
         statements = "\n".join(self.statements)
@@ -171,7 +185,8 @@ def create_schema_clone(
         run_sql(clone_engine, schema)
         # Sometimes, we still have some differences, annoyingly
         m = _create_migration(clone_engine, engine, safe=False)
-        m.apply(quiet=True)
+        m.print_changes()
+        m.apply(quiet=True, safe_only=True)
         yield clone_engine
 
 
