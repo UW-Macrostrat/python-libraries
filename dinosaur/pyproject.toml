@@ -11,13 +11,14 @@ version = "1.0.2"
 GeoAlchemy2 = "^0.9.4"
 SQLAlchemy = "^1.4.26"
 SQLAlchemy-Utils = "^0.37.0"
+docker = "^6.0.1"
 "macrostrat.database" = "^2.0.0"
 "macrostrat.utils" = "^1.0.0"
+migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
 python = "^3.8"
 schemainspect = "^3.0.1616029793"
 sqlparse = "^0.4.0"
-docker = "^6.0.1"
 
 [tool.poetry.dev-dependencies]
 "macrostrat.database" = {path = "../database", develop = true}
