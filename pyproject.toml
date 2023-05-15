@@ -2,23 +2,22 @@
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Macrostrat Python libraries"
 name = "macrostrat"
-version = "1.2.0"
+version = "1.3.0"
 
 [tool.poetry.dependencies]
-python = "^3.8"
-
-[tool.poetry.dev-dependencies]
-"macrostrat.database" = {path = "./database", develop = true}
-"macrostrat.dinosaur" = {path = "./dinosaur", develop = true}
-"macrostrat.utils" = {path = "./utils", develop = true}
-requests = "^2.27.1"
-rich = "^12.4.4"
-toml = "^0.10.2"
+python = "^3.10"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"
+"macrostrat.app_frame" = {path = "./app-frame", develop = true}
+"macrostrat.database" = {path = "./database", develop = true}
+"macrostrat.dinosaur" = {path = "./dinosaur", develop = true}
+"macrostrat.utils" = {path = "./utils", develop = true}
 pytest = "^7.2.2"
 python-dotenv = "^1.0.0"
+requests = "^2.27.1"
+rich = "^13"
+toml = "^0.10.2"
 
 [tool.pytest.ini_options]
 addopts = "--confcutdir=."

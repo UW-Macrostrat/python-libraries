@@ -31,6 +31,7 @@ def git_revision_info(**kwargs):
         "git describe --match=NOT-EVER-A-TAG --always --abbrev --dirty", **kwargs
     )
 
+
 def git_has_changes():
     """Check if there are uncommitted changes in the current git repository."""
     res = cmd("git diff-index --quiet HEAD --")
