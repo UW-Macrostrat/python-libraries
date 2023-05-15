@@ -5,7 +5,7 @@ name = "macrostrat.app_frame"
 packages = [
   {include = "macrostrat"},
 ]
-version = "0.1.0"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"
