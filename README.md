@@ -1,10 +1,17 @@
 # Macrostrat Python libraries
 
-A monorepo containing Python-based tools and libraries for Earth data projects
+A monorepo containing Python-based tools and libraries for Earth data projects.
 
 - This is still very early-stage.
-- The intent is to share common functionality between Sparrow and other tools.
-- This can be consumed as a local submodule or maybe eventually as PyPI packages.
+- The intent is to share common subsystems between Sparrow, Macrostrat and other tools.
+- All modules can be consumed as PyPI packages, or embedded locally as a submodule (though this is less-recommended).
+
+## Modules
+
+- `macrostrat.app_frame`: A control framework for manging Dockerized applications. Currently used by Sparrow, Mapboard GIS, and Macrostrat.
+- `macrostrat.database`: Database connection and query utilities geared towards PostgreSQL
+- `macrostrat.dinosaur`: Utilities for on-the-fly database migration and conformance testing
+- `macrostrat.utils`: Helpers for logging and command-line apps
 
 ## Development
 
