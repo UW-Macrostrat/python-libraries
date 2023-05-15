@@ -42,7 +42,6 @@ def database_url(docker_client):
     if testing_db is not None:
         yield testing_db
     elif docker_client is not None:
-
         port = get_unused_port()
 
         with database_cluster(
