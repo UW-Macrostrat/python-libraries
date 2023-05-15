@@ -330,7 +330,7 @@ files = [
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "1.0.0"
+version = "1.0.1"
 description = "A control script framework for containerized applications."
 category = "dev"
 optional = false
@@ -339,6 +339,8 @@ files = []
 develop = true
 
 [package.dependencies]
+"macrostrat.utils" = "^1.1.0"
+python-dotenv = "^1.0.0"
 rich = "^13"
 typer = "^0.9.0"
 
