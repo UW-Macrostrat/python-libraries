@@ -8,7 +8,7 @@ import requests
 from toml import load
 from rich import print
 
-modules = ["database", "dinosaur", "utils"]
+modules = ["database", "dinosaur", "utils", "app-frame"]
 
 from macrostrat.utils import cmd, relative_path, setup_stderr_logs, working_directory
 
