@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-from operator import mod
-from os import chdir, environ
+from os import environ
 from macrostrat.utils.shell import git_has_changes
 from pathlib import Path
 import requests
