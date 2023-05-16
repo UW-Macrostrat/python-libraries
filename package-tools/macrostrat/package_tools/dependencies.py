@@ -2,17 +2,6 @@ from pathlib import Path
 from toml import load
 
 
-def ensure_list(fn):
-    def wrapper(*args, **kwargs):
-        res = fn(*args, **kwargs)
-        # Flatten iterator
-        if hasattr(res, "__iter__"):
-            res = [i for i in res]
-        return res
-
-    return wrapper
-
-
 def get_all_dependencies(
     poetry_cfg: dict[str, dict[str, str]]
 ) -> dict[str, dict[str, str]]:
@@ -29,12 +18,13 @@ def get_all_dependencies(
     return all_deps
 
 
-@ensure_list
 def get_local_dependencies(poetry_cfg: dict[str, dict[str, str]]):
     all_deps = get_all_dependencies(poetry_cfg)
+    vals = {}
     for k, v in all_deps.items():
         if "path" in v and v.get("develop", False):
-            yield v["path"]
+            vals[k] = v
+    return vals
 
 
 def load_poetry_config(fp: Path):

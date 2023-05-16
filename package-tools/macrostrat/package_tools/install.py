@@ -22,10 +22,11 @@ def install_packages(
     if not virtualenvs:
         extra_env = {"POETRY_VIRTUALENVS_CREATE": "False"}
 
-    for _dir in local_deps:
+    for k, v in local_deps.items():
+        _dir = v["path"]
         fp = path / _dir
         cfg = load_poetry_config(path / _dir)
-        if cfg["name"] in omit:
+        if cfg["name"] in omit or cfg[k] in omit:
             continue
         print(f"Locking dependencies for [bold cyan]{cfg['name']}[/]...")
 

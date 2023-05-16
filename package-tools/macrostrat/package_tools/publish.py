@@ -43,7 +43,8 @@ def package_exists(pkg):
 
 
 def modules_to_publish(modules: list[Path]):
-    return [f for f in modules if not package_exists(load_poetry_config(f))]
+    configs = [load_poetry_config(f) for f in modules]
+    return [f for f in configs if not package_exists(f)]
 
 
 def module_version_string(fp: Path, long: bool = False):
@@ -55,19 +56,14 @@ def module_version_string(fp: Path, long: bool = False):
 
 # You should get a PyPI API token from https://pypi.org/account/
 # and set the environment variable POETRY_PYPI_TOKEN to it.
-def publish_packages(path: Path = Path.cwd(), omit: list[Path] = []):
+def publish_packages(path: Path = Path.cwd(), omit: list[str] = []):
     """Publish all packages that need to be published."""
     cfg = load_poetry_config(path)
     local_deps = get_local_dependencies(cfg)
 
     environ["POETRY_VIRTUALENVS_CREATE"] = "False"
 
-    if environ.get("POETRY_PYPI_TOKEN") is None:
-        raise RuntimeError(
-            "You must set the POETRY_PYPI_TOKEN environment variable to your PyPI API token."
-        )
-
-    module_dirs = [p for p in local_deps if p not in omit]
+    module_dirs = [path / v["path"] for k, v in local_deps.items() if k not in omit]
 
     module_dirs = modules_to_publish(module_dirs)
     if len(module_dirs) == 0:
