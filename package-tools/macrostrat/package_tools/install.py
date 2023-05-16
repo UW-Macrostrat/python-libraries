@@ -1,30 +1,41 @@
 from os import environ
 from macrostrat.utils import cmd
 from pathlib import Path
+from rich import print
 
 from .dependencies import get_local_dependencies, load_poetry_config
 
 
 def install_packages(
-    path: Path = Path.cwd(), omit: list[Path] = [], root=True, virtualenvs=False
+    path: Path = Path.cwd(),
+    omit: list[str] = [],
+    skip_root: bool = False,
+    virtualenvs: bool = False,
+    update: bool = False,
 ):
     """Install all packages in the root project's virtual environment."""
     cfg = load_poetry_config(path)
-    local_deps = get_local_dependencies(cfg["tool"]["poetry"])
+    local_deps = get_local_dependencies(cfg)
+    lock_cmd = "poetry lock" if update else "poetry lock --no-update"
 
     extra_env = {}
     if not virtualenvs:
         extra_env = {"POETRY_VIRTUALENVS_CREATE": "False"}
 
     for _dir in local_deps:
-        if _dir in omit:
-            continue
         fp = path / _dir
+        cfg = load_poetry_config(path / _dir)
+        if cfg["name"] in omit:
+            continue
+        print(f"Locking dependencies for [bold cyan]{cfg['name']}[/]...")
+
         cmd(
-            "poetry lock --no-update",
+            lock_cmd,
             cwd=fp,
             env={**environ, **extra_env},
         )
-    if root:
-        cmd("poetry lock --no-update")
+        print()
+    if not skip_root:
+        print(f"Installing project...")
+        cmd(lock_cmd)
         cmd("poetry install")
