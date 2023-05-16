@@ -92,39 +92,44 @@ def test_extraneous_argument(db):
     db.run_sql(sql, params=dict(name="Test2", extraneous="TestA"))
 
 
-
 def test_sql_identifier(db):
-    sql = SQL("SELECT name FROM {table} WHERE name = {name}").format(
-        table=Identifier("sample"),
-        name=Literal("Test")
-    ).as_string(db.engine.raw_connection().cursor())
+    sql = (
+        SQL("SELECT name FROM {table} WHERE name = {name}")
+        .format(table=Identifier("sample"), name=Literal("Test"))
+        .as_string(db.engine.raw_connection().cursor())
+    )
     assert infer_is_sql_text(sql)
     res = list(db.run_sql(sql, stop_on_error=True))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
 
+
 def test_partial_identifier(db):
     """https://www.postgresql.org/docs/current/sql-prepare.html"""
     conn = db.engine.raw_connection()
     cursor = conn.cursor()
-    sql = SQL("SELECT name FROM sam{partial_table} WHERE name = {name}").format(
-        name=Placeholder("name"),
-        partial_table=SQL("ple")
-    ).as_string(cursor)
+    sql = (
+        SQL("SELECT name FROM sam{partial_table} WHERE name = {name}")
+        .format(name=Placeholder("name"), partial_table=SQL("ple"))
+        .as_string(cursor)
+    )
 
     res = db.engine.execute(sql, name="Test").scalar()
     assert res == "Test"
-    
+
+
 def test_deprecated_keyword(db):
     sql1 = "SELECT * FROM sample WHERE name = :name"
     # Check that it raises the appropriate warning
     with warns(DeprecationWarning):
         db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
 
+
 def test_query_error(db):
     sql1 = "SELECT * FROM samplea WHERE name = :name"
     with raises(ProgrammingError), warns(DeprecationWarning):
         db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True)
+
 
 def test_query_error_1(db):
     sql1 = "SELECT * FROM samplea WHERE name = :name"
@@ -135,16 +140,18 @@ def test_query_error_1(db):
 def test_sql_object(db):
     sql = SQL("SELECT name FROM {table} WHERE name = {name}")
     params = dict(table=Identifier("sample"), name=Literal("Test"))
-    
+
     res = list(db.run_sql(sql, raise_errors=True, params=params))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
+
 
 def test_sqlalchemy_bound_parameters(db):
     """Some of the parameters should be pre-bound."""
     sql = "SELECT {column} FROM {table} WHERE {column} = :value"
     params = dict(column=Identifier("name"), table=Identifier("sample"), value="Test")
     db.run_sql(sql, params=params, raise_errors=True)
+
 
 def test_server_bound_parameters(db):
     """If we have Postgres-style string bind parameters, make sure we don't try to bind SQLAlchemy parameters."""
@@ -154,3 +161,20 @@ def test_server_bound_parameters(db):
     assert len(res) == 1
     assert res[0].scalar() == "Test"
 
+
+def test_server_parameters_function_def(db):
+    """Make sure we don't select all % as bound parameters."""
+    sql = """
+    CREATE OR REPLACE FUNCTION throw_error()
+    RETURNS void AS $$
+    BEGIN
+    IF true THEN
+        RAISE NOTICE 'prop %s, pattern %, schema %', prop, pattern, schema->'patternProperties'->pattern;
+    END IF;
+    END;
+    $$ LANGUAGE plpgsql;
+    """
+    with raises(TypeError):
+        db.run_sql(sql, raise_errors=True)
+    # This should not raise
+    db.run_sql(sql, raise_errors=True, has_server_binds=False)
