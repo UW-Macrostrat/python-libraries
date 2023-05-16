@@ -262,7 +262,7 @@ files = [
 
 [[package]]
 name = "macrostrat-database"
-version = "2.0.1"
+version = "2.1.1"
 description = "A SQLAlchemy-based database toolkit."
 category = "main"
 optional = false
@@ -274,9 +274,7 @@ develop = true
 click = "^8.1.3"
 GeoAlchemy2 = "^0.9.4"
 "macrostrat.utils" = "^1.0.0"
-migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
-schemainspect = "^3.0.1616029793"
 SQLAlchemy = "^1.4.26"
 SQLAlchemy-Utils = "^0.37.0"
 sqlparse = "^0.4.0"
@@ -731,4 +729,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "5f7de102e689d24bed41833f41fe075daf45ce63d47f8b91abf513ea60807775"
+content-hash = "a9abbf814357dc8649a55919a85004cd8960ab38e7182d5f69c0e23e5a5f7702"
