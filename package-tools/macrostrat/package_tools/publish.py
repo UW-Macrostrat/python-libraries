@@ -42,9 +42,8 @@ def package_exists(pkg):
     return pkg_exists
 
 
-def modules_to_publish(modules: list[Path]):
-    configs = [load_poetry_config(f) for f in modules]
-    return [f for f in configs if not package_exists(f)]
+def modules_to_publish(modules: list[Path], omit: list[str] = []):
+    return [f for f in modules if not package_exists(load_poetry_config(f))]
 
 
 def module_version_string(fp: Path, long: bool = False):
@@ -60,12 +59,14 @@ def publish_packages(path: Path = Path.cwd(), omit: list[str] = []):
     """Publish all packages that need to be published."""
     cfg = load_poetry_config(path)
     local_deps = get_local_dependencies(cfg)
+    # Filter omitted packages
+    local_deps = {k: v for k, v in local_deps.items() if k not in omit}
 
     environ["POETRY_VIRTUALENVS_CREATE"] = "False"
 
     module_dirs = [path / v["path"] for k, v in local_deps.items() if k not in omit]
-
     module_dirs = modules_to_publish(module_dirs)
+
     if len(module_dirs) == 0:
         print("[green]All modules are already published.")
     elif git_has_changes():

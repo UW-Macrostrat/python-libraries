@@ -26,7 +26,7 @@ def install_packages(
         _dir = v["path"]
         fp = path / _dir
         cfg = load_poetry_config(path / _dir)
-        if cfg["name"] in omit or cfg[k] in omit:
+        if k in omit:
             continue
         print(f"Locking dependencies for [bold cyan]{cfg['name']}[/]...")
 
