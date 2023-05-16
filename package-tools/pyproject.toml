@@ -1,0 +1,21 @@
+[tool.poetry]
+authors = ["Daven Quinn <dev@davenquinn.com>"]
+description = "Tools for managing Python packages in a monorepo"
+name = "macrostrat.package_tools"
+packages = [{include = "macrostrat"}]
+readme = "README.md"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.30.0"
+rich = "^13.3.5"
+toml = "^0.10.2"
+typer = "^0.9.0"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
+
+[tool.poetry.scripts]
+mono = "macrostrat.package_tools:mono"

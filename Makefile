@@ -1,8 +1,8 @@
 all:
-	poetry install
+	poetry run mono install
 
 publish:
-	poetry run publish.py
+	poetry run mono publish
 
 test:
 	poetry run pytest -s

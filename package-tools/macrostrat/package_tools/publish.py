@@ -1,20 +1,13 @@
 #!/usr/bin/env python
 
-from operator import mod
-from os import chdir, environ
+from os import environ
 from macrostrat.utils.shell import git_has_changes
 from pathlib import Path
 import requests
 from toml import load
 from rich import print
-
-modules = ["database", "dinosaur", "utils", "app-frame"]
-
-from macrostrat.utils import cmd, relative_path, setup_stderr_logs, working_directory
-
-setup_stderr_logs("macrostrat")
-
-environ["POETRY_VIRTUALENVS_CREATE"] = "False"
+from .dependencies import get_local_dependencies, load_poetry_config
+from macrostrat.utils import cmd, working_directory
 
 
 def prepare_module(fp: Path):
@@ -35,13 +28,6 @@ def publish_module(fp):
         cmd(f"git tag -a {tag} -m '{msg}'", shell=True)
 
 
-def get_package_data(fp: Path = Path(".")):
-    conf = fp / "pyproject.toml"
-    with conf.open("r") as f:
-        data = load(f)
-        return data["tool"]["poetry"]
-
-
 def package_exists(pkg):
     name = pkg["name"]
     version = pkg["version"]
@@ -56,12 +42,12 @@ def package_exists(pkg):
     return pkg_exists
 
 
-def modules_to_publish(modules: list[Path]):
-    return [f for f in modules if not package_exists(get_package_data(f))]
+def modules_to_publish(modules: list[Path], omit: list[str] = []):
+    return [f for f in modules if not package_exists(load_poetry_config(f))]
 
 
 def module_version_string(fp: Path, long: bool = False):
-    pkg = get_package_data(fp)
+    pkg = load_poetry_config(fp)
     if long:
         return f"{pkg['name']} version {pkg['version']}"
     return f"{pkg['name']}-v{pkg['version']}"
@@ -69,10 +55,18 @@ def module_version_string(fp: Path, long: bool = False):
 
 # You should get a PyPI API token from https://pypi.org/account/
 # and set the environment variable POETRY_PYPI_TOKEN to it.
-if __name__ == "__main__":
-    module_dirs = [relative_path(__file__, module) for module in modules]
+def publish_packages(path: Path = Path.cwd(), omit: list[str] = []):
+    """Publish all packages that need to be published."""
+    cfg = load_poetry_config(path)
+    local_deps = get_local_dependencies(cfg)
+    # Filter omitted packages
+    local_deps = {k: v for k, v in local_deps.items() if k not in omit}
 
+    environ["POETRY_VIRTUALENVS_CREATE"] = "False"
+
+    module_dirs = [path / v["path"] for k, v in local_deps.items() if k not in omit]
     module_dirs = modules_to_publish(module_dirs)
+
     if len(module_dirs) == 0:
         print("[green]All modules are already published.")
     elif git_has_changes():

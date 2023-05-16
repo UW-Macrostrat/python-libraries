@@ -398,6 +398,26 @@ type = "directory"
 url = "dinosaur"
 
 [[package]]
+name = "macrostrat-package-tools"
+version = "1.0.0"
+description = "Tools for managing Python packages in a monorepo"
+category = "dev"
+optional = false
+python-versions = "^3.10"
+files = []
+develop = true
+
+[package.dependencies]
+requests = "^2.30.0"
+rich = "^13.3.5"
+toml = "^0.10.2"
+typer = "^0.9.0"
+
+[package.source]
+type = "directory"
+url = "package-tools"
+
+[[package]]
 name = "macrostrat-utils"
 version = "1.1.0"
 description = "Core utilities for Macrostrat and Sparrow"
@@ -1050,4 +1070,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "5d771aa4c92df5deea569f21b8d2a82563574ae7271456fede61bef0207b2a27"
+content-hash = "17f3fcb2377005f1e8314292b149f6fe18b37fbc5510457b5c6a4efd2cc4ed59"
