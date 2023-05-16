@@ -113,6 +113,7 @@ def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
 
     return sql
 
+
 def _get_queries(sql, interpret_as_file=None):
     if isinstance(sql, (list, tuple)):
         queries = []
@@ -134,11 +135,14 @@ def _get_queries(sql, interpret_as_file=None):
 
     return split(sql)
 
+
 def _is_prebind_param(param):
     return isinstance(param, Composable)
 
+
 def _split_params(params):
-    params = params or []
+    if params is None:
+        return None, None
     new_params = []
     new_bind_params = []
     if isinstance(params, (list, tuple)):
@@ -159,6 +163,7 @@ def _split_params(params):
         new_bind_params = None
     return new_params, new_bind_params
 
+
 def _get_cursor(connectable):
     if isinstance(connectable, Engine):
         conn = connectable.connect()
@@ -177,6 +182,7 @@ def _get_cursor(connectable):
 
     return conn
 
+
 def _get_connection(connectable):
     if isinstance(connectable, Engine):
         return connectable.connect()
@@ -188,7 +194,7 @@ def _get_connection(connectable):
     if callable(conn):
         return conn()
     return conn
-    
+
 
 def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connection]):
     """Render a query to a SQL string."""
@@ -198,8 +204,17 @@ def _render_query(query: Union[SQL, Composed], connectable: Union[Engine, Connec
     conn = _get_cursor(connectable)
     return query.as_string(conn)
 
-            
+
+def infer_has_server_binds(sql):
+    return "%s" in sql or search(r"%\(\w+\)s", sql)
+
+
 def _run_sql(connectable, sql, **kwargs):
+    """
+    Internal function for running a query on a SQLAlchemy connectable,
+    which always returns an iterator. The wrapper function adds the option
+    to return a list of results.
+    """
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
             yield from _run_sql(conn, sql, **kwargs)
@@ -208,6 +223,8 @@ def _run_sql(connectable, sql, **kwargs):
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
+    has_server_binds = kwargs.pop("has_server_binds", None)
+
     if stop_on_error:
         raise_errors = True
         warn(DeprecationWarning("stop_on_error is deprecated, use raise_errors"))
@@ -242,14 +259,14 @@ def _run_sql(connectable, sql, **kwargs):
                 query = _render_query(query, connectable)
 
             sql_text = query
-            has_server_binds = False
             if isinstance(query, str):
                 sql_text = format(query, strip_comments=True).strip()
                 if sql_text == "":
                     continue
                 # Check for server-bound parameters in sql native style. If there are none, use
                 # the SQLAlchemy text() function, otherwise use the raw query string
-                has_server_binds = "%s" in sql_text or search(r'%\(\w+\)s', sql_text)
+                if has_server_binds is None:
+                    has_server_binds = infer_has_server_binds(sql_text)
 
             log.debug("Executing SQL: \n %s", query)
             if has_server_binds:
@@ -284,6 +301,33 @@ def run_sql_file(connectable, filename, **kwargs):
 
 
 def run_sql(*args, **kwargs):
+    """
+    Run a query on a SQLAlchemy connectable.
+
+    Parameters
+    ----------
+    connectable : Union[Engine, Connection]
+        A SQLAlchemy engine or connection object.
+    sql : Union[str, Path, IO, SQL, Composed]
+        A SQL query, or a file containing a SQL query.
+    params : Union[dict, list, tuple]
+        Parameters to bind to the query. If a list or tuple, the parameters
+        will be bound to the query in order. If a dict, the parameters will
+        be bound to the query by name.
+    stop_on_error : bool
+        If True, stop running queries if an error is encountered.
+    raise_errors : bool
+        If True, raise errors encountered while running queries.
+    has_server_binds : bool
+        Interpret the query to have server-side bind parameters (requiring execution
+        with the backend driver). By default, this is inferred from the query string,
+        but inference is not always reliable.
+    interpret_as_file : bool
+        If True, force interpreting the query as a file path.
+    yield_results : bool
+        If True, yield the results of the query as they are executed, rather than
+        returning a list after completion.
+    """
     res = _run_sql(*args, **kwargs)
     if kwargs.pop("yield_results", False):
         return res
