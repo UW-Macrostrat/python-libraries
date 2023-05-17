@@ -117,7 +117,7 @@ def up(
     else:
         app.info("All containers built successfully.", style="green bold")
 
-    running_containers = check_status(app.name, app.name.lower())
+    running_containers = check_status()
 
     app.info("Starting :app_name: server...", style="bold")
     compose("start")
