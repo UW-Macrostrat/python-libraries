@@ -330,7 +330,7 @@ files = [
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "1.0.1"
+version = "1.0.2"
 description = "A control script framework for containerized applications."
 category = "dev"
 optional = false
@@ -350,7 +350,7 @@ url = "app-frame"
 
 [[package]]
 name = "macrostrat-database"
-version = "2.1.1"
+version = "2.1.2"
 description = "A SQLAlchemy-based database toolkit."
 category = "dev"
 optional = false
