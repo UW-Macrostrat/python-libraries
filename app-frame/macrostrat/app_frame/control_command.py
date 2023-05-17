@@ -122,10 +122,10 @@ def up(
     app.info("Starting :app_name: server...", style="bold")
     compose("start")
 
-    for container, command in app.restart_commands.items():
-        if container in running_containers:
-            app.info(f"Reloading {container}...", style="bold")
-            compose("exec", container, command)
+    for _container, command in app.restart_commands.items():
+        if _container in running_containers:
+            app.info(f"Reloading {_container}...", style="bold")
+            compose("exec", _container, command)
 
     res = follow_logs_with_reloader(app, container)
     if res == Result.RESTART:
