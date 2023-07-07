@@ -4,8 +4,9 @@ description = "A control script framework for containerized applications."
 name = "macrostrat.app_frame"
 packages = [
   {include = "macrostrat"},
+  {include = "test_app"},
 ]
-version = "1.0.4"
+version = "1.0.5"
 
 [tool.poetry.dependencies]
 "macrostrat.utils" = "^1.1.0"

@@ -1,0 +1,14 @@
+version: "3"
+services:
+  gateway:
+    # Traefik reverse proxy. We might go back to Nginx or replace this with Caddy in the future.
+    image: "caddy:2"
+    ports:
+      - "3000:3000"
+    volumes:
+      # Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  app:
+    image: "hello-world"
+
+
