@@ -40,7 +40,7 @@ class Application(ApplicationBase):
     ):
         self.name = name
         self.command_name = command_name or name.lower()
-        self.project_prefix = project_prefix or name.lower()
+        self.project_prefix = project_prefix or name.lower().replace(" ", "_")
         self.console = Console()
         self.restart_commands = restart_commands
         self.app_module = app_module

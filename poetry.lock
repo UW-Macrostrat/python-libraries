@@ -330,7 +330,7 @@ files = [
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "1.0.2"
+version = "1.0.5"
 description = "A control script framework for containerized applications."
 category = "dev"
 optional = false

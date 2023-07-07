@@ -95,9 +95,9 @@ def up(
     if app is None:
         raise ValueError("Could not find application config")
     if container is None:
-        container = ""
+        _container = ""
 
-    compose("build", container)
+    compose("build", _container)
 
     sleep(0.1)
 
@@ -106,7 +106,7 @@ def up(
         "--no-start",
         "--remove-orphans",
         "--force-recreate" if force_recreate else "",
-        container,
+        _container,
     )
     if res.returncode != 0:
         app.info(
@@ -116,18 +116,18 @@ def up(
         sys.exit(res.returncode)
     else:
         app.info("All containers built successfully.", style="green bold")
+    print()
 
+    # Get list of currently running containers
     running_containers = check_status(app.name, app.command_name)
 
     app.info("Starting :app_name: server...", style="bold")
     compose("start")
+    print()
 
-    for _container, command in app.restart_commands.items():
-        if _container in running_containers:
-            app.info(f"Reloading {_container}...", style="bold")
-            compose("exec", _container, command)
+    run_restart_commands(app, running_containers)
 
-    res = follow_logs_with_reloader(app, container)
+    res = follow_logs_with_reloader(app, _container)
     if res == Result.RESTART:
         app.info("Restarting :app_name: server...", style="bold")
         ctx.invoke(up, ctx, container)
@@ -140,6 +140,14 @@ def up(
             style="bold",
         )
         return
+
+
+def run_restart_commands(app, running_containers):
+    for c, command in app.restart_commands.items():
+        if c in running_containers:
+            app.info(f"Reloading {c}...", style="bold")
+            compose("exec", c, command)
+    print()
 
 
 def down(ctx: Context):

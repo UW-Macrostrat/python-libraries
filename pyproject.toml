@@ -1,8 +1,11 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Macrostrat Python libraries"
-name = "macrostrat"
-version = "1.3.0"
+name = "macrostrat.python_libraries"
+version = "1.3.1"
+packages = [
+  {include = "macrostrat"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -22,3 +25,6 @@ toml = "^0.10.2"
 
 [tool.pytest.ini_options]
 addopts = "--confcutdir=."
+
+[tool.poetry.scripts]
+test-app = "test_app:main"

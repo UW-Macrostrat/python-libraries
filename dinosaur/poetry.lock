@@ -268,7 +268,7 @@ files = [
 
 [[package]]
 name = "macrostrat-database"
-version = "2.1.1"
+version = "2.1.2"
 description = "A SQLAlchemy-based database toolkit."
 category = "main"
 optional = false
