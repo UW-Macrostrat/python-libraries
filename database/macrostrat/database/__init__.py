@@ -30,7 +30,7 @@ class Database(object):
     session: Session
     __inspector__ = None
 
-    def __init__(self, db_conn, app=None, echo_sql=False, **kwargs):
+    def __init__(self, db_conn, echo_sql=False, **kwargs):
         """
         We can pass a connection string, a **Flask** application object
         with the appropriate configuration, or nothing, in which
@@ -41,9 +41,7 @@ class Database(object):
         compiles(Insert, "postgresql")(prefix_inserts)
 
         log.info(f"Setting up database connection '{db_conn}'")
-        self.engine = create_engine(
-            db_conn, executemany_mode="batch", echo=echo_sql, **kwargs
-        )
+        self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
         self.metadata = kwargs.get("metadata", metadata)
 
         # Scoped session for database
