@@ -84,16 +84,8 @@ class DatabaseMapper:
         log.info(f"Reflecting schema {schema}")
         if schema == "public":
             schema = None
-        if not self._prepared:
-            self.automap_base.prepare(
-                self.db.engine, reflect=False, **self.reflection_kwargs
-            )
-            self._prepared = True
-        # Reflect tables in schemas we care about
-        # Note: this will not reflect views because they don't have primary keys.
-        self.automap_base.metadata.reflect(
-            bind=self.db.engine,
-            schema=schema,
+        self.automap_base.prepare(
+            self.db.engine, reflect=False, schema=schema, **self.reflection_kwargs
         )
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
