@@ -2,10 +2,8 @@
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "A SQLAlchemy-based database toolkit."
 name = "macrostrat.database"
-packages = [
-  {include = "macrostrat"},
-]
-version = "2.1.2"
+packages = [{ include = "macrostrat" }]
+version = "2.1.3"
 
 [tool.poetry.dependencies]
 GeoAlchemy2 = "^0.9.4"
@@ -18,7 +16,7 @@ python = "^3.8"
 sqlparse = "^0.4.0"
 
 [tool.poetry.dev-dependencies]
-"macrostrat.utils" = {path = "../utils", develop = true}
+"macrostrat.utils" = { path = "../utils", develop = true }
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
