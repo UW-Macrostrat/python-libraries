@@ -76,11 +76,11 @@ def test_sql_interpolation_psycopg(db):
     assert infer_is_sql_text(sql)
 
     # db.engine.execute(sql, name="Test")
-    db.run_sql(sql, params=dict(name="Test"), stop_on_error=True)
+    db.run_sql(sql, params=dict(name="Test"), raise_errors=True)
     db.session.commit()
 
     sql1 = "SELECT * FROM sample WHERE name = :name"
-    res = list(db.run_sql(sql1, params=dict(name="Test"), stop_on_error=True))[0]
+    res = list(db.run_sql(sql1, params=dict(name="Test"), raise_errors=True))[0]
     assert res.first().name == "Test"
 
 
@@ -99,7 +99,7 @@ def test_sql_identifier(db):
         .as_string(db.engine.raw_connection().cursor())
     )
     assert infer_is_sql_text(sql)
-    res = list(db.run_sql(sql, stop_on_error=True))
+    res = list(db.run_sql(sql, raise_errors=True))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
 
