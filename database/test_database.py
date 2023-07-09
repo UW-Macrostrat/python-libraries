@@ -112,10 +112,9 @@ def test_raises_deprecation(db):
         .as_string(db.engine.raw_connection().cursor())
     )
     with warns(DeprecationWarning):
-        db.run_sql(text(sql), stop_on_error=True)
+        db.run_sql(sql, stop_on_error=True)
 
 
-@mark.skip(reason="This doesn't make as much sense with Sqlalchemy2.")
 def test_partial_identifier(db):
     """https://www.postgresql.org/docs/current/sql-prepare.html"""
     conn = db.engine.raw_connection()
@@ -127,8 +126,7 @@ def test_partial_identifier(db):
     )
 
     with db.engine.begin() as conn:
-        _text = text(sql).bindparams(name="Test")
-        res = conn.execute(sql).scalar()
+        res = conn.exec_driver_sql(sql, dict(name="Test")).scalar()
         assert res == "Test"
 
 

@@ -174,11 +174,13 @@ def _get_cursor(connectable):
     conn = connectable
     if hasattr(conn, "raw_connection"):
         conn = conn.raw_connection()
-    while hasattr(conn, "connection"):
-        if callable(conn.connection):
-            conn = conn.connection()
+    while hasattr(conn, "driver_connection") or hasattr(conn, "connection"):
+        if hasattr(conn, "driver_connection"):
+            conn = conn.driver_connection
         else:
             conn = conn.connection
+        if callable(conn):
+            conn = conn()
     if hasattr(conn, "cursor"):
         conn = conn.cursor()
 
