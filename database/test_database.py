@@ -4,11 +4,12 @@ from pytest import fixture
 from dotenv import load_dotenv
 from psycopg2.sql import SQL, Identifier, Literal, Placeholder
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.sql import text
 
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
 from macrostrat.database.utils import temp_database, infer_is_sql_text
-from pytest import warns, raises
+from pytest import warns, raises, mark
 
 
 load_dotenv()
@@ -124,8 +125,9 @@ def test_partial_identifier(db):
         .as_string(cursor)
     )
 
-    res = db.engine.execute(sql, name="Test").scalar()
-    assert res == "Test"
+    with db.engine.begin() as conn:
+        res = conn.exec_driver_sql(sql, dict(name="Test")).scalar()
+        assert res == "Test"
 
 
 def test_deprecated_keyword(db):

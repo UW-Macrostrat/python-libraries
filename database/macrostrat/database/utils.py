@@ -5,7 +5,7 @@ from sqlalchemy.sql import ClauseElement
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine, Connection, Transaction
 from sqlalchemy.schema import Table
-from sqlalchemy import MetaData, create_engine, text
+from sqlalchemy import MetaData, create_engine, TextClause, text
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
 from sqlalchemy.exc import InvalidRequestError
@@ -120,6 +120,8 @@ def _get_queries(sql, interpret_as_file=None):
         for i in sql:
             queries.extend(_get_queries(i, interpret_as_file=interpret_as_file))
         return queries
+    if isinstance(sql, TextClause):
+        return [sql]
     if isinstance(sql, SQL):
         return [sql]
 
@@ -172,11 +174,13 @@ def _get_cursor(connectable):
     conn = connectable
     if hasattr(conn, "raw_connection"):
         conn = conn.raw_connection()
-    while hasattr(conn, "connection"):
-        if callable(conn.connection):
-            conn = conn.connection()
+    while hasattr(conn, "driver_connection") or hasattr(conn, "connection"):
+        if hasattr(conn, "driver_connection"):
+            conn = conn.driver_connection
         else:
             conn = conn.connection
+        if callable(conn):
+            conn = conn()
     if hasattr(conn, "cursor"):
         conn = conn.cursor()
 
@@ -258,7 +262,7 @@ def _run_sql(connectable, sql, **kwargs):
             if isinstance(query, (SQL, Composed)):
                 query = _render_query(query, connectable)
 
-            sql_text = query
+            sql_text = str(query)
             if isinstance(query, str):
                 sql_text = format(query, strip_comments=True).strip()
                 if sql_text == "":
@@ -273,7 +277,9 @@ def _run_sql(connectable, sql, **kwargs):
                 conn = _get_connection(connectable)
                 res = conn.exec_driver_sql(query, params)
             else:
-                res = connectable.execute(text(query), params=params)
+                if not isinstance(query, TextClause):
+                    query = text(query)
+                res = connectable.execute(query, params)
             yield res
             if trans is not None:
                 trans.commit()
