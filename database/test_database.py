@@ -104,6 +104,16 @@ def test_sql_identifier(db):
     assert res[0].scalar() == "Test"
 
 
+def test_raises_deprecation(db):
+    sql = (
+        SQL("SELECT name FROM {table} WHERE name = {name}")
+        .format(table=Identifier("sample"), name=Literal("Test"))
+        .as_string(db.engine.raw_connection().cursor())
+    )
+    with warns(DeprecationWarning):
+        db.run_sql(sql, stop_on_error=True)
+
+
 def test_partial_identifier(db):
     """https://www.postgresql.org/docs/current/sql-prepare.html"""
     conn = db.engine.raw_connection()
