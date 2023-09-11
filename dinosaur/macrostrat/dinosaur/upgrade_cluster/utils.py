@@ -61,23 +61,12 @@ def database_cluster(
         container.remove()
 
 
-def wait_for_cluster(container: Container, url: str):
+def wait_for_ready(engine):
     """
     Wait for a database to be ready.
     """
-    print("Waiting for database %s to be ready...", url)
-    log.debug("Waiting for database %s to be ready...", url)
-
-    is_running = False
-    while not is_running:
-        print(container.status)
-        time.sleep(0.1)
-        is_running = container.status == "created"
-
     is_ready = False
-    engine = create_engine(url)
     while not is_ready:
-        # log_step(container)
         try:
             engine.connect()
         except OperationalError as err:
@@ -85,6 +74,23 @@ def wait_for_cluster(container: Container, url: str):
         else:
             is_ready = True
         time.sleep(0.1)
+
+
+def wait_for_cluster(container: Container, url: str):
+    """
+    Wait for a database to be ready.
+    """
+    log_text = "Waiting for database %s to be ready..." % url
+    print(log_text)
+    log.info(log_text)
+
+    is_running = False
+    while not is_running:
+        print(container.status)
+        time.sleep(0.1)
+        is_running = container.status == "created"
+
+    wait_for_ready(create_engine(url))
     print("Database cluster is ready")
     log.debug("Database cluster is ready")
     # log_step(container)
