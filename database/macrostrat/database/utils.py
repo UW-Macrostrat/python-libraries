@@ -51,13 +51,15 @@ def infer_is_sql_text(_string: str) -> bool:
         "DELETE",
         "ALTER",
         "SET",
+        "GRANT",
+        "WITH",
     ]
     lines = _string.split("\n")
     if len(lines) > 1:
         return True
     _string = _string.lower()
     for i in keywords:
-        if _string.strip().startswith(i.lower()):
+        if _string.strip().startswith(i.lower() + " "):
             return True
     return False
 
@@ -92,7 +94,20 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 def pretty_print(sql, **kwargs):
     for line in sql.split("\n"):
-        for i in ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]:
+        for i in [
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "CREATE",
+            "DROP",
+            "DELETE",
+            "ALTER",
+            "SET",
+            "GRANT",
+            "WITH",
+            "NOTIFY",
+            "COPY",
+        ]:
             if not line.startswith(i):
                 continue
             start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
