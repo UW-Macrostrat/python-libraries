@@ -21,7 +21,7 @@ def pytest_addoption(parser):
 
 @fixture(scope="session")
 def docker_client():
-    environ.setdefault("DOCKER_HOST", "unix:///var/run/docker.sock")
+    # environ.setdefault("DOCKER_HOST", "unix:///var/run/docker.sock")
     client = DockerClient.from_env()
     return client
 
