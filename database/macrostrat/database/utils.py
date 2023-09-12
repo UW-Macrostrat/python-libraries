@@ -84,15 +84,7 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 def pretty_print(sql, **kwargs):
     for line in sql.split("\n"):
-        for i in [
-            "SELECT",
-            "INSERT",
-            "UPDATE",
-            "CREATE",
-            "DROP",
-            "DELETE",
-            "ALTER",
-        ]:
+        for i in ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]:
             if not line.startswith(i):
                 continue
             start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
@@ -451,11 +443,4 @@ def reflect_table(engine, tablename, *column_args, **kwargs):
     """
     schema = kwargs.pop("schema", "public")
     meta = MetaData(schema=schema)
-    return Table(
-        tablename,
-        meta,
-        *column_args,
-        autoload=True,
-        autoload_with=engine,
-        **kwargs,
-    )
+    return Table(tablename, meta, *column_args, autoload_with=engine, **kwargs)

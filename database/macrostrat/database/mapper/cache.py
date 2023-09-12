@@ -7,15 +7,16 @@ from .base import ModelHelperMixins
 
 log = get_logger(__name__)
 
+
 class AutomapError(Exception):
     pass
+
 
 class DatabaseModelCache(object):
     cache_file = None
 
     def __init__(self, cache_file=None):
         self.cache_file = cache_file
-
 
     @property
     def _metadata_cache_filename(self):
@@ -36,9 +37,7 @@ class DatabaseModelCache(object):
             log.info(f"Cached database models to {self.cache_file}")
         except IOError:
             # couldn't write the file for some reason
-            log.info(
-                f"Could not cache database models to {self.cache_file}"
-            )
+            log.info(f"Could not cache database models to {self.cache_file}")
 
     def _load_database_map(self):
         # We have hard-coded the cache file for now
@@ -54,6 +53,8 @@ class DatabaseModelCache(object):
             log.info(
                 f"Could not find database model cache ({self._metadata_cache_filename})"
             )
+        except Exception as exc:
+            log.error(f"Error loading database model cache: {exc}")
         return cached_metadata
 
     def automap_base(self):
@@ -66,4 +67,3 @@ class DatabaseModelCache(object):
             base.loaded_from_cache = True
         base.builder = self
         return base
-
