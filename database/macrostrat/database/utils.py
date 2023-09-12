@@ -1,11 +1,11 @@
 from click import echo, secho
 from sqlalchemy.exc import ProgrammingError, IntegrityError, InternalError
 from sqlparse import split, format
-from sqlalchemy.sql import ClauseElement
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.engine import Engine, Connection, Transaction
+from sqlalchemy.sql.elements import TextClause, ClauseElement
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import Engine, Connection
 from sqlalchemy.schema import Table
-from sqlalchemy import MetaData, create_engine, TextClause, text
+from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
 from sqlalchemy_utils import create_database, database_exists, drop_database
 from sqlalchemy.exc import InvalidRequestError
