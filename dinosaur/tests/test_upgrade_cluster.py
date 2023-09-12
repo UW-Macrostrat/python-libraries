@@ -94,11 +94,11 @@ def test_schema_clone(postgres_11_db):
         assert insp.has_table("spatial_ref_sys", schema="public")
 
 
-def test_upgrade_cluster(postgres_11_cluster):
+def test_upgrade_cluster(postgres_11_cluster_volume):
     """Test upgrade of a PostgreSQL cluster."""
 
-    assert check_database_cluster_version(client, postgres_11_cluster) == 11
+    assert check_database_cluster_version(client, postgres_11_cluster_volume) == 11
 
-    upgrade_database_cluster(client, postgres_11_cluster, 14, ["test_database"])
+    upgrade_database_cluster(client, postgres_11_cluster_volume, 14, ["test_database"])
 
-    assert check_database_cluster_version(client, postgres_11_cluster) == 14
+    assert check_database_cluster_version(client, postgres_11_cluster_volume) == 14
