@@ -27,6 +27,13 @@ Make sure to keep development dependencies (e.g., for testing) separate from cor
 Tests can be run using `make test`, or, for added control, `poetry run pytest ...`.
 Docker is required to run all tests, as some of them require several containers.
 
+### Testing the `macrostrat.app_frame` module
+
+The `app_frame` module can be tested using a simple mock application,
+which can be controlled using the `poetry run test-app` command. This command
+presents the application's CLI interface, which can be used to start and stop
+the application, e.g. with `poetry run test-app up`.`
+
 ## Releasing on PyPI
 
 This repository is designed to facilitate rapid iteration of its components
