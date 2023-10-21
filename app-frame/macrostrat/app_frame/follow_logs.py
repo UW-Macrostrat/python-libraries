@@ -51,6 +51,7 @@ def follow_logs_with_reloader(
     try:
         with wait_for_keys():
             while True:
+                sleep(1)
                 # Read input from stdin
                 try:
                     key = sys.stdin.read(1)
