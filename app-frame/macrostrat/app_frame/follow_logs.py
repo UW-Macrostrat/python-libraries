@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from enum import Enum
 from subprocess import Popen
 from time import sleep
+from typing import Generator
+from datetime import datetime
 
 from macrostrat.utils import get_logger
 
@@ -14,7 +16,10 @@ from .core import Application
 log = get_logger(__name__)
 
 
-def follow_logs(app: Application, container: str, **kwargs):
+def follow_logs(app: Application, container: str | None = None, **kwargs):
+    """Follow logs for a container"""
+    start_time = datetime.now()
+
     app.info("Following container logs", style="green bold")
     app.info(
         f"- Press [bold]q[/bold] or [bold]Ctrl+c[/bold] to exit logs (:app_name: will keep running)."
@@ -27,12 +32,14 @@ def follow_logs(app: Application, container: str, **kwargs):
     )
     # Should integrate this into the macrostrat.utils.cmd function
     # env = kwargs.pop("env", _build_compose_env())
-    args = ["docker", "compose", "logs", "-f", "--since=1s"]
-    log.debug(" ".join(args))
-    sleep(0.1)
-    app.console.print()
-
-    if container is not None and container != "":
+    args = [
+        "docker",
+        "compose",
+        "logs",
+        "-f",
+        "--since=" + start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+    ]
+    if container is not None:
         args.append(container)
     return Popen(args, **kwargs)
 
@@ -43,29 +50,21 @@ class Result(Enum):
     EXIT = 3
 
 
-def follow_logs_with_reloader(
-    app: Application,
-    container: str,
-) -> Result:
-    proc = follow_logs(app, container)
-    try:
-        with wait_for_keys():
-            while True:
-                sleep(1)
-                # Read input from stdin
-                try:
-                    key = sys.stdin.read(1)
-                    if key == "q" or key == "Q":
-                        return Result.CONTINUE
-                    elif key == "r" or key == "R":
-                        return Result.RESTART
-                    elif key == "x" or key == "X":
-                        return Result.EXIT
-                except IOError:
-                    pass
-    finally:
-        proc.kill()
-        proc.wait()
+def command_stream(refresh_rate=1) -> Generator[Result, None, None]:
+    with wait_for_keys():
+        while True:
+            sleep(refresh_rate)
+            # Read input from stdin
+            try:
+                key = sys.stdin.read(1)
+                if key == "q" or key == "Q":
+                    yield Result.CONTINUE
+                elif key == "r" or key == "R":
+                    yield Result.RESTART
+                elif key == "x" or key == "X":
+                    yield Result.EXIT
+            except IOError:
+                pass
 
 
 @contextmanager
