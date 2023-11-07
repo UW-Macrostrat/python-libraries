@@ -396,6 +396,7 @@ files = []
 develop = true
 
 [package.dependencies]
+"macrostrat.utils" = "^1.0.0"
 requests = "^2.30.0"
 rich = "^13.3.5"
 toml = "^0.10.2"

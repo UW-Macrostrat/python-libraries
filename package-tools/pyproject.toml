@@ -12,6 +12,10 @@ requests = "^2.30.0"
 rich = "^13.3.5"
 toml = "^0.10.2"
 typer = "^0.9.0"
+"macrostrat.utils" = "^1.0.0"
+
+[tool.poetry.dev-dependencies]
+"macrostrat.utils" = { path = "../utils", develop = true }
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
