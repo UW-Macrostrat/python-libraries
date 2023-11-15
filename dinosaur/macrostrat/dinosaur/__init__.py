@@ -9,6 +9,7 @@ from migra.statements import check_for_drop
 from sqlalchemy import text
 from rich import print
 from typing import Callable
+import docker
 
 from macrostrat.utils import get_logger, cmd
 from macrostrat.database import Database
@@ -161,10 +162,18 @@ def db_migration(
             print(stmt, file=sys.stdout)
 
 
-def dump_schema(engine) -> str:
+def dump_schema(engine, image_name=None) -> str:
     flags, dbname = connection_args(engine)
-    res = cmd("pg_dump", "--schema-only", flags, dbname, capture_output=True)
-    return res.stdout.decode("utf-8")
+    flags_array = [f for f in flags.split(" ") if len(f) > 0]
+    args = ("pg_dump", "--schema-only", *flags_array, dbname)
+    if image_name is None:
+        # Run pg_dump locally
+        res = cmd(*args, capture_output=True)
+        return res.stdout.decode("utf-8")
+    else:
+        client = docker.from_env()
+        res = client.containers.run(image_name, args, network_mode="host", remove=True)
+        return res.decode("utf-8")
 
 
 def dump_schema_containerized(container, dbname) -> str:
@@ -176,9 +185,9 @@ def dump_schema_containerized(container, dbname) -> str:
 
 @contextmanager
 def create_schema_clone(
-    engine, db_url="postgresql://postgres@db:5432/sparrow_schema_clone"
+    engine, db_url="postgresql://postgres@db:5432/sparrow_schema_clone", image_name=None
 ):
-    schema = dump_schema(engine)
+    schema = dump_schema(engine, image_name=image_name)
     with temp_database(db_url) as clone_engine:
         # Not sure why we have to mess with this, but we do
         wait_for_ready(clone_engine)
@@ -224,6 +233,7 @@ class SchemaMigration:
 class MigrationManager:
     target_url = "postgresql://postgres@db:5432/sparrow_temp_migration"
     dry_run_url = "postgresql://postgres@db:5432/sparrow_schema_clone"
+    postgres_image_name = "postgres:15"
     schema = None
 
     def __init__(self, database, _init_function, migrations=None, schema=None):
@@ -310,7 +320,9 @@ class MigrationManager:
 
     def dry_run_migration(self, target):
         log.info("Running dry-run migration")
-        with create_schema_clone(self.db.engine, db_url=self.dry_run_url) as src:
+        with create_schema_clone(
+            self.db.engine, db_url=self.dry_run_url, image_name=self.postgres_image_name
+        ) as src:
             self._run_migration(src, target)
         log.info("Migration dry run successful")
 
