@@ -23,7 +23,10 @@ from macrostrat.dinosaur.upgrade_cluster.utils import (
     ensure_empty_docker_volume,
 )
 
-from macrostrat.dinosaur.upgrade_cluster import upgrade_database_cluster
+from macrostrat.dinosaur.upgrade_cluster import (
+    upgrade_database_cluster,
+    default_version_images,
+)
 from macrostrat.dinosaur.upgrade_cluster.describe import check_database_cluster_version
 
 root_dir = Path(__file__).parent
@@ -74,7 +77,9 @@ def postgres_11_db(postgres_11_cluster_volume):
 
 def test_dump_schema(postgres_11_db):
     """Test dumping of a PostgreSQL schema."""
-    schema_sql = dump_schema(postgres_11_db.engine)
+    schema_sql = dump_schema(
+        postgres_11_db.engine, image_name=default_version_images[11]
+    )
     assert "CREATE EXTENSION IF NOT EXISTS postgis" in schema_sql
     assert "CREATE TABLE public.sample" in schema_sql
 
@@ -85,7 +90,9 @@ def test_schema_clone(postgres_11_db):
     url = postgres_11_db.engine.url
     url_clone = url.set(database="test_schema_clone")
 
-    with create_schema_clone(postgres_11_db.engine, url_clone) as clone:
+    with create_schema_clone(
+        postgres_11_db.engine, url_clone, image_name=default_version_images[14]
+    ) as clone:
         conn = clone.connect()
         assert conn.execute(text("SELECT 1")).fetchone()[0] == 1
         insp = inspect(clone)
