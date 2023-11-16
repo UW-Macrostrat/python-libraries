@@ -9,6 +9,7 @@ from macrostrat.utils import get_logger
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert
 
+
 from .utils import (
     run_sql,
     get_or_create,

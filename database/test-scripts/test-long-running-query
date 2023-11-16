@@ -5,31 +5,17 @@ Run a long-running query to test if we can interrupt it.
 
 from macrostrat.database import Database
 from sys import argv, exit
+from sqlalchemy.exc import OperationalError
+
 
 db_conn = argv[1]
 print(f"Connecting to {db_conn}")
 
 db = Database(db_conn)
 
-# # Run a long-running query
-# try:
-#     db.run_sql("SELECT pg_sleep(10);")
-# except KeyboardInterrupt:
-#     print("Query was cancelled.")
-#     exit(1)
-
-# Sleep, and handle signal
-import time
-import signal
-import sys
-
-
-def signal_handler(sig, frame):
-    print("Query was cancelled.")
-    sys.exit(1)
-
-
-signal.signal(signal.SIGINT, signal_handler)
-
-time.sleep(10)
-print("Query was not cancelled.")
+try:
+    db.run_sql("SELECT pg_sleep(10);")
+except OperationalError as e:
+    if "canceling statement due to user request" in str(e):
+        print("Query canceled due to user request.")
+        exit(1)
