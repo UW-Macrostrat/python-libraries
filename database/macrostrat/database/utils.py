@@ -16,6 +16,8 @@ from pathlib import Path
 from warnings import warn
 from psycopg2.sql import SQL, Composable, Composed
 from re import search
+from macrostrat.utils import get_logger
+from .postgresql import _setup_psycopg2_wait_callback
 
 log = get_logger(__name__)
 
@@ -179,7 +181,7 @@ def _get_cursor(connectable):
     return conn
 
 
-def _get_connection(connectable):
+def _get_connection(connectable) -> Connection:
     if isinstance(connectable, Engine):
         return connectable.connect()
     if isinstance(connectable, Connection):
@@ -215,6 +217,8 @@ def _run_sql(connectable, sql, **kwargs):
         with connectable.connect() as conn:
             yield from _run_sql(conn, sql, **kwargs)
             return
+
+    _setup_psycopg2_wait_callback()
 
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
