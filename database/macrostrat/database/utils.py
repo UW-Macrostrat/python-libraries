@@ -15,6 +15,7 @@ from typing import Union, IO
 from pathlib import Path
 from warnings import warn
 from psycopg2.sql import SQL, Composable, Composed
+import signal
 from re import search
 
 log = get_logger(__name__)
@@ -179,7 +180,7 @@ def _get_cursor(connectable):
     return conn
 
 
-def _get_connection(connectable):
+def _get_connection(connectable) -> Connection:
     if isinstance(connectable, Engine):
         return connectable.connect()
     if isinstance(connectable, Connection):
@@ -216,6 +217,12 @@ def _run_sql(connectable, sql, **kwargs):
             yield from _run_sql(conn, sql, **kwargs)
             return
 
+    with ConnectionInterruptHandler(connectable):
+        yield from _run_sql_internal(connectable, sql, **kwargs)
+        return
+
+
+def _run_sql_internal(connectable, sql, **kwargs):
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
@@ -330,6 +337,44 @@ def run_sql(*args, **kwargs):
     if kwargs.pop("yield_results", False):
         return res
     return list(res)
+
+
+class ConnectionInterruptHandler(object):
+    # https://stackoverflow.com/questions/1112343/how-do-i-capture-sigint-in-python
+    def __init__(self, conn: Connection, sig=signal.SIGINT):
+        self.sig = sig
+        self.conn = conn
+
+    def __enter__(self):
+        self.interrupted = False
+        self.released = False
+
+        self.original_handler = signal.getsignal(self.sig)
+
+        def handler(signum, frame):
+            conn = self.conn
+            while hasattr(conn, "connection"):
+                conn = conn.connection
+            if hasattr(conn, "cancel"):
+                log.info("Cancelling query")
+                conn.cancel()
+
+            self.release()
+            self.interrupted = True
+            raise KeyboardInterrupt
+
+        signal.signal(self.sig, handler)
+        return self
+
+    def __exit__(self, type, value, tb):
+        self.release()
+
+    def release(self):
+        if self.released:
+            return False
+        signal.signal(self.sig, self.original_handler)
+        self.released = True
+        return True
 
 
 def execute(connectable, sql, params=None, stop_on_error=False):
