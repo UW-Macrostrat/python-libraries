@@ -1,4 +1,5 @@
 all:
+	poetry install
 	poetry run mono install
 
 publish:
