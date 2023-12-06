@@ -20,7 +20,7 @@ jobs:
 
       # Bundling
       - name: Install Python libraries 
-        run: poetry install && make
+        run: make
 
       - name: Run tests
         run: make test
