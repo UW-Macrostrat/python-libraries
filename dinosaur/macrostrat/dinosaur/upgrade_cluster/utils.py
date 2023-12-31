@@ -47,11 +47,14 @@ def database_cluster(
         user="postgres",
         ports=ports,
     )
-    log.info(f"Started container {container.name} ({image})")
+    log.info(f"Starting container {container.name} ({image})")
 
     url = f"postgresql://postgres@localhost:{port}/postgres"
     try:
         wait_for_cluster(container, url)
+
+        log.info(f"Started container {container.name} ({image})")
+
         yield container
     finally:
         # Dump all container logs
@@ -61,19 +64,27 @@ def database_cluster(
         container.remove()
 
 
-def wait_for_ready(engine):
+def wait_for_ready(engine, timeout=30):
     """
     Wait for a database to be ready.
     """
     is_ready = False
+    elapsed = 0
+    error = None
     while not is_ready:
         try:
             engine.connect()
         except OperationalError as err:
+            if error is None or error.code != err.code:
+                error = err
+                print(error)
             pass
         else:
             is_ready = True
         time.sleep(0.1)
+        elapsed += 0.1
+        if elapsed > timeout:
+            raise TimeoutError("Database was not found within timeout period")
 
 
 def wait_for_cluster(container: Container, url: str):
@@ -84,11 +95,24 @@ def wait_for_cluster(container: Container, url: str):
     print(log_text)
     log.info(log_text)
 
+    # Wait half a second to ensure that the container is stable
+    stability_timeout = 0.5
+
     is_running = False
-    while not is_running:
-        print(container.status)
+    time_running = 0
+    while time_running < stability_timeout:
+        container.reload()
         time.sleep(0.1)
-        is_running = container.status == "created"
+        print(container.status)
+        is_running = container.status == "running"
+        if is_running:
+            time_running += 0.1
+        else:
+            time_running = 0
+        if container.status == "exited":
+            raise RuntimeError(
+                "Container exited unexpectedly:\n" + container.logs().decode("utf-8")
+            )
 
     wait_for_ready(create_engine(url))
     print("Database cluster is ready")
