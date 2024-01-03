@@ -13,7 +13,7 @@ from typer.models import TyperInfo
 
 from .compose import check_status, compose
 from .core import Application
-from .follow_logs import Result, follow_logs_with_reloader
+from .follow_logs import Result, command_stream, follow_logs
 
 log = get_logger(__name__)
 
@@ -94,20 +94,51 @@ def up(
     app = ctx.find_object(Application)
     if app is None:
         raise ValueError("Could not find application config")
-    if container is None:
-        _container = ""
 
-    compose("build", _container)
+    start_app(app, container=container, force_recreate=force_recreate)
+    proc = follow_logs(app, container)
+    try:
+        for res in command_stream(refresh_rate=1):
+            # Stop the logs process and wait for it to exit
+            if res == Result.RESTART:
+                app.info("Restarting :app_name: server...", style="bold")
+                start_app(app, container=container, force_recreate=True)
+            elif res == Result.EXIT:
+                app.info("Stopping :app_name: server...", style="bold")
+                ctx.invoke(down, ctx)
+                return
+            elif res == Result.CONTINUE:
+                app.info(
+                    "[bold]Detaching from logs[/bold] [dim](:app_name: will continue to run)[/dim]",
+                    style="bold",
+                )
+                return
+    except Exception as e:
+        proc.kill()
+        proc.wait()
+
+
+def start_app(
+    app: Application,
+    container: str = typer.Argument(None),
+    force_recreate: bool = False,
+):
+    """Start the :app_name: server and follow logs."""
+
+    if container:
+        compose("build", container)
+    else:
+        compose("build")
 
     sleep(0.1)
 
-    res = compose(
-        "up",
-        "--no-start",
-        "--remove-orphans",
-        "--force-recreate" if force_recreate else "",
-        _container,
-    )
+    args = ["up", "--no-start", "--remove-orphans"]
+    if force_recreate:
+        args.append("--force-recreate")
+    if container:
+        args.append(container)
+
+    res = compose(*args)
     if res.returncode != 0:
         app.info(
             "One or more containers did not build successfully, aborting.",
@@ -126,20 +157,6 @@ def up(
     print()
 
     run_restart_commands(app, running_containers)
-
-    res = follow_logs_with_reloader(app, _container)
-    if res == Result.RESTART:
-        app.info("Restarting :app_name: server...", style="bold")
-        ctx.invoke(up, ctx, container)
-    elif res == Result.EXIT:
-        app.info("Stopping :app_name: server...", style="bold")
-        ctx.invoke(down, ctx)
-    elif res == Result.CONTINUE:
-        app.info(
-            "[bold]Detaching from logs[/bold] [dim](:app_name: will continue to run)[/dim]",
-            style="bold",
-        )
-        return
 
 
 def run_restart_commands(app, running_containers):

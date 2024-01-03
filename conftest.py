@@ -29,6 +29,7 @@ def docker_client():
 def database_url(docker_client):
     """Creates a testing database using an enviornment-provided connection string or by spinning up a Docker container."""
     testing_db = environ.get("TESTING_DATABASE")
+    image = environ.get("POSTGRES_IMAGE", "postgis/postgis:14-3.3")
 
     # Check if testing_db is accessible
     if testing_db is not None:
@@ -43,9 +44,7 @@ def database_url(docker_client):
     elif docker_client is not None:
         port = get_unused_port()
 
-        with database_cluster(
-            docker_client, "postgis/postgis:14-3.3", None, port=port
-        ) as container:
+        with database_cluster(docker_client, image, None, port=port) as container:
             # Connect to cluster
             url = f"postgresql://postgres@localhost:{port}/postgres"
             yield url
