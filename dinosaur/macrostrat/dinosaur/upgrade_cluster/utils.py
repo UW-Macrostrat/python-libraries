@@ -8,6 +8,7 @@ from docker.models.containers import Container
 from macrostrat.utils import get_logger
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
+from typing import Optional, Mapping
 
 log = get_logger(__name__)
 
@@ -18,7 +19,7 @@ def database_cluster(
     image: str,
     data_volume: str = None,
     remove=True,
-    environment={},
+    environment: Optional[Mapping[str, str]] = None,
     port=None,
 ):
     """
@@ -26,6 +27,8 @@ def database_cluster(
     under a managed installation of Sparrow.
     """
     print("Starting database cluster...")
+    if environment is None:
+        environment = {}
     environment.setdefault("POSTGRES_HOST_AUTH_METHOD", "trust")
     environment.setdefault("POSTGRES_DB", "postgres")
     environment.setdefault("PGUSER", "postgres")

@@ -4,13 +4,14 @@ from pytest import fixture
 from dotenv import load_dotenv
 from psycopg2.sql import SQL, Identifier, Literal, Placeholder
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.sql import text
 
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
 from macrostrat.database.utils import temp_database, infer_is_sql_text
 from macrostrat.database.postgresql import table_exists
-from pytest import warns, raises
-
+from pytest import warns, raises, mark
+from os import environ
 
 load_dotenv()
 
@@ -26,6 +27,14 @@ def engine(database_url, pytestconfig):
 @fixture(scope="session")
 def db(engine):
     return Database(engine.url)
+
+
+@fixture(scope="function")
+def conn(db):
+    """A connection managed by the database session."""
+    connection = db.session.connection()
+    yield connection
+    db.session.rollback()
 
 
 def test_database(db):
@@ -125,8 +134,9 @@ def test_partial_identifier(db):
         .as_string(cursor)
     )
 
-    res = db.engine.execute(sql, name="Test").scalar()
-    assert res == "Test"
+    with db.engine.begin() as conn:
+        res = conn.exec_driver_sql(sql, dict(name="Test")).scalar()
+        assert res == "Test"
 
 
 def test_deprecated_keyword(db):
@@ -189,6 +199,71 @@ def test_server_parameters_function_def(db):
         db.run_sql(sql, raise_errors=True)
     # This should not raise
     db.run_sql(sql, raise_errors=True, has_server_binds=False)
+
+
+def test_long_running_sql(db):
+    sql = "SELECT pg_sleep(0.5)"
+    res = list(db.run_sql(sql, raise_errors=True))
+    assert len(res) == 1
+    assert res[0].scalar() == ""
+
+
+def test_close_connection(conn):
+    """
+    Basic test demonstrating the underlying capability to kill a long-running query
+    by closing the connection to the database.
+    """
+
+    import threading
+    from psycopg2.extensions import QueryCanceledError
+    from sqlalchemy.exc import DBAPIError
+
+    sql = text("SELECT pg_sleep(10)")
+
+    seconds = 1
+    t = threading.Timer(seconds, conn.connection.cancel)
+    t.start()
+
+    try:
+        conn.execute(sql)
+        assert False
+    except DBAPIError as e:
+        if type(e.orig) == QueryCanceledError:
+            print("Long running query was cancelled.")
+            assert True
+    t.cancel()
+
+
+def test_sigint_cancel(db):
+    """
+    Basic test demonstrating the underlying capability to kill a long-running query
+    by sending a SIGINT.
+    """
+
+    import subprocess
+    import signal
+    import time
+
+    db_url = str(db.engine.url)
+
+    # Time how long it takes to run the script
+    start = time.time()
+
+    script = relative_path(__file__, "test-scripts/test-long-running-query")
+
+    p = subprocess.Popen(
+        [
+            str(script),
+            db_url,
+        ],
+    )
+    time.sleep(0.5)
+    p.send_signal(signal.SIGINT)
+    p.wait()
+    assert p.returncode == 1
+    # Make sure it didn't take too long
+    dT = time.time() - start
+    assert dT < 2
 
 
 def test_check_table_exists(db):

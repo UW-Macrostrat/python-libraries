@@ -33,7 +33,6 @@ class DatabaseMapper:
     automap_error = None
     _models = None
     _tables = None
-    _prepared = False
 
     def __init__(self, db, **kwargs):
         # https://docs.sqlalchemy.org/en/13/orm/extensions/automap.html#sqlalchemy.ext.automap.AutomapBase.prepare
@@ -77,23 +76,15 @@ class DatabaseMapper:
     def reflect_schema(self, schema, use_cache=True):
         if use_cache and self.automap_base.loaded_from_cache:
             log.info("Database models for %s have been loaded from cache", schema)
-            self.automap_base.prepare(
-                self.db.engine, schema=schema, **self.reflection_kwargs
-            )
+            self.automap_base.prepare(schema=schema, **self.reflection_kwargs)
             return
         log.info(f"Reflecting schema {schema}")
         if schema == "public":
             schema = None
-        if not self._prepared:
-            self.automap_base.prepare(
-                self.db.engine, reflect=False, **self.reflection_kwargs
-            )
-            self._prepared = True
         # Reflect tables in schemas we care about
         # Note: this will not reflect views because they don't have primary keys.
-        self.automap_base.metadata.reflect(
-            bind=self.db.engine,
-            schema=schema,
+        self.automap_base.prepare(
+            autoload_with=self.db.engine, schema=schema, **self.reflection_kwargs
         )
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)

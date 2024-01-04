@@ -7,6 +7,8 @@ from sqlalchemy.exc import CompileError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert, text
 from sqlalchemy.dialects import postgresql
+import psycopg2
+
 
 _import_mode = ContextVar("import-mode", default="do-nothing")
 
@@ -14,7 +16,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..database import Database
-
 
 # https://stackoverflow.com/questions/33307250/postgresql-on-conflict-in-sqlalchemy/62305344#62305344
 @contextmanager
@@ -57,6 +58,20 @@ def prefix_inserts(insert, compiler, **kw):
     return compiler.visit_insert(insert, **kw)
 
 
+_psycopg2_setup_was_run = ContextVar("psycopg2-setup-was-run", default=False)
+
+
+def _setup_psycopg2_wait_callback():
+    """Set up the wait callback for PostgreSQL connections. This allows for query cancellation with Ctrl-C."""
+    # TODO: we might want to do this only once on engine creation
+    # https://github.com/psycopg/psycopg2/issues/333
+    val = _psycopg2_setup_was_run.get()
+    if val:
+        return
+    psycopg2.extensions.set_wait_callback(psycopg2.extras.wait_select)
+    _psycopg2_setup_was_run.set(True)
+
+
 def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
     """Check if a table exists in a PostgreSQL database."""
     sql = """SELECT EXISTS (
@@ -68,3 +83,4 @@ def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
     return db.session.execute(
         text(sql), params=dict(schema=schema, table_name=table_name)
     ).scalar()
+

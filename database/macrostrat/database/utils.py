@@ -1,9 +1,9 @@
 from click import echo, secho
 from sqlalchemy.exc import ProgrammingError, IntegrityError, InternalError
 from sqlparse import split, format
-from sqlalchemy.sql import ClauseElement
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.engine import Engine, Connection, Transaction
+from sqlalchemy.sql.elements import TextClause, ClauseElement
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import Engine, Connection
 from sqlalchemy.schema import Table
 from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
@@ -16,6 +16,8 @@ from pathlib import Path
 from warnings import warn
 from psycopg2.sql import SQL, Composable, Composed
 from re import search
+from macrostrat.utils import get_logger
+from .postgresql import _setup_psycopg2_wait_callback
 
 log = get_logger(__name__)
 
@@ -84,15 +86,7 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 def pretty_print(sql, **kwargs):
     for line in sql.split("\n"):
-        for i in [
-            "SELECT",
-            "INSERT",
-            "UPDATE",
-            "CREATE",
-            "DROP",
-            "DELETE",
-            "ALTER",
-        ]:
+        for i in ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]:
             if not line.startswith(i):
                 continue
             start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
@@ -120,6 +114,8 @@ def _get_queries(sql, interpret_as_file=None):
         for i in sql:
             queries.extend(_get_queries(i, interpret_as_file=interpret_as_file))
         return queries
+    if isinstance(sql, TextClause):
+        return [sql]
     if isinstance(sql, SQL):
         return [sql]
 
@@ -172,18 +168,20 @@ def _get_cursor(connectable):
     conn = connectable
     if hasattr(conn, "raw_connection"):
         conn = conn.raw_connection()
-    while hasattr(conn, "connection"):
-        if callable(conn.connection):
-            conn = conn.connection()
+    while hasattr(conn, "driver_connection") or hasattr(conn, "connection"):
+        if hasattr(conn, "driver_connection"):
+            conn = conn.driver_connection
         else:
             conn = conn.connection
+        if callable(conn):
+            conn = conn()
     if hasattr(conn, "cursor"):
         conn = conn.cursor()
 
     return conn
 
 
-def _get_connection(connectable):
+def _get_connection(connectable) -> Connection:
     if isinstance(connectable, Engine):
         return connectable.connect()
     if isinstance(connectable, Connection):
@@ -219,6 +217,8 @@ def _run_sql(connectable, sql, **kwargs):
         with connectable.connect() as conn:
             yield from _run_sql(conn, sql, **kwargs)
             return
+
+    _setup_psycopg2_wait_callback()
 
     params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
@@ -258,7 +258,7 @@ def _run_sql(connectable, sql, **kwargs):
             if isinstance(query, (SQL, Composed)):
                 query = _render_query(query, connectable)
 
-            sql_text = query
+            sql_text = str(query)
             if isinstance(query, str):
                 sql_text = format(query, strip_comments=True).strip()
                 if sql_text == "":
@@ -273,7 +273,9 @@ def _run_sql(connectable, sql, **kwargs):
                 conn = _get_connection(connectable)
                 res = conn.exec_driver_sql(query, params)
             else:
-                res = connectable.execute(text(query), params=params)
+                if not isinstance(query, TextClause):
+                    query = text(query)
+                res = connectable.execute(query, params)
             yield res
             if trans is not None:
                 trans.commit()
@@ -445,11 +447,4 @@ def reflect_table(engine, tablename, *column_args, **kwargs):
     """
     schema = kwargs.pop("schema", "public")
     meta = MetaData(schema=schema)
-    return Table(
-        tablename,
-        meta,
-        *column_args,
-        autoload=True,
-        autoload_with=engine,
-        **kwargs,
-    )
+    return Table(tablename, meta, *column_args, autoload_with=engine, **kwargs)

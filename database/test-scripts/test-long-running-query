@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+"""
+Run a long-running query to test if we can interrupt it.
+"""
+
+from macrostrat.database import Database
+from sys import argv, exit
+from sqlalchemy.exc import OperationalError
+
+
+db_conn = argv[1]
+print(f"Connecting to {db_conn}")
+
+db = Database(db_conn)
+
+try:
+    db.run_sql("SELECT pg_sleep(10);")
+except OperationalError as e:
+    if "canceling statement due to user request" in str(e):
+        print("Query canceled due to user request.")
+        exit(1)
