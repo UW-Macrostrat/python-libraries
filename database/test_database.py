@@ -8,6 +8,7 @@ from sqlalchemy.exc import ProgrammingError
 from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
 from macrostrat.database.utils import temp_database, infer_is_sql_text
+from macrostrat.database.postgresql import table_exists
 from pytest import warns, raises
 
 
@@ -188,3 +189,14 @@ def test_server_parameters_function_def(db):
         db.run_sql(sql, raise_errors=True)
     # This should not raise
     db.run_sql(sql, raise_errors=True, has_server_binds=False)
+
+
+def test_check_table_exists(db):
+    tables = db.inspector.get_table_names()
+    assert "sample" in tables
+    assert "samplea" not in tables
+
+
+def test_check_table_exists_postgresql(db):
+    assert table_exists(db, "sample")
+    assert not table_exists(db, "samplea")

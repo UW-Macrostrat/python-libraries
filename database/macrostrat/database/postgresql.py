@@ -1,12 +1,20 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
 from contextvars import ContextVar
 
 from sqlalchemy.exc import CompileError
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql.expression import Insert
+from sqlalchemy.sql.expression import Insert, text
 from sqlalchemy.dialects import postgresql
 
 _import_mode = ContextVar("import-mode", default="do-nothing")
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..database import Database
+
 
 # https://stackoverflow.com/questions/33307250/postgresql-on-conflict-in-sqlalchemy/62305344#62305344
 @contextmanager
@@ -47,3 +55,16 @@ def prefix_inserts(insert, compiler, **kw):
             index_elements=insert.table.primary_key
         )
     return compiler.visit_insert(insert, **kw)
+
+
+def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
+    """Check if a table exists in a PostgreSQL database."""
+    sql = """SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = :schema
+          AND table_name = :table_name
+    );"""
+
+    return db.session.execute(
+        text(sql), params=dict(schema=schema, table_name=table_name)
+    ).scalar()
