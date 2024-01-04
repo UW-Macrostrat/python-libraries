@@ -29,6 +29,14 @@ def db(engine):
     return Database(engine.url)
 
 
+@fixture(scope="function")
+def conn(db):
+    """A connection managed by the database session."""
+    connection = db.session.connection()
+    yield connection
+    db.session.rollback()
+
+
 def test_database(db):
     # Get schema files
     schema_files = Path(relative_path(__file__, "test-fixtures")).glob("*.sql")
@@ -200,7 +208,7 @@ def test_long_running_sql(db):
     assert res[0].scalar() == ""
 
 
-def test_close_connection(db):
+def test_close_connection(conn):
     """
     Basic test demonstrating the underlying capability to kill a long-running query
     by closing the connection to the database.
@@ -210,7 +218,6 @@ def test_close_connection(db):
     from psycopg2.extensions import QueryCanceledError
     from sqlalchemy.exc import DBAPIError
 
-    conn = db.session.connection()
     sql = text("SELECT pg_sleep(10)")
 
     seconds = 1
@@ -268,4 +275,3 @@ def test_check_table_exists(db):
 def test_check_table_exists_postgresql(db):
     assert table_exists(db, "sample")
     assert not table_exists(db, "samplea")
-
