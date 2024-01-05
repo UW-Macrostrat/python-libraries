@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..database import Database
 
+
 # https://stackoverflow.com/questions/33307250/postgresql-on-conflict-in-sqlalchemy/62305344#62305344
 @contextmanager
 def on_conflict(action="restrict"):
@@ -30,6 +31,8 @@ def on_conflict(action="restrict"):
 # @compiles(Insert, "postgresql")
 def prefix_inserts(insert, compiler, **kw):
     """Conditionally adapt insert statements to use on-conflict resolution (a PostgreSQL feature)"""
+    if insert._post_values_clause is not None:
+        return compiler.visit_insert(insert, **kw)
     action = _import_mode.get()
     if action == "do-update":
         try:
@@ -83,4 +86,3 @@ def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
     return db.session.execute(
         text(sql), params=dict(schema=schema, table_name=table_name)
     ).scalar()
-
