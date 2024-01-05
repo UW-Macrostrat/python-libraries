@@ -10,22 +10,22 @@ from sqlalchemy.dialects import postgresql
 import psycopg2
 
 
-_import_mode = ContextVar("import-mode", default="do-nothing")
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..database import Database
 
+_insert_mode = ContextVar("insert-mode", default="do-nothing")
+
 
 # https://stackoverflow.com/questions/33307250/postgresql-on-conflict-in-sqlalchemy/62305344#62305344
 @contextmanager
 def on_conflict(action="restrict"):
-    token = _import_mode.set(action)
+    token = _insert_mode.set(action)
     try:
         yield
     finally:
-        _import_mode.reset(token)
+        _insert_mode.reset(token)
 
 
 # @compiles(Insert, "postgresql")
@@ -33,7 +33,8 @@ def prefix_inserts(insert, compiler, **kw):
     """Conditionally adapt insert statements to use on-conflict resolution (a PostgreSQL feature)"""
     if insert._post_values_clause is not None:
         return compiler.visit_insert(insert, **kw)
-    action = _import_mode.get()
+
+    action = _insert_mode.get()
     if action == "do-update":
         try:
             params = insert.compile().params
