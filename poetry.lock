@@ -344,7 +344,7 @@ url = "app-frame"
 
 [[package]]
 name = "macrostrat-database"
-version = "3.0.0-beta1"
+version = "3.0.0"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
 python-versions = "^3.8"
@@ -408,6 +408,24 @@ typer = "^0.9.0"
 [package.source]
 type = "directory"
 url = "package-tools"
+
+[[package]]
+name = "macrostrat-subsystem-manager"
+version = "1.1.0"
+description = "A control script framework for containerized applications."
+optional = false
+python-versions = "^3.10"
+files = []
+develop = true
+
+[package.dependencies]
+"macrostrat.utils" = "^1.1.0"
+python-dotenv = "^1.0.0"
+toposort = "^1.5"
+
+[package.source]
+type = "directory"
+url = "subsystem-manager"
 
 [[package]]
 name = "macrostrat-utils"
@@ -978,6 +996,17 @@ files = [
 ]
 
 [[package]]
+name = "toposort"
+version = "1.10"
+description = "Implements a topological sort algorithm."
+optional = false
+python-versions = "*"
+files = [
+    {file = "toposort-1.10-py3-none-any.whl", hash = "sha256:cbdbc0d0bee4d2695ab2ceec97fe0679e9c10eab4b2a87a9372b929e70563a87"},
+    {file = "toposort-1.10.tar.gz", hash = "sha256:bfbb479c53d0a696ea7402601f4e693c97b0367837c8898bc6471adfca37a6bd"},
+]
+
+[[package]]
 name = "typer"
 version = "0.9.0"
 description = "Typer, build great CLIs. Easy to code. Based on Python type hints."
@@ -1045,4 +1074,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "17f3fcb2377005f1e8314292b149f6fe18b37fbc5510457b5c6a4efd2cc4ed59"
+content-hash = "777b2726df30c262f27c0f5b6da8413326c272417e8647b2dc63ca25e919a301"
