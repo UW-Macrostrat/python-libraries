@@ -1,20 +1,17 @@
 [tool.poetry]
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "A control script framework for containerized applications."
-name = "macrostrat.app_frame"
+name = "macrostrat.subsystem_manager"
 packages = [
   {include = "macrostrat"},
-  {include = "test_app"},
 ]
-version = "1.2.0"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 "macrostrat.utils" = "^1.1.0"
 python = "^3.10"
 python-dotenv = "^1.0.0"
 toposort = "^1.5"
-rich = "^13"
-typer = "^0.9.0"
 
 [tool.poetry.dev-dependencies]
 

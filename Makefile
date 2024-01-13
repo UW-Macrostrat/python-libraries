@@ -1,4 +1,8 @@
-all:
+.PHONY: install publish test
+
+all: install
+
+install:
 	poetry install
 	poetry run mono install
 
