@@ -29,7 +29,6 @@ addopts = "--confcutdir=."
 
 [tool.poetry.scripts]
 test-app = "test_app:main"
-format = "isort -rc . && black ."
 
 [tool.isort]
 profile = "black"
