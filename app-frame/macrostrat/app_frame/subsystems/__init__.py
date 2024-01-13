@@ -2,6 +2,7 @@ from toposort import toposort_flatten
 from ..core import ApplicationBase
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import Version
+from typing import Optional
 
 from macrostrat.utils.logs import get_logger
 
@@ -20,12 +21,17 @@ class SubsystemManager:
     """
 
     _hooks_fired = []
-    _app: ApplicationBase
+    _app: Optional[ApplicationBase] = None
+    _subsystem_cls: Subsystem = Subsystem
 
-    def __init__(self, app: ApplicationBase):
-        self._app = app
+    def __init__(self, subsystem_cls: Subsystem = Subsystem):
+        self._app = None
         self.__init_store = []
         self.__store = None
+
+        # Ensure that the plugin class is a subclass of Subsystem
+        assert issubclass(subsystem_cls, Subsystem) or subsystem_cls is Subsystem
+        self._subsystem_cls = subsystem_cls
 
     def __iter__(self):
         try:
