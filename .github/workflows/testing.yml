@@ -6,24 +6,34 @@ on:
     branches: [main]
 jobs:
   test:
+    name: Continuous integration tests
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
 
-      - uses: actions/setup-python@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
+        uses: abatilo/actions-poetry@v2
 
-      # Bundling
-      - name: Install Python libraries 
-        run: make
+      - name: Setup a local virtual environment (if no poetry.toml file)
+        run: |
+          poetry config virtualenvs.create true --local
+          poetry config virtualenvs.in-project true --local
 
-      - name: Run tests
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ./.venv
+          key: venv-${{ hashFiles('poetry.lock') }}
+
+      - name: Install the project dependencies
+        run: poetry install
+
+      - name: Run the automated tests
         run: make test
-
-      # - name: Run Sparrow integration tests
-      #   run: sparrow test integration
