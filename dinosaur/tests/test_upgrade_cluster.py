@@ -1,33 +1,34 @@
 """
 PostgreSQL/PostGIS cluster upgrade tests reliant onto Docker.
 """
-from pytest import fixture
+import random
+import time
+from os import environ
+from pathlib import Path
+
 from docker.client import DockerClient
+from pytest import fixture
 from sqlalchemy import create_engine, inspect, text
+
 from macrostrat.database import Database
 from macrostrat.database.utils import run_sql_file
+from macrostrat.dinosaur import create_schema_clone, dump_schema
 from macrostrat.utils import get_logger
-from macrostrat.dinosaur import dump_schema, create_schema_clone
-from pathlib import Path
-from os import environ
-import time
-import random
 
 log = get_logger(__name__)
 
 random_hex = lambda: "%08x" % random.randrange(16**8)
 
-from macrostrat.dinosaur.upgrade_cluster.utils import (
-    database_cluster,
-    get_unused_port,
-    ensure_empty_docker_volume,
-)
-
 from macrostrat.dinosaur.upgrade_cluster import (
-    upgrade_database_cluster,
     default_version_images,
+    upgrade_database_cluster,
 )
 from macrostrat.dinosaur.upgrade_cluster.describe import check_database_cluster_version
+from macrostrat.dinosaur.upgrade_cluster.utils import (
+    database_cluster,
+    ensure_empty_docker_volume,
+    get_unused_port,
+)
 
 root_dir = Path(__file__).parent
 fixtures = root_dir / "fixtures"

@@ -1,13 +1,13 @@
-from toposort import toposort_flatten
-from ..core import ApplicationBase
+from typing import Optional
+
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import Version
-from typing import Optional
+from toposort import toposort_flatten
 
 from macrostrat.utils.logs import get_logger
 
+from ..core import ApplicationBase
 from .defs import Subsystem, SubsystemError
-
 
 log = get_logger(__name__)
 

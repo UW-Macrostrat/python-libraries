@@ -2,12 +2,12 @@
 A timer for measuring code performance, particularly in web servers.
 """
 
-from pydantic import BaseModel
-from typing import List
 from contextlib import contextmanager
 from contextvars import ContextVar
 from time import perf_counter
+from typing import List
 
+from pydantic import BaseModel
 
 code_timer = ContextVar("code_timer", default=None)
 

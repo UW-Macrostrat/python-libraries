@@ -2,23 +2,17 @@ import warnings
 from contextlib import contextmanager
 from typing import Optional
 
-from sqlalchemy import create_engine, inspect, MetaData, text
-from sqlalchemy.orm import sessionmaker, scoped_session, Session
+from sqlalchemy import MetaData, create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
-from macrostrat.utils import get_logger
 from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
 
+from macrostrat.utils import get_logger
 
-from .utils import (
-    run_sql,
-    get_or_create,
-    reflect_table,
-    get_dataframe,
-)
 from .mapper import DatabaseMapper
-from .postgresql import prefix_inserts, on_conflict  # noqa
-
+from .postgresql import on_conflict, prefix_inserts  # noqa
+from .utils import get_dataframe, get_or_create, reflect_table, run_sql
 
 metadata = MetaData()
 

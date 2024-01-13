@@ -9,5 +9,9 @@ install:
 publish:
 	poetry run mono publish
 
+format:
+	poetry run isort .
+	poetry run black .
+
 test:
 	poetry run pytest -s -x --failed-first

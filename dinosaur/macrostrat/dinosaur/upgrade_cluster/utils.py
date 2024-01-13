@@ -1,14 +1,15 @@
+import socket
 import time
 from contextlib import contextmanager
-import socket
+from typing import Mapping, Optional
 
 import docker
 from docker.client import DockerClient
 from docker.models.containers import Container
-from macrostrat.utils import get_logger
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from typing import Optional, Mapping
+
+from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
 

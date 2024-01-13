@@ -1,25 +1,21 @@
 import os
 import sys
 from contextlib import contextmanager, redirect_stdout
+from typing import Callable
 
-from sqlalchemy.exc import ProgrammingError, IntegrityError, DataError
-from schemainspect import get_inspector
+import docker
 from migra import Migration
 from migra.statements import check_for_drop
-from sqlalchemy import text
 from rich import print
-from typing import Callable
-import docker
+from schemainspect import get_inspector
+from sqlalchemy import text
+from sqlalchemy.exc import DataError, IntegrityError, ProgrammingError
 
-from macrostrat.utils import get_logger, cmd
 from macrostrat.database import Database
-from macrostrat.database.utils import (
-    run_sql,
-    temp_database,
-    connection_args,
-)
-from .upgrade_cluster.utils import wait_for_cluster, wait_for_ready
+from macrostrat.database.utils import connection_args, run_sql, temp_database
+from macrostrat.utils import cmd, get_logger
 
+from .upgrade_cluster.utils import wait_for_cluster, wait_for_ready
 
 log = get_logger(__name__)
 

@@ -5,11 +5,12 @@ core and command-line interface.
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from .logs import setup_stderr_logs, get_logger
+
+from .logs import get_logger, setup_stderr_logs
 from .shell import cmd, split_args
 
 
-def relative_path(base, *parts)->Path:
+def relative_path(base, *parts) -> Path:
     if not os.path.isdir(str(base)):
         base = os.path.dirname(base)
     return Path(os.path.join(base, *parts))

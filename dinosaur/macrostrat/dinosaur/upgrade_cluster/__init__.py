@@ -1,19 +1,21 @@
-from docker.client import DockerClient
-from macrostrat.utils import get_logger
-from rich.console import Console
 from typing import List
 
+from docker.client import DockerClient
+from rich.console import Console
+
+from macrostrat.utils import get_logger
+
+from .describe import (
+    check_database_cluster_version,
+    check_database_exists,
+    count_database_tables,
+)
+from .restore import pg_restore
 from .utils import (
     database_cluster,
     ensure_empty_docker_volume,
-    replace_docker_volume,
     get_unused_port,
-)
-from .restore import pg_restore
-from .describe import (
-    check_database_exists,
-    count_database_tables,
-    check_database_cluster_version,
+    replace_docker_volume,
 )
 
 log = get_logger(__name__)

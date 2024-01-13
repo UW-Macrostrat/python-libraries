@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 
 from os import environ
-from macrostrat.utils.shell import git_has_changes
 from pathlib import Path
+
 import requests
-from toml import load
 from rich import print
-from .dependencies import get_local_dependencies, load_poetry_config
+from toml import load
+
 from macrostrat.utils import cmd, working_directory
+from macrostrat.utils.shell import git_has_changes
+
+from .dependencies import get_local_dependencies, load_poetry_config
 
 
 def prepare_module(fp: Path):

@@ -6,10 +6,11 @@ from time import sleep
 import click
 import typer
 from click import Group
-from macrostrat.utils import get_logger
 from typer import Context, Typer
 from typer.core import TyperGroup
 from typer.models import TyperInfo
+
+from macrostrat.utils import get_logger
 
 from .compose import check_status, compose
 from .core import Application

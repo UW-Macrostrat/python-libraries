@@ -1,22 +1,28 @@
-from click import echo, secho
-from sqlalchemy.exc import ProgrammingError, IntegrityError, InternalError
-from sqlparse import split, format
-from sqlalchemy.sql.elements import TextClause, ClauseElement
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.engine import Engine, Connection
-from sqlalchemy.schema import Table
-from sqlalchemy import MetaData, create_engine, text
 from contextlib import contextmanager
-from sqlalchemy_utils import create_database, database_exists, drop_database
-from sqlalchemy.exc import InvalidRequestError
-from macrostrat.utils import cmd, get_logger
-from time import sleep
-from typing import Union, IO
 from pathlib import Path
-from warnings import warn
-from psycopg2.sql import SQL, Composable, Composed
 from re import search
-from macrostrat.utils import get_logger
+from time import sleep
+from typing import IO, Union
+from warnings import warn
+
+from click import echo, secho
+from psycopg2.sql import SQL, Composable, Composed
+from sqlalchemy import MetaData, create_engine, text
+from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import (
+    IntegrityError,
+    InternalError,
+    InvalidRequestError,
+    ProgrammingError,
+)
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.schema import Table
+from sqlalchemy.sql.elements import ClauseElement, TextClause
+from sqlalchemy_utils import create_database, database_exists, drop_database
+from sqlparse import format, split
+
+from macrostrat.utils import cmd, get_logger
+
 from .postgresql import _setup_psycopg2_wait_callback
 
 log = get_logger(__name__)

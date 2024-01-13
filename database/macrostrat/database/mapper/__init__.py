@@ -1,20 +1,21 @@
 from distutils.log import warn
-from macrostrat.database.utils import reflect_table
-from sqlalchemy.ext.automap import generate_relationship
-from macrostrat.utils.logs import get_logger
 from warnings import warn
 
 # Drag in geographic types for database reflection
-from geoalchemy2 import Geometry, Geography
+from geoalchemy2 import Geography, Geometry
+from sqlalchemy.ext.automap import generate_relationship
+
+from macrostrat.database.utils import reflect_table
+from macrostrat.utils.logs import get_logger
 
 from .cache import DatabaseModelCache
 from .utils import (
     ModelCollection,
     TableCollection,
-    classname_for_table,
     _classname_for_table,
-    name_for_scalar_relationship,
+    classname_for_table,
     name_for_collection_relationship,
+    name_for_scalar_relationship,
 )
 
 log = get_logger(__name__)

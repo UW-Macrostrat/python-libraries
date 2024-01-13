@@ -1,17 +1,17 @@
 # Skeletal testing file
+from os import environ
 from pathlib import Path
-from pytest import fixture
+
 from dotenv import load_dotenv
 from psycopg2.sql import SQL, Identifier, Literal, Placeholder
+from pytest import fixture, mark, raises, warns
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
-from macrostrat.utils import relative_path, get_logger
 from macrostrat.database import Database, run_sql
-from macrostrat.database.utils import temp_database, infer_is_sql_text
 from macrostrat.database.postgresql import table_exists
-from pytest import warns, raises, mark
-from os import environ
+from macrostrat.database.utils import infer_is_sql_text, temp_database
+from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
 
@@ -215,6 +215,7 @@ def test_close_connection(conn):
     """
 
     import threading
+
     from psycopg2.extensions import QueryCanceledError
     from sqlalchemy.exc import DBAPIError
 
@@ -240,8 +241,8 @@ def test_sigint_cancel(db):
     by sending a SIGINT.
     """
 
-    import subprocess
     import signal
+    import subprocess
     import time
 
     db_url = str(db.engine.url)

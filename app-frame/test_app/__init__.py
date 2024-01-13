@@ -1,6 +1,6 @@
 from pathlib import Path
-from macrostrat.app_frame import Application
 
+from macrostrat.app_frame import Application
 
 APP_ROOT = Path(__file__).parent
 
