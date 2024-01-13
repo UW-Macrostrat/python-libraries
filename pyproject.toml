@@ -16,7 +16,6 @@ black = "^22.10.0"
 "macrostrat.database" = {path = "./database", develop = true}
 "macrostrat.dinosaur" = {path = "./dinosaur", develop = true}
 "macrostrat.package_tools" = {path = "./package-tools", develop = true}
-"macrostrat.subsystem_manager" = {path = "./subsystem-manager", develop = true}
 "macrostrat.utils" = {path = "./utils", develop = true}
 pytest = "^7.2.2"
 python-dotenv = "^1.0.0"

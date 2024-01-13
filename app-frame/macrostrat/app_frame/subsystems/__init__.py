@@ -1,32 +1,17 @@
-import sparrow
 from toposort import toposort_flatten
+from ..core import ApplicationBase
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import Version
-from sparrow.defs import SparrowPlugin, SparrowCorePlugin, SparrowPluginError
 
-from ..logs import get_logger
+from macrostrat.utils.logs import get_logger
+
+from .defs import Subsystem, SubsystemError
+
 
 log = get_logger(__name__)
 
 
-def handle_compat_error(plugin):
-    _error = (
-        f"Plugin '{plugin.name}' is incompatible with Sparrow core "
-        f"version {sparrow.core.__version__} (expected {plugin.sparrow_version})"
-    )
-    log.error(_error)
-    if issubclass(plugin, SparrowCorePlugin):
-        raise SparrowPluginError(_error)
-
-
-def handle_load_error(plugin, err):
-    _error = f"Could not load plugin '{plugin.name}': {err}"
-    log.error(_error)
-    if issubclass(plugin, SparrowCorePlugin):
-        raise SparrowPluginError(_error)
-
-
-class SparrowPluginManager(object):
+class SubsystemManager:
     """
     Storage class for plugins. Currently, we enforce a single
     phase of plugin loading, ended by a call to `finished_loading_plugins`.
@@ -35,8 +20,10 @@ class SparrowPluginManager(object):
     """
 
     _hooks_fired = []
+    _app: ApplicationBase
 
-    def __init__(self):
+    def __init__(self, app: ApplicationBase):
+        self._app = app
         self.__init_store = []
         self.__store = None
 
@@ -44,48 +31,48 @@ class SparrowPluginManager(object):
         try:
             yield from self.__store
         except TypeError:
-            raise SparrowPluginError("Cannot list plugins until loading is finished.")
+            raise SubsystemError("Cannot list subsystems until loading is finished.")
 
     @property
     def is_ready(self):
         return self.__store is not None
 
-    def _is_compatible(self, plugin):
+    def _is_compatible(self, sub: Subsystem):
         """Assess package compatibility: https://packaging.pypa.io/en/latest/specifiers.html"""
-        if plugin.sparrow_version is None:
+        if sub.app_version is None:
             return True
         try:
-            spec = SpecifierSet(plugin.sparrow_version, prereleases=True)
+            spec = SpecifierSet(sub.app_version, prereleases=True)
         except InvalidSpecifier:
-            raise SparrowPluginError(
-                f"Plugin '{plugin.name}' specifies an invalid Sparrow compatibility range '{plugin.sparrow_version}'"
+            raise SubsystemError(
+                f"Subsystem '{sub.name}' specifies an invalid {self.app.name} compatibility range '{sub.app_version}'"
             )
-        return Version(sparrow.core.__version__) in spec
+        return Version() in spec
 
     def add(self, plugin):
         if not plugin.should_enable(self):
             return
         if not self._is_compatible(plugin):
-            handle_compat_error(plugin)
+            _raise_compat_error(plugin)
             return
 
         try:
             self.__init_store.append(plugin)
         except AttributeError:
-            raise SparrowPluginError(
-                "Cannot add plugins after Sparrow is finished loading."
+            raise SubsystemError(
+                f"Cannot add subsystems after {self.app.name} is finished loading."
             )
         except Exception as err:
-            handle_load_error(plugin, err)
+            _raise_load_error(plugin, err)
 
     def add_module(self, module):
         for _, obj in module.__dict__.items():
             try:
-                assert issubclass(obj, SparrowPlugin)
+                assert issubclass(obj, Subsystem)
             except (TypeError, AssertionError):
                 continue
 
-            if obj in [SparrowPlugin, SparrowCorePlugin]:
+            if obj is Subsystem:
                 continue
 
             self.add(obj)
@@ -98,22 +85,22 @@ class SparrowPluginManager(object):
         store = store or self.__store
         for p in store:
             if getattr(p, "name") is None:
-                raise SparrowPluginError(
-                    f"Sparrow plugin '{p}' must have a name attribute."
+                raise SubsystemError(
+                    f"{self.app.name} subsystem '{p}' must have a name attribute."
                 )
         struct = {p.name: set(p.dependencies) for p in store}
         map_ = {p.name: p for p in store}
         res = toposort_flatten(struct, sort=True)
         return {map_[k] for k in res}
 
-    def __load_plugin(self, plugin_class, app):
-        if not issubclass(plugin_class, SparrowPlugin):
-            raise SparrowPluginError(
-                "Sparrow plugins must be a subclass of SparrowPlugin"
+    def __load_plugin(self, plugin_class, app: ApplicationBase):
+        if not issubclass(plugin_class, Subsystem):
+            raise SubsystemError(
+                f"{app.name} subsystems must be a subclass of Subsystem"
             )
         return plugin_class(app)
 
-    def finalize(self, app):
+    def finalize(self, app: ApplicationBase):
         candidate_store = self.order_plugins(self.__init_store)
 
         self.__store = []
@@ -122,12 +109,12 @@ class SparrowPluginManager(object):
 
         self.__init_store = None
 
-    def get(self, name: str) -> SparrowPlugin:
+    def get(self, name: str) -> Subsystem:
         """Get a plugin object, given its name."""
         for plugin in self.__store:
             if plugin.name == name:
                 return plugin
-        raise AttributeError(f"Plugin {name} not found")
+        raise AttributeError(f"Subsystem {name} not found")
 
     def _iter_hooks(self, hook_name):
         method_name = "on_" + hook_name.replace("-", "_")
@@ -135,10 +122,25 @@ class SparrowPluginManager(object):
             method = getattr(plugin, method_name, None)
             if method is None:
                 continue
-            log.info("  plugin: " + plugin.name)
+            log.info("  subsystem: " + plugin.name)
             yield plugin, method
 
     def run_hook(self, hook_name, *args, **kwargs):
         self._hooks_fired.append(hook_name)
         for _, method in self._iter_hooks(hook_name):
             method(*args, **kwargs)
+
+
+def _raise_compat_error(sub: Subsystem, app: ApplicationBase):
+    _error = (
+        f"Subsystem '{sub.name}' is incompatible with {app.name} "
+        f"version {app.version} (expected {sub.app_version})"
+    )
+    log.error(_error)
+    raise SubsystemError(_error)
+
+
+def _raise_load_error(sub, err):
+    _error = f"Could not load subsystem '{sub.name}': {err}"
+    log.error(_error)
+    raise SubsystemError(_error)
