@@ -1,8 +1,10 @@
+from os import makedirs, path
+from pickle import dump, load
+
 from sqlalchemy.ext.automap import automap_base
-from os import path, makedirs
+
 from macrostrat.utils.logs import get_logger
-from sqlalchemy.ext.automap import automap_base
-from pickle import load, dump
+
 from .base import ModelHelperMixins
 
 log = get_logger(__name__)

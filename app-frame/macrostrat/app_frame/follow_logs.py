@@ -3,11 +3,11 @@ import os
 import sys
 import termios
 from contextlib import contextmanager
+from datetime import datetime
 from enum import Enum
 from subprocess import Popen
 from time import sleep
 from typing import Generator
-from datetime import datetime
 
 from macrostrat.utils import get_logger
 

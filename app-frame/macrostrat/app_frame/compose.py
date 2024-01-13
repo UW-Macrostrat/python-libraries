@@ -1,5 +1,6 @@
-from macrostrat.utils import cmd, get_logger
 from rich.console import Console
+
+from macrostrat.utils import cmd, get_logger
 
 console = Console()
 

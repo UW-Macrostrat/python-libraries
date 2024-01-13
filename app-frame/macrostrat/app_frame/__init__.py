@@ -1,4 +1,4 @@
-from .core import Application
 from .compose import compose
-from .subsystems import SubsystemManager, Subsystem, SubsystemError
+from .core import Application
 from .exc import ApplicationError
+from .subsystems import Subsystem, SubsystemError, SubsystemManager

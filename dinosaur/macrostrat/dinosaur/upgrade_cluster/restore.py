@@ -1,7 +1,7 @@
 import asyncio
+
 from docker.models.containers import Container
 from rich.console import Console
-
 
 console = Console()
 

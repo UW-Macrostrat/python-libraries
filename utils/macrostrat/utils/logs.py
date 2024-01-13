@@ -1,6 +1,7 @@
 import logging
 from sys import stderr
-from colorlog import StreamHandler, ColoredFormatter
+
+from colorlog import ColoredFormatter, StreamHandler
 
 
 class SparrowLogFormatter(ColoredFormatter):

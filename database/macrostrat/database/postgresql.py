@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import TYPE_CHECKING
 
+import psycopg2
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import CompileError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert, text
-from sqlalchemy.dialects import postgresql
-import psycopg2
-
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..database import Database

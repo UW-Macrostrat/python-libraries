@@ -1,11 +1,12 @@
-from rich.console import Console
-from typing import Optional, Callable
-from macrostrat.utils import setup_stderr_logs, get_logger
 import logging
 from os import environ
 from pathlib import Path
-from dotenv import load_dotenv
+from typing import Callable, Optional
 
+from dotenv import load_dotenv
+from rich.console import Console
+
+from macrostrat.utils import get_logger, setup_stderr_logs
 
 log = get_logger(__name__)
 

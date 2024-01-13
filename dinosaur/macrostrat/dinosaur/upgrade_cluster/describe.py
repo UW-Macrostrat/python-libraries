@@ -1,8 +1,9 @@
-from docker.models.containers import Container
-from subprocess import CalledProcessError
-from docker.errors import ContainerError
-from docker.client import DockerClient
 from pathlib import Path
+from subprocess import CalledProcessError
+
+from docker.client import DockerClient
+from docker.errors import ContainerError
+from docker.models.containers import Container
 
 from macrostrat.utils import get_logger
 

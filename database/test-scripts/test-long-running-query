@@ -3,10 +3,11 @@
 Run a long-running query to test if we can interrupt it.
 """
 
-from macrostrat.database import Database
 from sys import argv, exit
+
 from sqlalchemy.exc import OperationalError
 
+from macrostrat.database import Database
 
 db_conn = argv[1]
 print(f"Connecting to {db_conn}")
