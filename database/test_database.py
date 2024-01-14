@@ -278,6 +278,16 @@ def test_run_query_2(db):
     assert r1[0].name == "Test"
 
 
+def test_ambiguous_comment_bind(db):
+    sql = """
+    /* This is a comment {with_fake_param} */
+    SELECT name FROM sample WHERE name = {name}
+    """
+    res = db.run_query(sql, dict(name=Literal("Test")))
+    data = res.scalar()
+    assert data == "Test"
+
+
 def test_close_connection(conn):
     """
     Basic test demonstrating the underlying capability to kill a long-running query
