@@ -213,7 +213,7 @@ def infer_has_server_binds(sql):
     return "%s" in sql or search(r"%\(\w+\)s", sql)
 
 
-def _run_sql(connectable, sql, **kwargs):
+def _run_sql(connectable, sql, params=None, **kwargs):
     """
     Internal function for running a query on a SQLAlchemy connectable,
     which always returns an iterator. The wrapper function adds the option
@@ -226,7 +226,6 @@ def _run_sql(connectable, sql, **kwargs):
 
     _setup_psycopg2_wait_callback()
 
-    params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
     has_server_binds = kwargs.pop("has_server_binds", None)
