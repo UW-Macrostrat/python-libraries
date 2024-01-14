@@ -12,7 +12,7 @@ from macrostrat.utils import get_logger
 
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
-from .utils import get_dataframe, get_or_create, reflect_table, run_sql
+from .utils import get_dataframe, get_or_create, reflect_table, run_query, run_sql
 
 metadata = MetaData()
 
@@ -86,14 +86,17 @@ class Database(object):
                 session.rollback()
                 log.debug(err)
 
-    def run_sql(self, fn, **kwargs):
+    def run_sql(self, fn, params=None, **kwargs):
         """Executes SQL files passed"""
-        return iter(run_sql(self.session, fn, **kwargs))
+        return iter(run_sql(self.session, fn, params, **kwargs))
 
-    def exec_sql(self, sql, **kwargs):
+    def run_query(self, sql, params=None, **kwargs):
+        return run_query(self.session, sql, params, **kwargs)
+
+    def exec_sql(self, sql, params=None, **kwargs):
         """Executes SQL files passed"""
         warnings.warn("exec_sql is deprecated. Use run_sql instead", DeprecationWarning)
-        return self.run_sql(sql, **kwargs)
+        return self.run_sql(sql, params, **kwargs)
 
     def get_dataframe(self, *args):
         """Returns a Pandas DataFrame from a SQL query"""

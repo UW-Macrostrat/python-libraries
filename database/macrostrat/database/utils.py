@@ -51,13 +51,15 @@ def infer_is_sql_text(_string: str) -> bool:
         "DELETE",
         "ALTER",
         "SET",
+        "GRANT",
+        "WITH",
     ]
     lines = _string.split("\n")
     if len(lines) > 1:
         return True
     _string = _string.lower()
     for i in keywords:
-        if _string.strip().startswith(i.lower()):
+        if _string.strip().startswith(i.lower() + " "):
             return True
     return False
 
@@ -92,7 +94,20 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 def pretty_print(sql, **kwargs):
     for line in sql.split("\n"):
-        for i in ["SELECT", "INSERT", "UPDATE", "CREATE", "DROP", "DELETE", "ALTER"]:
+        for i in [
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "CREATE",
+            "DROP",
+            "DELETE",
+            "ALTER",
+            "SET",
+            "GRANT",
+            "WITH",
+            "NOTIFY",
+            "COPY",
+        ]:
             if not line.startswith(i):
                 continue
             start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
@@ -213,7 +228,7 @@ def infer_has_server_binds(sql):
     return "%s" in sql or search(r"%\(\w+\)s", sql)
 
 
-def _run_sql(connectable, sql, **kwargs):
+def _run_sql(connectable, sql, params=None, **kwargs):
     """
     Internal function for running a query on a SQLAlchemy connectable,
     which always returns an iterator. The wrapper function adds the option
@@ -221,15 +236,15 @@ def _run_sql(connectable, sql, **kwargs):
     """
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
-            yield from _run_sql(conn, sql, **kwargs)
+            yield from _run_sql(conn, sql, params, **kwargs)
             return
 
     _setup_psycopg2_wait_callback()
 
-    params = kwargs.pop("params", None)
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
     has_server_binds = kwargs.pop("has_server_binds", None)
+    ensure_single_query = kwargs.pop("ensure_single_query", False)
 
     if stop_on_error:
         raise_errors = True
@@ -241,6 +256,9 @@ def _run_sql(connectable, sql, **kwargs):
 
     if queries is None:
         return
+
+    if ensure_single_query and len(queries) > 1:
+        raise ValueError("Multiple queries passed when only one was expected")
 
     # check if parameters is a list of the same length as the number of queries
     if not isinstance(params, list) or not len(params) == len(queries):
@@ -304,8 +322,24 @@ def _run_sql(connectable, sql, **kwargs):
                 raise err
 
 
-def run_sql_file(connectable, filename, **kwargs):
-    return run_sql(connectable, filename, interpret_as_file=True, **kwargs)
+def run_sql_file(connectable, filename, params=None, **kwargs):
+    return run_sql(connectable, filename, params, interpret_as_file=True, **kwargs)
+
+
+def run_query(connectable, query, params=None, **kwargs):
+    return next(
+        iter(
+            _run_sql(
+                connectable,
+                query,
+                params,
+                ensure_single_query=True,
+                yield_results=False,
+                raise_errors=True,
+                **kwargs,
+            )
+        )
+    )
 
 
 def run_sql(*args, **kwargs):
@@ -335,6 +369,8 @@ def run_sql(*args, **kwargs):
     yield_results : bool
         If True, yield the results of the query as they are executed, rather than
         returning a list after completion.
+    ensure_single_query : bool
+        If True, raise an error if multiple queries are passed when only one is expected.
     """
     res = _run_sql(*args, **kwargs)
     if kwargs.pop("yield_results", False):

@@ -14,4 +14,4 @@ format:
 	poetry run black .
 
 test:
-	poetry run pytest -s -x --failed-first
+	poetry run pytest -s -x
