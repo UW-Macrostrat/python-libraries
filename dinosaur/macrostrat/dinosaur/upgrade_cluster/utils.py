@@ -68,26 +68,26 @@ def database_cluster(
         container.remove()
 
 
-def wait_for_ready(engine, timeout=30):
+def wait_for_ready(engine, timeout=5):
     """
     Wait for a database to be ready.
     """
     is_ready = False
     elapsed = 0
     error = None
+    start_time = time.time()
     while not is_ready:
         try:
             engine.connect()
         except OperationalError as err:
-            if error is None or error.code != err.code:
-                error = err
-                print(error)
-            pass
+            error = err
         else:
             is_ready = True
         time.sleep(0.1)
-        elapsed += 0.1
+        elapsed = time.time() - start_time
         if elapsed > timeout:
+            if error is not None:
+                raise error
             raise TimeoutError("Database was not found within timeout period")
 
 
@@ -104,13 +104,13 @@ def wait_for_cluster(container: Container, url: str):
 
     is_running = False
     time_running = 0
+    start_time = time.time()
     while time_running < stability_timeout:
         container.reload()
         time.sleep(0.1)
-        print(container.status)
         is_running = container.status == "running"
         if is_running:
-            time_running += 0.1
+            time_running = time.time() - start_time
         else:
             time_running = 0
         if container.status == "exited":
