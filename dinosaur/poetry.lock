@@ -266,7 +266,7 @@ files = [
 
 [[package]]
 name = "macrostrat-database"
-version = "3.0.0"
+version = "3.1.0"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
 python-versions = "^3.8"
@@ -724,4 +724,4 @@ test = ["websockets"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "435c776dc59d620a65e6a10a39dae1e696f82a484457ae81fec8ebe6c15664db"
+content-hash = "0f245fb59495d9c229ef0c8577aba3caf2ed76e6322fa80089f61048eb820080"
