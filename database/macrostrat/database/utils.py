@@ -150,7 +150,7 @@ def _get_queries(sql, interpret_as_file=None):
     if isinstance(sql, Path):
         sql = sql.read_text()
 
-    return split(sql)
+    return split(format(sql, strip_comments=True))
 
 
 def _is_prebind_param(param):
