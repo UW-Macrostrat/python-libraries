@@ -7,6 +7,8 @@ NOTE: At the moment, these tests are not independent and must run in order.
 from pathlib import Path
 
 from dotenv import load_dotenv
+from psycopg2.errors import SyntaxError
+from psycopg2.extensions import AsIs
 from psycopg2.sql import SQL, Identifier, Literal, Placeholder
 from pytest import fixture, mark, raises, warns
 from sqlalchemy.exc import ProgrammingError
@@ -196,6 +198,44 @@ def test_server_bound_parameters(db):
     res = list(db.run_sql(sql, params=params, raise_errors=True))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
+
+
+def test_server_bound_parameters_mixed(db):
+    sql = "SELECT name FROM {table_name} WHERE name = %(name)s"
+    res = db.run_query(sql, {"name": "Test", "table_name": Identifier("sample")})
+    assert res.scalar() == "Test"
+
+
+def test_server_bound_parameters_invalid(db):
+    sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
+    with raises(KeyError):
+        db.run_query(sql, {"name": "Test", "table_name": Identifier("sample")})
+
+
+def test_server_bound_parameters_invalid_2(db):
+    sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
+    try:
+        db.run_query(sql, {"name": "Test", "table_name": "sample"})
+    except ProgrammingError as e:
+        assert isinstance(e.orig, SyntaxError)
+    else:
+        assert False
+
+
+def test_server_bound_parameters_invalid_3(db):
+    sql = "SELECT name FROM {table_name} WHERE name = :name"
+    try:
+        db.run_query(sql, {"name": "Test", "table_name": "sample"})
+    except ProgrammingError as e:
+        assert isinstance(e.orig, SyntaxError)
+    else:
+        assert False
+
+
+def test_server_bound_parameters_dbapi_extensions(db):
+    sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
+    res = db.run_query(sql, {"name": "Test", "table_name": AsIs("sample")})
+    assert res.scalar() == "Test"
 
 
 def test_server_parameters_function_def(db):
