@@ -1,5 +1,9 @@
-# Skeletal testing file
-from os import environ
+"""
+Test the database module.
+
+NOTE: At the moment, these tests are not independent and must run in order.
+"""
+
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -25,8 +29,23 @@ def engine(database_url, pytestconfig):
 
 
 @fixture(scope="session")
-def db(engine):
+def empty_db(engine):
     return Database(engine.url)
+
+
+@fixture(scope="session")
+def db(empty_db):
+    # Get schema files
+    schema_files = Path(relative_path(__file__, "test-fixtures")).glob("*.sql")
+
+    file_list = list(schema_files)
+    assert len(file_list) == 1
+
+    # Create tables
+    for sqlfile in file_list:
+        res = run_sql(empty_db.engine, sqlfile)
+        assert len(res) == 3
+    return empty_db
 
 
 @fixture(scope="function")
@@ -38,19 +57,7 @@ def conn(db):
 
 
 def test_database(db):
-    # Get schema files
-    schema_files = Path(relative_path(__file__, "test-fixtures")).glob("*.sql")
-
-    file_list = list(schema_files)
-    assert len(file_list) == 1
-
-    # Create tables
-    for sqlfile in file_list:
-        res = run_sql(db.engine, sqlfile)
-        assert len(res) == 3
-
     db.automap(schemas=["public", "geology"])
-
     # Test that tables exist
     assert "sample" in db.model
     assert "geology_formation" in db.model
@@ -81,12 +88,23 @@ def test_sql_text_inference_3():
     assert not infer_is_sql_text("sample.sql")
 
 
-def test_sql_interpolation_psycopg(db):
-    sql = "INSERT INTO sample (name) VALUES (:name)"
-    assert infer_is_sql_text(sql)
+def test_sql_text_inference_4():
+    assert not infer_is_sql_text("select.sql")
 
-    # db.engine.execute(sql, name="Test")
-    db.run_sql(sql, params=dict(name="Test"), raise_errors=True)
+
+def test_sql_text_inference_5():
+    assert not infer_is_sql_text("SELECT.sql")
+
+
+insert_sample_query = "INSERT INTO sample (name) VALUES (:name)"
+
+
+def test_sql_text_inference_6():
+    assert infer_is_sql_text(insert_sample_query)
+
+
+def test_sql_interpolation_psycopg(db):
+    db.run_sql(insert_sample_query, params=dict(name="Test"), raise_errors=True)
     db.session.commit()
 
     sql1 = "SELECT * FROM sample WHERE name = :name"
@@ -95,11 +113,8 @@ def test_sql_interpolation_psycopg(db):
 
 
 def test_extraneous_argument(db):
-    sql = "INSERT INTO sample (name) VALUES (:name)"
-    assert infer_is_sql_text(sql)
-
     # db.engine.execute(sql, name="Test")
-    db.run_sql(sql, params=dict(name="Test2", extraneous="TestA"))
+    db.run_sql(insert_sample_query, params=dict(name="Test2", extraneous="TestA"))
 
 
 def test_sql_identifier(db):
@@ -206,6 +221,21 @@ def test_long_running_sql(db):
     res = list(db.run_sql(sql, raise_errors=True))
     assert len(res) == 1
     assert res[0].scalar() == ""
+
+
+def test_run_query(db):
+    sql = "SELECT name FROM sample WHERE name = %(name)s"
+    res = db.run_query(sql, dict(name="Test"))
+    assert res.scalar() == "Test"
+
+
+def test_run_query_2(db):
+    sql = "SELECT name FROM sample WHERE name = %(name)s"
+    res = db.run_query(sql, dict(name="Test"))
+    r1 = list(res)
+    assert len(r1) == 1
+    assert r1[0][0] == "Test"
+    assert r1[0].name == "Test"
 
 
 def test_close_connection(conn):

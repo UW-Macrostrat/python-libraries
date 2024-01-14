@@ -236,7 +236,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
     """
     if isinstance(connectable, Engine):
         with connectable.connect() as conn:
-            yield from _run_sql(conn, sql, **kwargs)
+            yield from _run_sql(conn, sql, params, **kwargs)
             return
 
     _setup_psycopg2_wait_callback()
@@ -244,6 +244,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
     has_server_binds = kwargs.pop("has_server_binds", None)
+    ensure_single_query = kwargs.pop("ensure_single_query", False)
 
     if stop_on_error:
         raise_errors = True
@@ -255,6 +256,9 @@ def _run_sql(connectable, sql, params=None, **kwargs):
 
     if queries is None:
         return
+
+    if ensure_single_query and len(queries) > 1:
+        raise ValueError("Multiple queries passed when only one was expected")
 
     # check if parameters is a list of the same length as the number of queries
     if not isinstance(params, list) or not len(params) == len(queries):
@@ -318,8 +322,24 @@ def _run_sql(connectable, sql, params=None, **kwargs):
                 raise err
 
 
-def run_sql_file(connectable, filename, **kwargs):
-    return run_sql(connectable, filename, interpret_as_file=True, **kwargs)
+def run_sql_file(connectable, filename, params=None, **kwargs):
+    return run_sql(connectable, filename, params, interpret_as_file=True, **kwargs)
+
+
+def run_query(connectable, query, params=None, **kwargs):
+    return next(
+        iter(
+            _run_sql(
+                connectable,
+                query,
+                params,
+                ensure_single_query=True,
+                yield_results=False,
+                raise_errors=True,
+                **kwargs,
+            )
+        )
+    )
 
 
 def run_sql(*args, **kwargs):
@@ -349,6 +369,8 @@ def run_sql(*args, **kwargs):
     yield_results : bool
         If True, yield the results of the query as they are executed, rather than
         returning a list after completion.
+    ensure_single_query : bool
+        If True, raise an error if multiple queries are passed when only one is expected.
     """
     res = _run_sql(*args, **kwargs)
     if kwargs.pop("yield_results", False):
