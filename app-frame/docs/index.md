@@ -13,7 +13,7 @@ acquire features for managing Kubernetes-based applications.
 app = Application(
     "Mapboard",
     restart_commands={"gateway": "caddy reload --config /etc/caddy/Caddyfile"},
-    app_module="mapboard.server",
+    log_modules=["mapboard.server"],
     compose_files=[MAPBOARD_ROOT / "system" / "docker-compose.yaml"],
 )
 cli = app.control_command()
