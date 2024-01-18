@@ -21,3 +21,6 @@ typer = "^0.9.0"
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core>=1.0.0"]
+
+[tool.poetry.scripts]
+test-app = "test_app:main"

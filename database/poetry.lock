@@ -139,7 +139,7 @@ test = ["objgraph", "psutil"]
 
 [[package]]
 name = "macrostrat-utils"
-version = "1.2.0"
+version = "1.2.1"
 description = "Core utilities for Macrostrat and Sparrow"
 optional = false
 python-versions = "^3.8"
