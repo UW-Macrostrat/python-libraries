@@ -50,7 +50,7 @@ class Application(ApplicationBase):
         if isinstance(log_modules, str):
             log_modules = [log_modules]
         if log_modules is not None:
-            self._app_modules = log_modules
+            self._log_modules = log_modules
 
         self._dotenv_cfg = load_dotenv
 
