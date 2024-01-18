@@ -339,7 +339,7 @@ colors = ["colorama (>=0.4.6)"]
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "1.2.1"
+version = "1.2.2"
 description = "A control script framework for containerized applications."
 optional = false
 python-versions = "^3.10"
