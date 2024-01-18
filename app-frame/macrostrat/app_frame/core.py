@@ -25,6 +25,7 @@ ComposeFilesDependency = list[Path] | Callable[[ApplicationBase], list[Path]]
 class Application(ApplicationBase):
     console: Console
     _dotenv_cfg: bool | Path | list[Path]
+    _log_modules: list[str] = []
 
     def __init__(
         self,
@@ -33,7 +34,7 @@ class Application(ApplicationBase):
         command_name: Optional[str] = None,
         project_prefix: Optional[str] = None,
         restart_commands: dict[str, str] = {},
-        app_module: Optional[str] = None,
+        log_modules: Optional[str | list[str]] = None,
         root_dir: Path | Callable[[Path], Path] = Path.cwd(),
         compose_files: ComposeFilesDependency = [],
         env: EnvironmentDependency = {},
@@ -42,9 +43,15 @@ class Application(ApplicationBase):
         self.name = name
         self.command_name = command_name or name.lower()
         self.project_prefix = project_prefix or name.lower().replace(" ", "_")
+        self.envvar_prefix = self.project_prefix.upper() + "_"
         self.console = Console()
         self.restart_commands = restart_commands
-        self.app_module = app_module
+
+        if isinstance(log_modules, str):
+            log_modules = [log_modules]
+        if log_modules is not None:
+            self._app_modules = log_modules
+
         self._dotenv_cfg = load_dotenv
 
         # Root dir and compose files can be specified using dependency injection.
@@ -92,11 +99,11 @@ class Application(ApplicationBase):
             environ[k] = v
 
     def setup_logs(self, verbose: bool = False):
-        if self.app_module is None:
-            log.warning("No app module specified, not setting up logs")
+        if len(self._log_modules) == 0:
+            log.warning("No modules specified, not setting up logs")
             return
         if verbose:
-            setup_stderr_logs(self.app_module)
+            setup_stderr_logs(*self._log_modules)
         else:
             # Disable all logging
             # TODO: This is a hack, we shouldn't have to explicitly disable

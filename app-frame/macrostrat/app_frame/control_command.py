@@ -1,12 +1,13 @@
 # Typer command-line application
 
 import sys
+from os import environ
 from time import sleep
 
 import click
 import typer
 from click import Group
-from typer import Context, Typer
+from typer import Context, Option, Typer
 from typer.core import TyperGroup
 from typer.models import TyperInfo
 
@@ -44,8 +45,17 @@ class ControlCommand(Typer):
         self.app = app
         self.name = app.name
 
-        def callback(ctx: Context, verbose: bool = False):
+        verbose_envvar = self.app.envvar_prefix + "VERBOSE"
+
+        def callback(
+            ctx: Context,
+            verbose: bool = Option(False, "--verbose", envvar=verbose_envvar),
+        ):
             ctx.obj = self.app
+            # Setting the environment variable allows nested commands to pick up
+            # the verbosity setting, if needed.
+            if verbose:
+                environ[verbose_envvar] = "1"
             self.app.setup_logs(verbose=verbose)
 
         callback.__doc__ = f"""{self.app.name} command-line interface"""
@@ -195,4 +205,4 @@ def restart(ctx: Context, container: str = typer.Argument(None)):
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def _compose(args):
     """Run docker compose commands in the appropriate context"""
-    compose(*args)
+    compose(*args, collect_args=False)
