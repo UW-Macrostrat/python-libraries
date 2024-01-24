@@ -5,6 +5,7 @@ NOTE: At the moment, these tests are not independent and must run in order.
 """
 
 from pathlib import Path
+from sys import stdout
 
 from dotenv import load_dotenv
 from psycopg2.errors import SyntaxError
@@ -286,6 +287,13 @@ def test_ambiguous_comment_bind(db):
     res = db.run_query(sql, dict(name=Literal("Test")))
     data = res.scalar()
     assert data == "Test"
+
+
+def test_copy_statement(db):
+    pg_conn = db.engine.connect().connection
+    cur = pg_conn.cursor()
+
+    cur.copy_expert("COPY sample (name) TO STDOUT", stdout)
 
 
 def test_close_connection(conn):
