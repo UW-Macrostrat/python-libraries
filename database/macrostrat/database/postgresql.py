@@ -60,20 +60,6 @@ def prefix_inserts(insert, compiler, **kw):
     return compiler.visit_insert(insert, **kw)
 
 
-_psycopg2_setup_was_run = ContextVar("psycopg2-setup-was-run", default=False)
-
-
-def _setup_psycopg2_wait_callback():
-    """Set up the wait callback for PostgreSQL connections. This allows for query cancellation with Ctrl-C."""
-    # TODO: we might want to do this only once on engine creation
-    # https://github.com/psycopg/psycopg2/issues/333
-    val = _psycopg2_setup_was_run.get()
-    if val:
-        return
-    psycopg2.extensions.set_wait_callback(psycopg2.extras.wait_select)
-    _psycopg2_setup_was_run.set(True)
-
-
 def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
     """Check if a table exists in a PostgreSQL database."""
     sql = """SELECT EXISTS (

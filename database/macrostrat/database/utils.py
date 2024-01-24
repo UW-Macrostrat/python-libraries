@@ -6,6 +6,8 @@ from typing import IO, Union
 from warnings import warn
 
 from click import echo, secho
+from psycopg2.extensions import set_wait_callback
+from psycopg2.extras import wait_select
 from psycopg2.sql import SQL, Composable, Composed
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import Connection, Engine
@@ -22,8 +24,6 @@ from sqlalchemy_utils import create_database, database_exists, drop_database
 from sqlparse import format, split
 
 from macrostrat.utils import cmd, get_logger
-
-from .postgresql import _setup_psycopg2_wait_callback
 
 log = get_logger(__name__)
 
@@ -239,8 +239,6 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             yield from _run_sql(conn, sql, params, **kwargs)
             return
 
-    _setup_psycopg2_wait_callback()
-
     stop_on_error = kwargs.pop("stop_on_error", False)
     raise_errors = kwargs.pop("raise_errors", False)
     has_server_binds = kwargs.pop("has_server_binds", None)
@@ -266,6 +264,9 @@ def _run_sql(connectable, sql, params=None, **kwargs):
 
     for query, params in zip(queries, params):
         trans = None
+        # This only does something for postgresql, but it's harmless to run it for other engines
+        set_wait_callback(wait_select)
+
         try:
             trans = connectable.begin()
         except InvalidRequestError:
@@ -320,6 +321,8 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             log.error(err)
             if raise_errors:
                 raise err
+        finally:
+            set_wait_callback(None)
 
 
 def run_sql_file(connectable, filename, params=None, **kwargs):
