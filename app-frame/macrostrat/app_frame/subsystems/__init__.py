@@ -99,12 +99,17 @@ class SubsystemManager:
         res = toposort_flatten(struct, sort=True)
         return {map_[k] for k in res}
 
-    def __load_plugin(self, plugin_class, app: ApplicationBase):
-        if not issubclass(plugin_class, Subsystem):
-            raise SubsystemError(
-                f"{app.name} subsystems must be a subclass of Subsystem"
-            )
-        return plugin_class(app)
+    def __load_plugin(self, plugin, app: ApplicationBase):
+        if isinstance(plugin, Subsystem):
+            log.info(f"Loading subsystem: {plugin.__class__.name}")
+            return plugin
+
+        if issubclass(plugin, Subsystem):
+            return self.__load_plugin(plugin(app))
+
+        raise SubsystemError(
+            f"{app.name} subsystems must be an instance or subclass of Subsystem"
+        )
 
     def finalize(self, app: ApplicationBase):
         candidate_store = self.order_plugins(self.__init_store)
