@@ -12,7 +12,16 @@ from macrostrat.utils import get_logger
 
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
-from .utils import get_dataframe, get_or_create, reflect_table, run_query, run_sql
+from .utils import (  # noqa
+    create_database,
+    database_exists,
+    drop_database,
+    get_dataframe,
+    get_or_create,
+    reflect_table,
+    run_query,
+    run_sql,
+)
 
 metadata = MetaData()
 

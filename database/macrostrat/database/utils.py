@@ -20,7 +20,8 @@ from sqlalchemy.exc import (
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.elements import ClauseElement, TextClause
-from sqlalchemy_utils import create_database, database_exists, drop_database
+from sqlalchemy_utils import create_database as _create_database
+from sqlalchemy_utils import database_exists, drop_database
 from sqlparse import format, split
 
 from macrostrat.utils import cmd, get_logger
@@ -437,15 +438,40 @@ def get_db_model(db, model_name: str):
 @contextmanager
 def temp_database(conn_string, drop=True, ensure_empty=False):
     """Create a temporary database and tear it down after tests."""
-    if ensure_empty:
-        drop_database(conn_string)
-    if not database_exists(conn_string):
-        create_database(conn_string)
+    create_database(conn_string, exists_ok=True, replace=ensure_empty)
     try:
         yield create_engine(conn_string)
     finally:
         if drop:
             drop_database(conn_string)
+
+
+def create_database(url, **kwargs):
+    """Create a database if it doesn't exist.
+
+    Parameters
+    ----------
+    url : str
+        A SQLAlchemy database URL.
+    exists_ok : bool
+        If True, don't raise an error if the database already exists.
+    replace : bool
+        If True, drop the database if it exists and create a new one.
+    kwargs : dict
+        Additional keyword arguments to pass to `sqlalchemy_utils.create_database`.
+    """
+    db_exists = database_exists(url)
+
+    should_replace = kwargs.pop("replace", False)
+    exists_ok = kwargs.pop("exists_ok", False)
+
+    if should_replace and db_exists:
+        drop_database(url)
+        db_exists = False
+
+    if exists_ok and db_exists:
+        return
+    _create_database(url, **kwargs)
 
 
 def connection_args(engine):
