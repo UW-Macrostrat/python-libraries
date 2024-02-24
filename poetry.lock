@@ -339,7 +339,7 @@ colors = ["colorama (>=0.4.6)"]
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "1.2.2"
+version = "1.2.3"
 description = "A control script framework for containerized applications."
 optional = false
 python-versions = "^3.10"
@@ -359,7 +359,7 @@ url = "app-frame"
 
 [[package]]
 name = "macrostrat-database"
-version = "3.1.1"
+version = "3.1.2"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
 python-versions = "^3.8"
@@ -381,7 +381,7 @@ url = "database"
 
 [[package]]
 name = "macrostrat-dinosaur"
-version = "3.0.0"
+version = "3.0.1"
 description = "Diff-based database migrations"
 optional = false
 python-versions = "^3.8"
@@ -391,8 +391,8 @@ develop = true
 [package.dependencies]
 docker = "^6.0.1"
 GeoAlchemy2 = "^0.14.0"
-"macrostrat.database" = "^3.0.0"
-"macrostrat.utils" = "^1.0.0"
+"macrostrat.database" = "^3.1.2"
+"macrostrat.utils" = "^1.2.1"
 migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
 schemainspect = "^3.0.1616029793"
