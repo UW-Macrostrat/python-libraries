@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.2.0] - 2024-03-13
+
+Add `macrostrat.database.transfer` module to incorporate functions for streamlining `pg_dump`, `pg_restore` and similar operations. 
+
 ## [3.0.0] - 2024-01-04
 
 - Switch to sqlalchemy v2
