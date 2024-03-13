@@ -4,8 +4,8 @@ from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
 
-from .dump_database import _pg_dump
-from .restore_database import _pg_restore
+from .dump_database import pg_dump
+from .restore_database import pg_restore
 from .utils import print_stdout, print_stream_progress
 
 log = get_logger(__name__)
@@ -45,8 +45,8 @@ async def move_tables(
     log.debug(f"Dump args: {dump_args}")
     log.debug(f"Restore args: {restore_args}")
 
-    source = await _pg_dump(from_database, **kwargs, args=dump_args)
-    dest = await _pg_restore(to_database, **kwargs, args=restore_args)
+    source = await pg_dump(from_database, **kwargs, args=dump_args)
+    dest = await pg_restore(to_database, **kwargs, args=restore_args)
 
     await asyncio.gather(
         asyncio.create_task(print_stream_progress(source.stdout, dest.stdin)),
