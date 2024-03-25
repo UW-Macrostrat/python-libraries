@@ -3,9 +3,7 @@ authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Macrostrat Python libraries"
 name = "macrostrat.python_libraries"
 version = "1.4.0"
-packages = [
-  {include = "macrostrat"},
-]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -26,7 +24,8 @@ isort = "^5.13.2"
 mkdocs = "^1.5.3"
 mkdocs-material = "^9.5.3"
 mkdocs-monorepo-plugin = "^1.0.5"
-mkdocstrings = "^0.24.0"
+mkdocstrings = {extras = ["python"], version = "^0.24.1"}
+
 
 [tool.pytest.ini_options]
 addopts = "--confcutdir=."

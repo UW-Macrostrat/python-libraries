@@ -9,8 +9,8 @@ geoscience software products and applications.
 
 - [`macrostrat.app-frame`](app-frame): A skeleton to scaffold application
   control scripts
-- [`macrostrat.database`](database): Tools to maintain "database-driven"
-  applications, especially PostgreSQL and PostGIS
+- [`macrostrat.database`](macrostrat/database.md): Tools to maintain
+  "database-driven" applications, especially PostgreSQL and PostGIS
 - [`macrostrat.dinosaur`](dinosaur): A library for database schema evolution
 - [`macrostrat.utils`](utils): A collection of utility functions
 - [`macrostrat.package-tools`](package-tools): Tools for managing Python

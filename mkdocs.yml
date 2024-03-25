@@ -4,7 +4,6 @@ theme:
 nav:
   - Home: "index.md"
   - Macrostrat:
-      - App Frame: "macrostrat/app_frame.md"
       - Database: "macrostrat/database.md"
       - Dinosaur: "macrostrat/dinosaur.md"
       - Package Tools: "macrostrat/package_tools.md"
