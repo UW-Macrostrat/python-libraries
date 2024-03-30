@@ -9,6 +9,7 @@ from click import echo, secho
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
 from psycopg2.sql import SQL, Composable, Composed
+from rich.console import Console
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import (
@@ -344,6 +345,45 @@ def run_query(connectable, query, params=None, **kwargs):
             )
         )
     )
+
+
+def get_sql_files(
+    fixtures: Union[Path, list[Path]], recursive=False, order_by_name=True
+):
+    files = []
+    if isinstance(fixtures, Path):
+        fixtures = [fixtures]
+    for fixture in fixtures:
+        files.extend(_get_sql_files(fixture, recursive))
+    if order_by_name:
+        files = sorted(files)
+    return files
+
+
+def _get_sql_files(fixture: Path, recursive=False):
+    if not fixture.exists():
+        raise FileNotFoundError(f"Fixture {fixture} does not exist.")
+    if fixture.is_file() and fixture.suffix == ".sql":
+        return [fixture]
+    _fn = "rglob" if recursive else "glob"
+    files = getattr(fixture, _fn)("*.sql")
+    return [r for r in files if r.is_file()]
+
+
+def run_fixtures(connectable, fixtures: Union[Path, list[Path]], params=None, **kwargs):
+    """
+    Run a set of SQL fixture files on a database. Fixtures can be passed as a list of file paths or a directory.
+    Fixtures are ordered by name by default, but this can be disabled.
+    """
+    recursive = kwargs.pop("recursive", False)
+    order_by_name = kwargs.pop("order_by_name", True)
+    console = kwargs.pop("console", Console(stderr=True))
+    files = get_sql_files(fixtures, recursive=recursive, order_by_name=order_by_name)
+
+    for fixture in files:
+        console.print(f"[cyan bold]{fixture}[/]")
+        run_sql_file(connectable, fixture, params, **kwargs)
+        console.print()
 
 
 def run_sql(*args, **kwargs):
