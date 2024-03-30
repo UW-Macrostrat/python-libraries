@@ -1,13 +1,22 @@
 # Changelog
 
+## [3.3.0] - 2024-03-30
+
+This release focuses on nicer semantics for applying database fixtures.
+
+- Mark `Database.reflect_table` function as deprecated.
+- Add a `Database.instance_params` dictionary to store common parameters that
+  can be applied to any queries
+
 ## [3.2.0] - 2024-03-13
 
-Add `macrostrat.database.transfer` module to incorporate functions for streamlining `pg_dump`, `pg_restore` and similar operations. 
+Add `macrostrat.database.transfer` module to incorporate functions for
+streamlining `pg_dump`, `pg_restore` and similar operations.
 
 ## [3.0.0] - 2024-01-04
 
 - Switch to sqlalchemy v2
-- Improve database automapping 
+- Improve database automapping
 
 ## [2.1.2] - 2023-05-16
 

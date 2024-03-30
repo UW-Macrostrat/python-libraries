@@ -1,8 +1,8 @@
 import warnings
 from contextlib import contextmanager
-from typing import Optional
+from typing import Optional, Union
 
-from sqlalchemy import MetaData, create_engine, inspect, text
+from sqlalchemy import URL, MetaData, create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
@@ -32,17 +32,29 @@ class Database(object):
     mapper: Optional[DatabaseMapper] = None
     metadata: MetaData
     session: Session
+    instance_params: dict
+
     __inspector__ = None
 
-    def __init__(self, db_conn, echo_sql=False, **kwargs):
+    def __init__(self, db_conn: Union[str, URL], *, echo_sql=False, **kwargs):
         """
-        We can pass a connection string, a **Flask** application object
-        with the appropriate configuration, or nothing, in which
-        case we will try to infer the correct database from
-        the SPARROW_BACKEND_CONFIG file, if available.
+        Wrapper for interacting with a database using SQLAlchemy.
+        Optimized for use with PostgreSQL, but usable with SQLite
+        as well.
+
+        Args:
+            db_conn (str): Connection string for the database.
+
+        Keyword Args:
+            echo_sql (bool): If True, will echo SQL commands to the
+                console. Default is False.
+            instance_params (dict): Parameters to
+                pass to queries and other database operations.
         """
 
         compiles(Insert, "postgresql")(prefix_inserts)
+
+        self.instance_params = kwargs.pop("instance_params", {})
 
         log.info(f"Setting up database connection '{db_conn}'")
         self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
@@ -96,15 +108,48 @@ class Database(object):
                 log.debug(err)
 
     def run_sql(self, fn, params=None, **kwargs):
-        """Executes SQL files passed"""
+        """Executes SQL files or query strings using the run_sql function.
+
+        Args:
+            fn (str|Path): SQL file or query string to execute.
+            params (dict): Parameters to pass to the query.
+
+        Keyword Args:
+            use_instance_params (bool): If True, will use the instance_params set on
+                the Database object. Default is True.
+
+        Returns: Iterator of results from the query.
+        """
+        if params is None:
+            params = {}
+        if kwargs.pop("use_instance_params", True):
+            params.update(self.instance_params)
         return iter(run_sql(self.session, fn, params, **kwargs))
 
     def run_query(self, sql, params=None, **kwargs):
+        """Run a single query on the database object, returning the result.
+
+        Args:
+            sql (str): SQL file or query to execute.
+            params (dict): Parameters to pass to the query.
+
+        Keyword Args:
+            use_instance_params (bool): If True, will use the instance_params set on
+                the Database object. Default is True.
+        """
+        if params is None:
+            params = {}
+        if kwargs.pop("use_instance_params", True):
+            params.update(self.instance_params)
+
         return run_query(self.session, sql, params, **kwargs)
 
     def exec_sql(self, sql, params=None, **kwargs):
         """Executes SQL files passed"""
-        warnings.warn("exec_sql is deprecated. Use run_sql instead", DeprecationWarning)
+        warnings.warn(
+            "exec_sql is deprecated and will be removed in version 4.0. Use run_sql instead",
+            DeprecationWarning,
+        )
         return self.run_sql(sql, params, **kwargs)
 
     def get_dataframe(self, *args):
@@ -152,6 +197,11 @@ class Database(object):
         instance to set up foreign and primary key constraints.
         https://docs.sqlalchemy.org/en/13/core/reflection.html#reflecting-views
         """
+        warnings.warn(
+            "reflect_table is deprecated and will be removed in version 4.0. Shift away from table refection, or use reflect_table from the macrostrat.database.utils module.",
+            DeprecationWarning,
+        )
+
         return reflect_table(self.engine, *args, **kwargs)
 
     @property
