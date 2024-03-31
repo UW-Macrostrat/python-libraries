@@ -39,7 +39,7 @@ def empty_db(engine):
 @fixture(scope="session")
 def db(empty_db):
     # Get schema files
-    schema_files = Path(relative_path(__file__, "test-fixtures")).glob("*.sql")
+    schema_files = Path(relative_path(__file__, "fixtures")).glob("*.sql")
 
     file_list = list(schema_files)
     assert len(file_list) == 1
@@ -338,7 +338,7 @@ def test_sigint_cancel(db):
     # Time how long it takes to run the script
     start = time.time()
 
-    script = relative_path(__file__, "test-scripts/test-long-running-query")
+    script = relative_path(__file__, "scripts/test-long-running-query")
 
     p = subprocess.Popen(
         [
