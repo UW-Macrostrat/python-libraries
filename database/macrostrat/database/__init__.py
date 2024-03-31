@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from psycopg2.errors import InvalidSavepointSpecification
+from psycopg2.sql import Identifier
 from sqlalchemy import URL, MetaData, create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError, InternalError
 from sqlalchemy.ext.compiler import compiles
@@ -306,7 +307,8 @@ class Database(object):
 
         if connection is None:
             connection = self.session.connection()
-        connection.execute(text(f"SAVEPOINT {name}"))
+        params = {"name": Identifier(name)}
+        run_query(connection, "SAVEPOINT {name}", params)
         should_rollback = rollback
         self.session = Session(bind=connection)
         try:
@@ -315,16 +317,21 @@ class Database(object):
             should_rollback = True
             raise e
         finally:
-            try:
-                if should_rollback:
-                    connection.execute(text(f"ROLLBACK TO SAVEPOINT {name}"))
-                else:
-                    connection.execute(text(f"RELEASE SAVEPOINT {name}"))
-            except InternalError as err:
-                if isinstance(err.orig, InvalidSavepointSpecification):
-                    log.warning(
-                        f"Savepoint {name} does not exist; we may have already rolled back."
-                    )
-                    connection.execute(text(f"ROLLBACK"))
+            _clear_savepoint(connection, name, rollback=should_rollback)
             self.session.close()
             self.session = _prev_session
+
+
+def _clear_savepoint(connection, name, rollback=True):
+    params = {"name": Identifier(name)}
+    try:
+        if rollback:
+            run_query(connection, "ROLLBACK TO SAVEPOINT {name}", params)
+        else:
+            run_query(connection, "RELEASE SAVEPOINT {name}", params)
+    except InternalError as err:
+        if isinstance(err.orig, InvalidSavepointSpecification):
+            log.warning(
+                f"Savepoint {name} does not exist; we may have already rolled back."
+            )
+            run_query(connection, "ROLLBACK")
