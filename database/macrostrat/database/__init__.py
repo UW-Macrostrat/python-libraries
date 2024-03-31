@@ -266,16 +266,19 @@ class Database(object):
                 yield base_db
         """
         if connection is None:
-            connection = self.engine.connect()
-        transaction = connection.begin()
-        session = Session(bind=connection)
-        prev_session = self.session
-        self.session = session
+            connection = self.session.connection()
+        if connection.in_transaction():
+            transaction = connection.begin_nested()
+        else:
+            transaction = connection.begin()
+        # session = Session(bind=connection)
+        # prev_session = self.session
+        # self.session = session
 
         should_rollback = rollback == "always"
 
         try:
-            yield self
+            yield transaction
         except Exception as e:
             should_rollback = rollback != "never"
             if raise_errors:
@@ -285,8 +288,8 @@ class Database(object):
                 transaction.rollback()
             else:
                 transaction.commit()
-            session.close()
-            self.session = prev_session
+            # session.close()
+            # self.session = prev_session
 
     savepoint_counter = 0
 

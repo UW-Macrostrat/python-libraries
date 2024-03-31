@@ -58,11 +58,36 @@ def test_apply_fixtures_transaction(db):
     assert not table_exists(db, "table1", schema="test1")
 
 
+def test_apply_fixtures_directly(db):
+    with db.transaction(rollback="always") as tx:
+        db.run_fixtures(fixture_dir)
+        assert table_exists(db, "table1", schema="test1")
+        tx.rollback()
+    assert not table_exists(db, "table1", schema="test1")
+
+
 def test_apply_fixtures_savepoint(db):
     with db.savepoint(rollback="always"):
         db.run_fixtures(fixture_dir)
         assert table_exists(db, "table1", schema="test1")
     assert not table_exists(db, "table1", schema="test1")
+
+
+def test_nested_transactions(db):
+    with db.transaction():
+        db.run_fixtures(fixture_dir)
+        assert table_exists(db, "table1", schema="test1")
+        with db.transaction() as tx:
+            db.run_query("DROP TABLE test1.table1 CASCADE")
+            assert not table_exists(db, "table1", schema="test1")
+            tx.rollback()
+        assert table_exists(db, "table1", schema="test1")
+        with db.transaction():
+            db.run_query("DROP TABLE test1.table2")
+            assert not table_exists(db, "table2", schema="test1")
+        assert not table_exists(db, "table2", schema="test1")
+    assert table_exists(db, "table1", schema="test1")
+    assert not table_exists(db, "table2", schema="test1")
 
 
 def test_nested_savepoint(db):
