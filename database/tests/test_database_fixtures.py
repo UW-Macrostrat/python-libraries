@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from psycopg2.sql import Literal
-from pytest import fixture, raises
+from pytest import fixture, mark, raises
 from sqlalchemy.exc import StatementError
 
 from macrostrat.database.postgresql import table_exists
@@ -70,7 +70,7 @@ def test_nested_savepoint(db):
         db.run_fixtures(fixture_dir)
         assert table_exists(db, "table1", schema="test1")
         with db.savepoint(rollback=True):
-            db.run_query("DROP TABLE test1.table1")
+            db.run_query("DROP TABLE test1.table1 CASCADE")
             assert not table_exists(db, "table1", schema="test1")
         assert table_exists(db, "table1", schema="test1")
         with db.savepoint(rollback=False):
@@ -79,3 +79,29 @@ def test_nested_savepoint(db):
         assert not table_exists(db, "table2", schema="test1")
     assert table_exists(db, "table1", schema="test1")
     assert not table_exists(db, "table2", schema="test1")
+
+
+def test_savepoint_failing_query(db):
+    """This works to rollback the savepoint, but is awkward."""
+    with db.savepoint(rollback=False):
+        db.run_fixtures(fixture_dir)
+        # This query will fail without a cascade
+        try:
+            db.run_query(
+                "INSERT INTO test1.table1 (nonexistent_column) VALUES ('aaahh')",
+            )
+        except Exception:
+            pass
+    db.session = db._session_factory()
+    assert not table_exists(db, "table1", schema="test1")
+
+
+def test_failing_query_nested_savepoint(db):
+    with db.savepoint(rollback=False):
+        db.run_fixtures(fixture_dir)
+        with raises(Exception):
+            with db.savepoint(rollback=True):
+                db.run_query(
+                    "INSERT INTO test1.table1 (nonexistent_column) VALUES ('aaahh')",
+                )
+    assert not table_exists(db, "table1", schema="test1")

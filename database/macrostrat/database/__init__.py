@@ -4,8 +4,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
+from psycopg2.errors import InvalidSavepointSpecification
 from sqlalchemy import URL, MetaData, create_engine, inspect, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, InternalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
@@ -304,7 +305,7 @@ class Database(object):
         _prev_session = self.session
 
         if connection is None:
-            connection = self.engine.connect()
+            connection = self.session.connection()
         connection.execute(text(f"SAVEPOINT {name}"))
         should_rollback = rollback
         self.session = Session(bind=connection)
@@ -314,9 +315,16 @@ class Database(object):
             should_rollback = True
             raise e
         finally:
-            if should_rollback:
-                connection.execute(text(f"ROLLBACK TO SAVEPOINT {name}"))
-            else:
-                connection.execute(text(f"RELEASE SAVEPOINT {name}"))
+            try:
+                if should_rollback:
+                    connection.execute(text(f"ROLLBACK TO SAVEPOINT {name}"))
+                else:
+                    connection.execute(text(f"RELEASE SAVEPOINT {name}"))
+            except InternalError as err:
+                if isinstance(err.orig, InvalidSavepointSpecification):
+                    log.warning(
+                        f"Savepoint {name} does not exist; we may have already rolled back."
+                    )
+                    connection.execute(text(f"ROLLBACK"))
             self.session.close()
             self.session = _prev_session
