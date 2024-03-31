@@ -249,7 +249,7 @@ class Database(object):
         return self.model
 
     @contextmanager
-    def transaction(self, *, rollback=False, connection=None):
+    def transaction(self, *, rollback="on-error", connection=None, raise_errors=True):
         """Create a database session that can be rolled back after use.
         This is similar to the `session_scope` method but includes
         more fine-grained control over transactions. The two methods may be integrated
@@ -272,13 +272,14 @@ class Database(object):
         prev_session = self.session
         self.session = session
 
-        should_rollback = rollback
+        should_rollback = rollback == "always"
 
         try:
             yield self
         except Exception as e:
-            should_rollback = True
-            raise e
+            should_rollback = rollback != "never"
+            if raise_errors:
+                raise e
         finally:
             if should_rollback:
                 transaction.rollback()
@@ -290,7 +291,7 @@ class Database(object):
     savepoint_counter = 0
 
     @contextmanager
-    def savepoint(self, name=None, rollback=False, connection=None):
+    def savepoint(self, name=None, rollback="on-error", connection=None):
         """A PostgreSQL-specific savepoint context manager. This is similar to the
         `transaction` context manager but uses savepoints directly for simpler operation.
         Notably, it supports nested savepoints, a feature that is difficult in SQLAlchemy's `transaction`
@@ -309,12 +310,12 @@ class Database(object):
             connection = self.session.connection()
         params = {"name": Identifier(name)}
         run_query(connection, "SAVEPOINT {name}", params)
-        should_rollback = rollback
+        should_rollback = rollback == "always"
         self.session = Session(bind=connection)
         try:
             yield name
         except Exception as e:
-            should_rollback = True
+            should_rollback = rollback != "never"
             raise e
         finally:
             _clear_savepoint(connection, name, rollback=should_rollback)

@@ -52,28 +52,28 @@ fixture_dir = Path(__file__).parent / "fixtures" / "schema-dir"
 
 
 def test_apply_fixtures_transaction(db):
-    with db.transaction(rollback=True):
+    with db.transaction(rollback="always"):
         db.run_fixtures(fixture_dir)
         assert table_exists(db, "table1", schema="test1")
     assert not table_exists(db, "table1", schema="test1")
 
 
 def test_apply_fixtures_savepoint(db):
-    with db.savepoint(rollback=True):
+    with db.savepoint(rollback="always"):
         db.run_fixtures(fixture_dir)
         assert table_exists(db, "table1", schema="test1")
     assert not table_exists(db, "table1", schema="test1")
 
 
 def test_nested_savepoint(db):
-    with db.savepoint(rollback=False):
+    with db.savepoint():
         db.run_fixtures(fixture_dir)
         assert table_exists(db, "table1", schema="test1")
-        with db.savepoint(rollback=True):
+        with db.savepoint(rollback="always"):
             db.run_query("DROP TABLE test1.table1 CASCADE")
             assert not table_exists(db, "table1", schema="test1")
         assert table_exists(db, "table1", schema="test1")
-        with db.savepoint(rollback=False):
+        with db.savepoint():
             db.run_query("DROP TABLE test1.table2")
             assert not table_exists(db, "table2", schema="test1")
         assert not table_exists(db, "table2", schema="test1")
@@ -83,7 +83,7 @@ def test_nested_savepoint(db):
 
 def test_savepoint_failing_query(db):
     """This works to rollback the savepoint, but is awkward."""
-    with db.savepoint(rollback=False):
+    with db.savepoint():
         db.run_fixtures(fixture_dir)
         # This query will fail without a cascade
         try:
@@ -97,10 +97,10 @@ def test_savepoint_failing_query(db):
 
 
 def test_failing_query_nested_savepoint(db):
-    with db.savepoint(rollback=False):
+    with db.savepoint(rollback="on-error"):
         db.run_fixtures(fixture_dir)
         with raises(Exception):
-            with db.savepoint(rollback=True):
+            with db.savepoint(rollback="always"):
                 db.run_query(
                     "INSERT INTO test1.table1 (nonexistent_column) VALUES ('aaahh')",
                 )
