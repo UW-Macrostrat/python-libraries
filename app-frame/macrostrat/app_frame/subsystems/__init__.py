@@ -1,3 +1,4 @@
+import warnings
 from typing import Optional
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
@@ -73,14 +74,8 @@ class SubsystemManager:
 
     def add_module(self, module):
         for _, obj in module.__dict__.items():
-            try:
-                assert issubclass(obj, Subsystem)
-            except (TypeError, AssertionError):
+            if not issubclass(obj, Subsystem) or obj is Subsystem:
                 continue
-
-            if obj is Subsystem:
-                continue
-
             self.add(obj)
 
     def add_all(self, *plugins):
@@ -101,14 +96,14 @@ class SubsystemManager:
 
     def __load_plugin(self, plugin, app: ApplicationBase):
         if isinstance(plugin, Subsystem):
-            log.info(f"Loading subsystem: {plugin.__class__.name}")
+            if plugin.app is not app:
+                raise SubsystemError(f"Subsystem {plugin.name} was initialized against the wrong app")
             return plugin
-
         if issubclass(plugin, Subsystem):
-            return self.__load_plugin(plugin(app))
+            return plugin(app)
 
         raise SubsystemError(
-            f"{app.name} subsystems must be an instance or subclass of Subsystem"
+            f"{app.name} subsystems must be a instance or subclass of Subsystem"
         )
 
     def finalize(self, app: ApplicationBase):
