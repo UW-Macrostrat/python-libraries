@@ -27,7 +27,7 @@ def database_cluster(
     Start a database cluster in a Docker volume
     under a managed installation of Sparrow.
     """
-    print("Starting database cluster...")
+    print("Starting database cluster using image %s" % image)
     if environment is None:
         environment = {}
     environment.setdefault("POSTGRES_HOST_AUTH_METHOD", "trust")
@@ -104,16 +104,26 @@ def wait_for_cluster(container: Container, url: str):
 
     is_running = False
     time_running = 0
+    print(container.logs().decode("utf-8"))
     start_time = time.time()
+    last_log_time = start_time
     while time_running < stability_timeout:
         container.reload()
+        # Print logs
         time.sleep(0.1)
         is_running = container.status == "running"
+        last_log_time = time.time()
+        new_logs = container.logs(since=last_log_time).decode("utf-8")
+        if new_logs != "":
+            print(new_logs)
         if is_running:
-            time_running = time.time() - start_time
+            time_running = last_log_time - start_time
         else:
             time_running = 0
-        if container.status == "exited":
+
+
+
+    if container.status == "exited":
             raise RuntimeError(
                 "Container exited unexpectedly:\n" + container.logs().decode("utf-8")
             )
