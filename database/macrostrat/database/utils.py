@@ -8,7 +8,7 @@ from warnings import warn
 from click import echo, secho
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
-from psycopg2.sql import SQL, Composable, Composed
+from psycopg.sql import SQL, Composable, Composed
 import psycopg2.errors
 from rich.console import Console
 from sqlalchemy import MetaData, create_engine, text

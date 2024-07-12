@@ -8,9 +8,9 @@ from pathlib import Path
 from sys import stdout
 
 from dotenv import load_dotenv
-from psycopg2.errors import SyntaxError
+from psycopg.errors import SyntaxError
 from psycopg2.extensions import AsIs
-from psycopg2.sql import SQL, Identifier, Literal, Placeholder
+from psycopg.sql import SQL, Identifier, Literal, Placeholder
 from pytest import fixture, mark, raises, warns
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text

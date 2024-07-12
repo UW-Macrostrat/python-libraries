@@ -4,8 +4,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
-from psycopg2.errors import InvalidSavepointSpecification
-from psycopg2.sql import Identifier
+from psycopg.errors import InvalidSavepointSpecification
+from psycopg.sql import Identifier
 from sqlalchemy import URL, MetaData, create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError, InternalError
 from sqlalchemy.ext.compiler import compiles
@@ -57,12 +57,26 @@ class Database(object):
                 pass to queries and other database operations.
         """
 
+
         compiles(Insert, "postgresql")(prefix_inserts)
 
         self.instance_params = kwargs.pop("instance_params", {})
 
         log.info(f"Setting up database connection '{db_conn}'")
-        self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
+
+        url = db_conn
+        if not isinstance(url, URL):
+            url = URL(url)
+        if url.drivername == "postgresql":
+            # Use the psycopg3 driver if available
+            try:
+                from psycopg3 import connect
+            except ImportError:
+                pass
+            else:
+                url.drivername = "postgresql+psycopg"
+
+        self.engine = create_engine(url, echo=echo_sql, **kwargs)
         self.metadata = kwargs.get("metadata", metadata)
 
         # Scoped session for database

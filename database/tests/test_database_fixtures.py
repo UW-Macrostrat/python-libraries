@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from psycopg2.sql import Literal
+from psycopg.sql import Literal
 from pytest import fixture, mark, raises
 from sqlalchemy.exc import StatementError
 
