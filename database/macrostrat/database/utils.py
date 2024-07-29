@@ -17,6 +17,7 @@ from sqlalchemy.exc import (
     InternalError,
     InvalidRequestError,
     ProgrammingError,
+    OperationalError
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
@@ -309,7 +310,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             elif hasattr(connectable, "commit"):
                 connectable.commit()
             pretty_print(sql_text, dim=True)
-        except (ProgrammingError, IntegrityError, InternalError) as err:
+        except (ProgrammingError, IntegrityError, InternalError, OperationalError) as err:
             _err = str(err.orig).strip()
             dim = "already exists" in _err
             if trans is not None:
