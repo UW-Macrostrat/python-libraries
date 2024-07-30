@@ -83,7 +83,7 @@ def test_nested_savepoint(db):
 
 def test_savepoint_failing_query(db):
     """This works to rollback the savepoint, but is awkward."""
-    with db.savepoint():
+    with db.savepoint(rollback="on-error"):
         db.run_fixtures(fixture_dir)
         # This query will fail without a cascade
         try:

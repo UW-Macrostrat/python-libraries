@@ -8,7 +8,7 @@ from typing import Optional, Union
 from psycopg.errors import InvalidSavepointSpecification
 from psycopg.sql import Identifier
 from sqlalchemy import URL, MetaData, create_engine, inspect, text
-from sqlalchemy.exc import IntegrityError, InternalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.engine.url import make_url
@@ -329,6 +329,7 @@ class Database(object):
 
         if connection is None:
             connection = self.session.connection()
+
         params = {"name": Identifier(name)}
         run_query(connection, "SAVEPOINT {name}", params)
         should_rollback = rollback == "always"
@@ -351,7 +352,7 @@ def _clear_savepoint(connection, name, rollback=True):
             run_query(connection, "ROLLBACK TO SAVEPOINT {name}", params)
         else:
             run_query(connection, "RELEASE SAVEPOINT {name}", params)
-    except InternalError as err:
+    except OperationalError as err:
         if isinstance(err.orig, InvalidSavepointSpecification):
             log.warning(
                 f"Savepoint {name} does not exist; we may have already rolled back."
