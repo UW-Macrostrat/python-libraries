@@ -9,6 +9,7 @@ from click import echo, secho
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
 from psycopg2.sql import SQL, Composable, Composed
+import psycopg2.errors
 from rich.console import Console
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import Connection, Engine
@@ -265,8 +266,28 @@ def _run_sql(connectable, sql, params=None, **kwargs):
     if not isinstance(params, list) or not len(params) == len(queries):
         params = [params] * len(queries)
 
-    for query, params in zip(queries, params):
-        trans = None
+    for query, _params in zip(queries, params):
+        params, pre_bind_params = _split_params(_params)
+
+        if pre_bind_params is not None:
+            if not isinstance(query, SQL):
+                query = SQL(query)
+            # Pre-bind the parameters using PsycoPG2
+            query = query.format(**pre_bind_params)
+
+        if isinstance(query, (SQL, Composed)):
+            query = _render_query(query, connectable)
+
+        sql_text = str(query)
+        if isinstance(query, str):
+            sql_text = format(query, strip_comments=True).strip()
+            if sql_text == "":
+                continue
+            # Check for server-bound parameters in sql native style. If there are none, use
+            # the SQLAlchemy text() function, otherwise use the raw query string
+            if has_server_binds is None:
+                has_server_binds = infer_has_server_binds(sql_text)
+
         # This only does something for postgresql, but it's harmless to run it for other engines
         set_wait_callback(wait_select)
 
@@ -275,27 +296,6 @@ def _run_sql(connectable, sql, params=None, **kwargs):
         except InvalidRequestError:
             trans = None
         try:
-            params, pre_bind_params = _split_params(params)
-
-            if pre_bind_params is not None:
-                if not isinstance(query, SQL):
-                    query = SQL(query)
-                # Pre-bind the parameters using PsycoPG2
-                query = query.format(**pre_bind_params)
-
-            if isinstance(query, (SQL, Composed)):
-                query = _render_query(query, connectable)
-
-            sql_text = str(query)
-            if isinstance(query, str):
-                sql_text = format(query, strip_comments=True).strip()
-                if sql_text == "":
-                    continue
-                # Check for server-bound parameters in sql native style. If there are none, use
-                # the SQLAlchemy text() function, otherwise use the raw query string
-                if has_server_binds is None:
-                    has_server_binds = infer_has_server_binds(sql_text)
-
             log.debug("Executing SQL: \n %s", query)
             if has_server_binds:
                 conn = _get_connection(connectable)
@@ -310,22 +310,49 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             elif hasattr(connectable, "commit"):
                 connectable.commit()
             pretty_print(sql_text, dim=True)
-        except (ProgrammingError, IntegrityError, InternalError, OperationalError) as err:
-            _err = str(err.orig).strip()
-            dim = "already exists" in _err
+        except Exception as err:
             if trans is not None:
                 trans.rollback()
             elif hasattr(connectable, "rollback"):
                 connectable.rollback()
-            pretty_print(sql_text, fg=None if dim else "red", dim=True)
-            if dim:
-                _err = "  " + _err
-            secho(_err, fg="red", dim=dim)
-            log.error(err)
-            if raise_errors:
+            if raise_errors or _should_raise_query_error(err):
                 raise err
+
+            _print_error(sql_text, err)
         finally:
             set_wait_callback(None)
+
+
+def _should_raise_query_error(err):
+    """Determine if an error should be raised for a query or not."""
+    if not isinstance(err, (ProgrammingError, IntegrityError, InternalError, OperationalError)):
+        return True
+
+    orig_err = getattr(err, "orig", None)
+    if orig_err is None:
+        return True
+
+    # If we cancel statements midstream, we should raise the error.
+    # We might want to change this behavior in the future.
+    # Ideally we could handle operational errors more gracefully
+    if isinstance(orig_err, psycopg2.errors.QueryCanceled) or orig_err.pgcode == "57014":
+        return True
+
+    return False
+
+
+def _print_error(sql_text, err):
+    if orig := getattr(err, "orig", None):
+        _err = str(orig)
+    else:
+        _err = str(err)
+    _err = _err.strip()
+    dim = "already exists" in _err
+    pretty_print(sql_text, fg=None if dim else "red", dim=True)
+    if dim:
+        _err = "  " + _err
+    secho(_err, fg="red", dim=dim)
+    log.error(err)
 
 
 def run_sql_file(connectable, filename, params=None, **kwargs):
