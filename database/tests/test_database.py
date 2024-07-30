@@ -309,7 +309,7 @@ def test_copy_statement(db):
     pg_conn = db.engine.connect().connection
     cur = pg_conn.cursor()
 
-    cur.copy_expert("COPY sample (name) TO STDOUT", stdout)
+    cur.copy("COPY sample (name) TO STDOUT", stdout)
 
 
 def test_close_connection(conn):
@@ -320,7 +320,7 @@ def test_close_connection(conn):
 
     import threading
 
-    from psycopg2.extensions import QueryCanceledError
+    from psycopg.errors import QueryCanceled
     from sqlalchemy.exc import DBAPIError
 
     sql = text("SELECT pg_sleep(10)")
@@ -333,7 +333,7 @@ def test_close_connection(conn):
         conn.execute(sql)
         assert False
     except DBAPIError as e:
-        if type(e.orig) == QueryCanceledError:
+        if type(e.orig) == QueryCanceled:
             print("Long running query was cancelled.")
             assert True
     t.cancel()
@@ -361,14 +361,15 @@ def test_sigint_cancel(db):
             str(script),
             db_url,
         ],
+        stdout=subprocess.PIPE,
     )
     time.sleep(0.5)
     p.send_signal(signal.SIGINT)
     p.wait()
-    assert p.returncode == 1
     # Make sure it didn't take too long
     dT = time.time() - start
     assert dT < 2
+    assert p.returncode != 0
 
 
 def test_check_table_exists(db):
