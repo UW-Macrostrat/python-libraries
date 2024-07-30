@@ -11,6 +11,7 @@ from sqlalchemy import URL, MetaData, create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError, InternalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
@@ -67,7 +68,7 @@ class Database(object):
 
         url = db_conn
         if not isinstance(url, URL):
-            url = URL(url)
+            url = make_url(url)
 
         # Prefer the psycopg3 driver for PostgreSQL
 

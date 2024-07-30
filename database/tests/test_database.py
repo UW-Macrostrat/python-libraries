@@ -6,11 +6,12 @@ NOTE: At the moment, these tests are not independent and must run in order.
 
 from pathlib import Path
 from sys import stdout
+from typing import Any
 
 from dotenv import load_dotenv
 from psycopg.errors import SyntaxError
-from psycopg2.extensions import AsIs
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
+#from psycopg2.extensions import AsIs
 from pytest import fixture, mark, raises, warns
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
@@ -209,7 +210,7 @@ def test_server_bound_parameters_mixed(db):
 
 def test_server_bound_parameters_invalid(db):
     sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
-    with raises(KeyError):
+    with raises(ProgrammingError):
         db.run_query(sql, {"name": "Test", "table_name": Identifier("sample")})
 
 
@@ -238,6 +239,21 @@ def test_server_bound_parameters_dbapi_extensions(db):
     res = db.run_query(sql, {"name": "Test", "table_name": AsIs("sample")})
     assert res.scalar() == "Test"
 
+from psycopg.adapt import Dumper, Buffer
+
+
+class AsIs(Dumper):
+    adapted: str
+
+    def __init__(self, p_str):
+        super().__init__(p_str)
+
+    def dump(self, obj: Any):
+        raise NotImplementedError("AsIs cannot be used as a server-bound parameter")
+
+    def quote(self):
+        return self.adapted
+
 
 def test_server_parameters_function_def(db):
     """Make sure we don't select all % as bound parameters."""
@@ -251,7 +267,7 @@ def test_server_parameters_function_def(db):
     END;
     $$ LANGUAGE plpgsql;
     """
-    with raises(TypeError):
+    with raises(ProgrammingError):
         db.run_sql(sql, raise_errors=True)
     # This should not raise
     db.run_sql(sql, raise_errors=True, has_server_binds=False)
