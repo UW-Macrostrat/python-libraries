@@ -6,6 +6,7 @@ from typing import IO, Union
 from warnings import warn
 
 from click import echo, secho
+
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
 from psycopg.sql import SQL, Composable, Composed
@@ -196,6 +197,8 @@ def _get_cursor(connectable):
     while hasattr(conn, "driver_connection") or hasattr(conn, "connection"):
         if hasattr(conn, "driver_connection"):
             conn = conn.driver_connection
+        elif conn.connection == conn:
+            break
         else:
             conn = conn.connection
         if callable(conn):

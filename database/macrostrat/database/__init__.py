@@ -1,4 +1,5 @@
 import warnings
+import psycopg
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
@@ -67,14 +68,19 @@ class Database(object):
         url = db_conn
         if not isinstance(url, URL):
             url = URL(url)
-        if url.drivername == "postgresql":
+
+        # Prefer the psycopg3 driver for PostgreSQL
+
+
+
+        if url.drivername.startswith("postgresql"):
             # Use the psycopg3 driver if available
             try:
-                from psycopg3 import connect
+                from psycopg import connect
             except ImportError:
                 pass
             else:
-                url.drivername = "postgresql+psycopg"
+                url = url.set(drivername="postgresql+psycopg")
 
         self.engine = create_engine(url, echo=echo_sql, **kwargs)
         self.metadata = kwargs.get("metadata", metadata)
