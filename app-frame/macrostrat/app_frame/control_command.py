@@ -133,41 +133,49 @@ def start_app(
     app: Application,
     container: str = typer.Argument(None),
     force_recreate: bool = False,
+    single_stage: bool = False,
 ):
     """Start the :app_name: server and follow logs."""
 
-    if container:
-        compose("build", container)
-    else:
-        compose("build")
+    if not single_stage:
+        build_args = ["build"]
+        if container is not None:
+            build_args.append(container)
+        res = compose(*build_args)
+        fail_with_message(app, res, "Build images")
+        sleep(0.1)
 
-    sleep(0.1)
-
-    args = ["up", "--no-start", "--remove-orphans"]
+    args = ["up", "--remove-orphans"]
+    if not single_stage:
+        args += ["--no-start", "--no-build"]
     if force_recreate:
         args.append("--force-recreate")
-    if container:
+    if container is not None:
         args.append(container)
 
     res = compose(*args)
-    if res.returncode != 0:
-        app.info(
-            "One or more containers did not build successfully, aborting.",
-            style="red bold",
-        )
-        sys.exit(res.returncode)
-    else:
-        app.info("All containers built successfully.", style="green bold")
-    print()
+    fail_with_message(app, res, "Create containers")
 
     # Get list of currently running containers
     running_containers = check_status(app.name, app.command_name)
 
-    app.info("Starting :app_name: server...", style="bold")
-    compose("start")
-    print()
+    if not single_stage:
+        app.info("Starting :app_name: server...", style="bold")
+        res = compose("start")
+        fail_with_message(app, res, "Start :app_name:")
 
     run_restart_commands(app, running_containers)
+
+def fail_with_message(app, res, stage_name):
+    if res.returncode != 0:
+        app.info(
+            f"{stage_name} failed, aborting.",
+            style="red bold",
+        )
+        sys.exit(res.returncode)
+    else:
+        app.info(f"{stage_name} succeeded.", style="green bold")
+        print()
 
 
 def run_restart_commands(app, running_containers):
