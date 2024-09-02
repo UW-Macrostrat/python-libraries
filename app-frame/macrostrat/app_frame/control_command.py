@@ -26,6 +26,7 @@ class OrderCommands(TyperGroup):
         return list(self.commands)  # get commands using self.commands
 
 
+
 class ControlCommand(Typer):
     name: str
 
@@ -62,9 +63,6 @@ class ControlCommand(Typer):
 
         self.registered_callback = TyperInfo(callback=callback)
 
-        # Click commands must be added after Typer commands in the current design.
-        self._click_commands = []
-
         self.build_commands()
 
     def build_commands(self):
@@ -74,28 +72,24 @@ class ControlCommand(Typer):
             self.command(rich_help_panel="System")(cmd)
         self.add_click_command(_compose, "compose", rich_help_panel="System")
 
-    def add_click_command(self, cmd, *args, **kwargs):
-        """Add a click command for lazy initialization
-        params:
-            cmd: click command
-            args: args to pass to click.add_command
-            kwargs: kwargs to pass to click.add_command
-            rich_help_panel: name of rich help panel to add to
-        """
-        rich_help_panel = kwargs.pop("rich_help_panel", None)
-        if rich_help_panel is not None:
-            setattr(cmd, "rich_help_panel", rich_help_panel)
-        cfunc = lambda _click: _click.add_command(cmd, *args, **kwargs)
-        self._click_commands.append(cfunc)
+    def add_command(self, cmd, *args, **kwargs):
+        """Simple wrapper around command"""
+        self.command(*args, **kwargs)(cmd)
 
-    def __call__(self):
-        """Run this command using its underlying click object."""
-        cmd = typer.main.get_command(self)
-        assert isinstance(cmd, click.Group)
-        self._click = cmd
-        for cfunc in self._click_commands:
-            cfunc(self._click)
-        return self._click()
+    def add_click_command(self, cmd, *args, **kwargs):
+        """Add a click command
+        params:
+            cmd: callable
+            args: arguments to pass to typer.command
+            kwargs: keyword arguments to pass to typer.command
+        """
+        def _click_command(ctx: typer.Context):
+            cmd(ctx.args)
+
+        _click_command.__doc__ = cmd.__doc__
+
+        self.add_command(_click_command,*args, **kwargs)
+
 
 
 def up(
