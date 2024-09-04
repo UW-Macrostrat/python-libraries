@@ -7,8 +7,21 @@
       <sourceFolder url="file://$MODULE_DIR$/database" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/dinosaur" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/package-tools" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/site" isTestSource="false" generated="true" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/app-frame/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/database/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/dinosaur/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/utils/dist" />
     </content>
     <orderEntry type="jdk" jdkName="Poetry (python-libraries)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="PyNamespacePackagesService">
+    <option name="namespacePackageFolders">
+      <list>
+        <option value="$MODULE_DIR$/utils/macrostrat" />
+      </list>
+    </option>
   </component>
 </module>

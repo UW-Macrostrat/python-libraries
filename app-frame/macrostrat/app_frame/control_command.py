@@ -1,12 +1,14 @@
 # Typer command-line application
 
 import sys
+import typing as t
 from os import environ
 from time import sleep
 
 import click
 import typer
 from click import Group
+from typer import rich_utils
 from typer import Context, Option, Typer
 from typer.core import TyperGroup
 from typer.models import TyperInfo
@@ -23,9 +25,20 @@ log = get_logger(__name__)
 class OrderCommands(TyperGroup):
     def list_commands(self, ctx: Context):
         """Return list of commands in the order of appearance."""
-        return list(self.commands)  # get commands using self.commands
+        deprecated = []
+        commands = []
+
+        for name, command in self.commands.items():
+            if command.deprecated:
+                deprecated.append(name)
+            else:
+                commands.append(name)
+        return commands + deprecated
 
 
+    def get_params(self, ctx: Context) -> t.List["Parameter"]:
+        """ Don't show the completion options in the help text, to avoid cluttering the output """
+        return [p for p in self.params if not p.name in ("install_completion", "show_completion")]
 
 class ControlCommand(Typer):
     name: str
@@ -45,6 +58,10 @@ class ControlCommand(Typer):
         super().__init__(**kwargs)
         self.app = app
         self.name = app.name
+
+        # Make sure the help text is not dimmed after the first line
+        rich_utils.STYLE_HELPTEXT = None
+
 
         verbose_envvar = self.app.envvar_prefix + "VERBOSE"
 
