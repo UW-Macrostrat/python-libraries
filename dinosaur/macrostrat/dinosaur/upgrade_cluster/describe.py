@@ -18,13 +18,17 @@ def check_database_cluster_version(client: DockerClient, volume_name: str):
     version_file = Path(cluster_dir) / "PG_VERSION"
     log.info(f"Checking version of database cluster in volume {volume_name}")
     try:
-        stdout = client.containers.run(
+        stdout, stderr = client.containers.run(
             "bash",
             f"cat {version_file}",
             volumes={volume_name: {"bind": cluster_dir, "mode": "ro"}},
             remove=True,
             stdout=True,
+            stderr=True,
         )
+        if stderr is not None:
+            log.error(stderr.decode("utf-8").strip())
+            return None
     except (ContainerError, CalledProcessError) as exc:
         log.error(exc)
         return None
