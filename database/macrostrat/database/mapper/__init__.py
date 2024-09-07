@@ -1,4 +1,3 @@
-from distutils.log import warn
 from warnings import warn
 
 # Drag in geographic types for database reflection
