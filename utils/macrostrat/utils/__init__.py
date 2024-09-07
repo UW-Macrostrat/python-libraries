@@ -25,3 +25,14 @@ def working_directory(path: Path):
     os.chdir(str(path))
     yield
     os.chdir(prev_cwd)
+
+@contextmanager
+def override_environment(**kwargs):
+    """Override environment variables for a block of code."""
+    old_environ = dict(os.environ)
+    os.environ.update(kwargs)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)

@@ -30,3 +30,4 @@ def check_status(app_name: str, command_name: str) -> list[str]:
     )
 
     return containers
+
