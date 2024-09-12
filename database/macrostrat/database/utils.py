@@ -333,9 +333,10 @@ def _should_raise_query_error(err):
         return True
 
     # If we cancel statements midstream, we should raise the error.
-    # We might want to change this behavior in the future.
+    # We might want to change this behavior in the future, or support more graceful handling of errors from other
+    # database backends.
     # Ideally we could handle operational errors more gracefully
-    if isinstance(orig_err, psycopg2.errors.QueryCanceled) or orig_err.pgcode == "57014":
+    if isinstance(orig_err, psycopg2.errors.QueryCanceled) or getattr(orig_err, "pgcode", None) == "57014":
         return True
 
     return False
