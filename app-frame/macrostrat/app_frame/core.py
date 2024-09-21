@@ -83,7 +83,7 @@ class Application(ApplicationBase):
 
     def setup_environment(self, env: EnvironmentDependency):
         environ["DOCKER_SCAN_SUGGEST"] = "false"
-        environ["DOCKER_BUILDKIT"] = "1"
+        #environ["DOCKER_BUILDKIT"] = "1"
 
         # Set up environment for docker-compose
         # We may need to move this to a context where it is only

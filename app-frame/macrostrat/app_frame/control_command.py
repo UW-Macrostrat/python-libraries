@@ -8,6 +8,7 @@ from time import sleep
 import click
 import typer
 from click import Group
+from pydantic.dataclasses import dataclass
 from typer import rich_utils
 from typer import Context, Option, Typer
 from typer.core import TyperGroup
@@ -104,6 +105,13 @@ class ControlCommand(Typer):
             cmd(ctx.args)
 
         _click_command.__doc__ = cmd.__doc__
+
+        kwargs["context_settings"] = {
+            "allow_extra_args": True,
+            "ignore_unknown_options": True,
+            "help_option_names": [],
+            **kwargs.get("context_settings", {}),
+        }
 
         self.add_command(_click_command,*args, **kwargs)
 
