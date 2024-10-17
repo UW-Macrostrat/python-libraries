@@ -1,6 +1,8 @@
+from http.client import HTTPException
 from os import environ
 from pytest import fixture, mark
 from starlette.authentication import requires
+from starlette.requests import Request
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
@@ -10,7 +12,18 @@ from .identity import BaseUser, IdentityProvider
 from .api import AuthAPI
 from starlette.applications import Starlette
 from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.responses import JSONResponse
 from uuid import uuid4
+
+
+async def http_exception(request: Request, exc: HTTPException):
+    return JSONResponse(
+        {
+            "detail": exc.detail,
+            "error": exc.error,
+        },
+        status_code=exc.status_code,
+    )
 
 
 class MockDatabase(IdentityProvider):
@@ -56,8 +69,9 @@ def admin_client(app, db):
 @fixture(scope="class")
 def app(auth_backend):
     # Create a Starlette app
-    _app = Starlette()
+    _app = Starlette(exception_handlers={HTTPException: http_exception})
     _app.add_middleware(AuthenticationMiddleware, backend=auth_backend)
+
     # Mount the AuthAPI routes
     _app.mount("/auth", AuthAPI, name="auth")
     return _app
@@ -76,12 +90,7 @@ def client(app, db):
 
 
 def is_forbidden(res):
-    data = res.json()["error"]
-    return (
-        res.status_code == 403
-        and data["detail"] == "Forbidden"
-        and data["status_code"] == 403
-    )
+    return res.status_code == 403 and res.reason_phrase == "Forbidden"
 
 
 def get_access_cookie(response):
