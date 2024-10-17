@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.4.0] - 2024-10-17
+
+- Add capability to instantiate the `Database` wrapper class from an engine as
+  well as a URL.
+
 ## [3.3.0] - 2024-03-30
 
 This release focuses on nicer semantics for applying database fixtures.

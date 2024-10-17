@@ -1,19 +1,17 @@
 import warnings
 from contextlib import contextmanager
-from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
 from psycopg2.errors import InvalidSavepointSpecification
 from psycopg2.sql import Identifier
-from sqlalchemy import URL, MetaData, create_engine, inspect, text
+from sqlalchemy import URL, MetaData, create_engine, inspect, Engine
 from sqlalchemy.exc import IntegrityError, InternalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
-
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
 from .utils import (  # noqa
@@ -41,14 +39,14 @@ class Database(object):
 
     __inspector__ = None
 
-    def __init__(self, db_conn: Union[str, URL], *, echo_sql=False, **kwargs):
+    def __init__(self, db_conn: Union[str, URL, Engine], *, echo_sql=False, **kwargs):
         """
         Wrapper for interacting with a database using SQLAlchemy.
         Optimized for use with PostgreSQL, but usable with SQLite
         as well.
 
         Args:
-            db_conn (str): Connection string for the database.
+            db_conn (str | URL | Engine): Connection string or engine for the database.
 
         Keyword Args:
             echo_sql (bool): If True, will echo SQL commands to the
@@ -61,8 +59,12 @@ class Database(object):
 
         self.instance_params = kwargs.pop("instance_params", {})
 
-        log.info(f"Setting up database connection '{db_conn}'")
-        self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
+        if isinstance(db_conn, Engine):
+            log.info(f"Set up database connection with engine {db_conn.url}")
+            self.engine = db_conn
+        else:
+            log.info(f"Setting up database connection with URL '{db_conn}'")
+            self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
         self.metadata = kwargs.get("metadata", metadata)
 
         # Scoped session for database
