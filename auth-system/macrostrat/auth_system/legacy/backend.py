@@ -3,10 +3,10 @@ JSON Web Token authentication.
 
 """
 import time
+import warnings
 from typing import Tuple, Any
 
 import jwt
-import warnings
 from starlette.authentication import (
     BaseUser,
     SimpleUser,
@@ -17,6 +17,7 @@ from starlette.authentication import (
 )
 from starlette.requests import Request
 from starlette.responses import Response
+
 from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
@@ -49,7 +50,11 @@ class JWTBackend(AuthenticationBackend):
         payload = dict(iat=now, nbf=now, exp=now + max_age, type=type)
         payload.update(data)
 
-        token = self._encode(payload).decode("utf-8")
+        token = self._encode(payload)
+        # PyJWT 1.x returns bytes, so we need to decode it,
+        # but PyJWT 2.x returns a string, so we don't need to decode it.
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
 
         if response is None:
             return token

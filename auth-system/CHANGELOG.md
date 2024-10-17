@@ -15,6 +15,7 @@ generalized authentication system.
 - Get all tests to pass by mocking database
 
 There are now 16 passing tests of the old auth system!
+These can be run with `poetry run pytest auth-system`
 
 ### Begin bringing in Macrostrat's newer ORCID-based authentication system
 
