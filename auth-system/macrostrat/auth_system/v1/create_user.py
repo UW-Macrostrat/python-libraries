@@ -1,5 +1,4 @@
-import click
-from click import echo, secho, style, prompt
+from click import echo, style, prompt
 from sqlalchemy.exc import IntegrityError
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -19,11 +18,11 @@ class User(BaseModel):
 
     def set_password(self, plaintext):
         # 'salt' the passwords to prevent brute forcing
-        salt = environ.get("SPARROW_SECRET_KEY")
+        salt = environ.get("SECRET_KEY")
         self.password = generate_password_hash(salt + str(plaintext))
 
     def is_correct_password(self, plaintext):
-        salt = environ.get("SPARROW_SECRET_KEY")
+        salt = environ.get("SECRET_KEY")
         return check_password_hash(self.password, salt + str(plaintext))
 
 

@@ -11,3 +11,4 @@ generalized authentication system.
 
 Then we will start integrating Macrostrat's ORCID-based system.
 
+- Add user model code from `sparrow.database`
