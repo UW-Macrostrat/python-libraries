@@ -4,15 +4,9 @@ from starlette.authentication import requires, AuthenticationError
 from macrostrat.utils import get_logger
 
 from webargs_starlette import use_annotations
-from .context import get_backend
-from .create_user import User
+from .context import get_backend, get_identity_provider
 
 log = get_logger(__name__)
-
-
-def get_backend():
-    app = get_sparrow_app()
-    return app.plugins.get("auth").backend
 
 
 def UnauthorizedResponse(**kwargs):
@@ -20,15 +14,13 @@ def UnauthorizedResponse(**kwargs):
         dict(login=False, username=None, message="user is not authenticated"), **kwargs
     )
 
-GetUser = Callable[[str], BaseUser]
-
 
 @use_annotations(location="json")
-async def login(request, username: str, password: str, get_current_user: GetUser):
-    db = get_database()
+async def login(request, username: str, password: str):
     backend = get_backend()
+    users = get_identity_provider()
+    current_user = users.get_user(username)
 
-    current_user = db.session.query(User).get(username)
     log.debug(current_user)
 
     if current_user is not None and current_user.is_correct_password(password):
