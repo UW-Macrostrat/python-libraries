@@ -52,7 +52,8 @@ This repository is designed to facilitate rapid iteration of its components
 and release to PyPI. All modules are part of the `macrostrat` namespace package:
 `macrostrat.database`, `macrostrat.dinosaur`, `macrostrat.utils`, etc.
 
-To release a new version of a module, increment its `pyproject.toml` file and
+To release a new version of a module, increment its version in the appropriate
+`pyproject.toml` file and
 run `make publish`. This will run a publication script that checks for current
 versions and publishes if none exist.
 
