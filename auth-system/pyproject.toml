@@ -12,11 +12,12 @@ python = "^3.9"
 "macrostrat.utils" = "^1.2.0"
 PyJWT = "^1.7.1"
 werkzeug = "^2.3.7"
+starlette = "^0.31.1"
+webargs-starlette = "^2.0.0"
 
 
 [tool.poetry.dev-dependencies]
 pytest = "^8.3.2"
-
 
 [build-system]
 requires = ["poetry-core"]

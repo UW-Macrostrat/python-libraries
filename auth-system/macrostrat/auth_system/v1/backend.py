@@ -17,7 +17,7 @@ from starlette.authentication import (
 )
 from starlette.requests import Request
 from starlette.responses import Response
-from sparrow.logs import get_logger
+from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
 

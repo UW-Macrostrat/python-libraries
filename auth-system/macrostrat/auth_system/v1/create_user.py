@@ -3,26 +3,31 @@ from sqlalchemy.exc import IntegrityError
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from os import environ
+
+from macrostrat.auth_system.v1.context import get_secret_key
 from macrostrat.database.mapper import BaseModel
 
+# Abstract base class for all models
+class BaseUser(BaseModel):
+    __abstract__ = True
+    password: str
 
-class User(BaseModel):
-    if BaseModel.loaded_from_cache:
-        __table__ = BaseModel.metadata.tables["user"]
-    else:
-        __tablename__ = "user"
-        __table_args__ = {"extend_existing": True}
+    def set_password(self, plaintext: str) -> None:
+        ...
 
-    # Columns are automagically mapped from database
-    # *NEVER* directly set the password column.
+    def is_correct_password(self, plaintext):
+        ...
+
+
+class User(BaseUser):
 
     def set_password(self, plaintext):
         # 'salt' the passwords to prevent brute forcing
-        salt = environ.get("SECRET_KEY")
+        salt = get_secret_key()
         self.password = generate_password_hash(salt + str(plaintext))
 
     def is_correct_password(self, plaintext):
-        salt = environ.get("SECRET_KEY")
+        salt =  get_secret_key()
         return check_password_hash(self.password, salt + str(plaintext))
 
 

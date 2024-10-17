@@ -1,10 +1,11 @@
 from starlette.routing import Route, Router
 from starlette.responses import JSONResponse
 from starlette.authentication import requires, AuthenticationError
+from macrostrat.utils import get_logger
+
 from webargs_starlette import use_annotations
-from sparrow.database.models import User
-from sparrow.core.context import get_sparrow_app, get_database
-from sparrow.logs import get_logger
+from .context import get_backend
+from .create_user import User
 
 log = get_logger(__name__)
 
@@ -19,9 +20,11 @@ def UnauthorizedResponse(**kwargs):
         dict(login=False, username=None, message="user is not authenticated"), **kwargs
     )
 
+GetUser = Callable[[str], BaseUser]
+
 
 @use_annotations(location="json")
-async def login(request, username: str, password: str):
+async def login(request, username: str, password: str, get_current_user: GetUser):
     db = get_database()
     backend = get_backend()
 
