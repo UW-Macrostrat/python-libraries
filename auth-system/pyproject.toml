@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "macrostrat.auth_system"
-version = "1.0.1"
+version = "1.0.2"
 description = "Authentication system for Macrostrat and related apps"
 authors = ["Daven Quinn <code@davenquinn.com>"]
 readme = "README.md"
@@ -17,6 +17,7 @@ webargs-starlette = "^2.0.0"
 fastapi = "^0.104.0"
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 bcrypt = "^4.1.1"
+httpx = "^0.25.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^8.3.2"
