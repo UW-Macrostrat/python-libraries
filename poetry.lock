@@ -681,7 +681,7 @@ url = "app-frame"
 
 [[package]]
 name = "macrostrat-auth-system"
-version = "0.1.0"
+version = "1.0.0"
 description = "Authentication system for Macrostrat and related apps"
 optional = false
 python-versions = "^3.9"

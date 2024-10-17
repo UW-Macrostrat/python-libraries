@@ -7,13 +7,15 @@ system. It is divided into two submodules:
   local storage of hashed passwords. This system was created as part
   of [Sparrow](https://sparrow-data.org) and is being phased out in favor of a
   more modern system based on ORCID.
-- `macrostrat.auth_system.oauth`: An ORCID-based user
+- `macrostrat.auth_system.core`: An ORCID-based user
   authentication system. This system will become the primary authentication
-  system for
-  Macrostrat.
+  system for Macrostrat, but it is still in development.
 
 We plan to gradually converge the functionality of both versions while phasing
 out the legacy system.
+
+The system has tests that can be run with `poetry run pytest auth-system`
+(currently, only the legacy system is covered).
 
 ## Key planned functionality
 
