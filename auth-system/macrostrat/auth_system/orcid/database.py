@@ -8,12 +8,12 @@ from .schema import Token
 
 
 # TODO:
-# - remove globals
+# - remove globals in favor of contextlib
 # - integrate with macrostrat.database code
 
 
 def get_access_token(token: str):
-    """The sole database call """
+    """The sole database call"""
 
     session_maker = get_session_maker()
     with session_maker() as session:
@@ -29,7 +29,11 @@ def get_access_token(token: str):
 
         # Update the used_on column
         if result is not None:
-            stmt = update(Token).where(Token.token == token).values(used_on=datetime.datetime.utcnow())
+            stmt = (
+                update(Token)
+                .where(Token.token == token)
+                .values(used_on=datetime.datetime.utcnow())
+            )
             session.execute(stmt)
             session.commit()
 

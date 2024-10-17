@@ -1,19 +1,19 @@
 from http.client import HTTPException
-from os import environ
+from uuid import uuid4
+
 from pytest import fixture, mark
+from starlette.applications import Starlette
 from starlette.authentication import requires
+from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.testclient import TestClient
-from starlette.websockets import WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocket
 
 from . import get_backend
+from .api import AuthAPI
 from .context import create_backend, set_identity_provider, get_identity_provider
 from .identity import BaseUser, IdentityProvider
-from .api import AuthAPI
-from starlette.applications import Starlette
-from starlette.middleware.authentication import AuthenticationMiddleware
-from starlette.responses import JSONResponse
-from uuid import uuid4
 
 
 async def http_exception(request: Request, exc: HTTPException):
