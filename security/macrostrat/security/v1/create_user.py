@@ -1,7 +1,30 @@
 import click
 from click import echo, secho, style, prompt
 from sqlalchemy.exc import IntegrityError
-from sparrow.database.models import User
+
+from werkzeug.security import generate_password_hash, check_password_hash
+from os import environ
+from macrostrat.database.mapper import BaseModel
+
+
+class User(BaseModel):
+    if BaseModel.loaded_from_cache:
+        __table__ = BaseModel.metadata.tables["user"]
+    else:
+        __tablename__ = "user"
+        __table_args__ = {"extend_existing": True}
+
+    # Columns are automagically mapped from database
+    # *NEVER* directly set the password column.
+
+    def set_password(self, plaintext):
+        # 'salt' the passwords to prevent brute forcing
+        salt = environ.get("SPARROW_SECRET_KEY")
+        self.password = generate_password_hash(salt + str(plaintext))
+
+    def is_correct_password(self, plaintext):
+        salt = environ.get("SPARROW_SECRET_KEY")
+        return check_password_hash(self.password, salt + str(plaintext))
 
 
 def _create_user(db, username, password, raise_on_error=True):
