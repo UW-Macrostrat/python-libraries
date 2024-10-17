@@ -47,21 +47,22 @@ https://members.orcid.org/api/integrate/orcid-sign-in
 Usage in Sparrow:
 
 ```python
-from macrostrat.auth_system.v1.api import AuthAPI
-from macrostrat.auth_system.v1.backend import JWTBackend
+from macrostrat.auth_system.legacy.api import AuthAPI
+from macrostrat.auth_system.legacy.backend import JWTBackend
 from starlette.authentication import AuthenticationError  # noqa
 from starlette.middleware.authentication import AuthenticationMiddleware
 from sparrow.plugins import SparrowCorePlugin
 
+
 class AuthPlugin(SparrowCorePlugin):
-    name = "auth"
+  name = "auth"
 
-    backend = JWTBackend(environ.get("SPARROW_SECRET_KEY", ""))
+  backend = JWTBackend(environ.get("SPARROW_SECRET_KEY", ""))
 
-    def on_asgi_setup(self, api):
-        api.add_middleware(AuthenticationMiddleware, backend=self.backend)
+  def on_asgi_setup(self, api):
+    api.add_middleware(AuthenticationMiddleware, backend=self.backend)
 
-    def on_api_initialized_v2(self, api):
-        api.mount("/auth", AuthAPI, name="auth")
+  def on_api_initialized_v2(self, api):
+    api.mount("/auth", AuthAPI, name="auth")
 
 ```
