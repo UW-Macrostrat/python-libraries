@@ -23,8 +23,9 @@ These can be run with `poetry run pytest auth-system`
   `79330fa`](https://github.com/UW-Macrostrat/macrostrat-xdd/commit/79d30fa3fe3be62ca80cedc69752d3825fabadbf).
 - Made minimal changes to align with the new module structure.
 
-## [Unreleased]
+## [1.0.0]
 
-The `1.0.0` release will integrate this system more closely with
-`macrostrat.database` code and update to newer versions of `pyjwt` and other
-libraries.
+- Integrate the system more closely with the `macrostrat.database` module
+- Update to newer versions of `pyjwt` and `werkzeug`.
+- Use `ContextVar` rather than global variables for session storage.
+- Rename `orcid` -> `core` to reflect the uncertain scope of the module.

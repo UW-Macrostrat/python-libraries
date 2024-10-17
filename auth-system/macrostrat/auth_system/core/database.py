@@ -1,15 +1,13 @@
 import datetime
+from contextvars import ContextVar
+from typing import Optional
 
-from sqlalchemy import create_engine, Engine
+from sqlalchemy import Engine
 from sqlalchemy import select, update
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
+from macrostrat.database import Database
 from .schema import Token
-
-
-# TODO:
-# - remove globals in favor of contextlib
-# - integrate with macrostrat.database code
 
 
 def get_access_token(token: str):
@@ -40,35 +38,34 @@ def get_access_token(token: str):
         return (session.scalars(select_stmt)).first()
 
 
-engine: Engine | None = None
-base: declarative_base = None
-session: Session | None = None
+_database: ContextVar[Optional[Database]] = ContextVar("database", default=None)
+_base: ContextVar[Optional[declarative_base]] = ContextVar(
+    "declarative_base", default=None
+)
+
+
+def get_database():
+    return _database.get()
 
 
 def get_engine() -> Engine:
-    return engine
+    return get_database().engine
 
 
 def get_base() -> declarative_base:
-    return base
+    return _base.get()
 
 
 def connect_engine(uri: str, schema: str):
-    global engine
-    global session
-    global base
-
-    engine = create_engine(uri)
-    session = session
+    database = Database(uri)
 
     base = declarative_base()
-    base.metadata.reflect(get_engine())
-    base.metadata.reflect(get_engine(), schema=schema, views=True)
+    base.metadata.reflect(database.engine)
+    base.metadata.reflect(database.engine, schema=schema, views=True)
 
 
 def dispose_engine():
-    global engine
-    engine.dispose()
+    get_engine().dispose()
 
 
 def get_session_maker() -> sessionmaker:
