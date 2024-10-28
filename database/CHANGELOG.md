@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.4.1] - 2024-10-28
+
+- Update the underlying version of `sqlparse` and `geoalchemy2`.
+
 ## [3.4.0] - 2024-10-17
 
 - Add capability to instantiate the `Database` wrapper class from an engine as

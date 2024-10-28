@@ -502,13 +502,13 @@ all = ["email-validator (>=2.0.0)", "httpx (>=0.23.0)", "itsdangerous (>=1.1.0)"
 
 [[package]]
 name = "geoalchemy2"
-version = "0.14.7"
+version = "0.15.2"
 description = "Using SQLAlchemy with Spatial Databases"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "GeoAlchemy2-0.14.7-py3-none-any.whl", hash = "sha256:af592892c58da0b98aa284d400f207f08a643aeee4523f025cef74991f76af14"},
-    {file = "GeoAlchemy2-0.14.7.tar.gz", hash = "sha256:9ff731c4e5b955525cb128ee7173222365e7f084d4b99f6f68e491bac6b44d21"},
+    {file = "GeoAlchemy2-0.15.2-py3-none-any.whl", hash = "sha256:546455dc39f5bcdfc5b871e57d3f7546c8a6f798eb364c474200f488ace6fd32"},
+    {file = "geoalchemy2-0.15.2.tar.gz", hash = "sha256:3af0272db927373e74ee3b064cdc9464ba08defdb945c51745db1b841482f5dc"},
 ]
 
 [package.dependencies]
@@ -795,7 +795,7 @@ url = "auth-system"
 
 [[package]]
 name = "macrostrat-database"
-version = "3.4.0"
+version = "3.4.1"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
 python-versions = "^3.8"
@@ -805,13 +805,13 @@ develop = true
 [package.dependencies]
 aiofiles = "^23.2.1"
 click = "^8.1.3"
-GeoAlchemy2 = "^0.14.0"
+GeoAlchemy2 = "^0.15.2"
 "macrostrat.utils" = "^1.0.0"
 psycopg2-binary = "^2.9.6"
 rich = "^13.7.1"
 SQLAlchemy = "^2.0.18"
 SQLAlchemy-Utils = "^0.41.1"
-sqlparse = "^0.4.4"
+sqlparse = "^0.5.1"
 
 [package.source]
 type = "directory"
@@ -819,7 +819,7 @@ url = "database"
 
 [[package]]
 name = "macrostrat-dinosaur"
-version = "3.1.0"
+version = "3.1.1"
 description = "Diff-based database migrations"
 optional = false
 python-versions = "^3.8"
@@ -828,15 +828,12 @@ develop = true
 
 [package.dependencies]
 docker = "^7.0.0"
-GeoAlchemy2 = "^0.14.0"
-"macrostrat.database" = "^3.1.2"
+"macrostrat.database" = "^3.4.1"
 "macrostrat.utils" = "^1.2.1"
 migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
 schemainspect = "^3.0.1616029793"
 SQLAlchemy = "^2.0.0"
-SQLAlchemy-Utils = "^0.41.1"
-sqlparse = "^0.4.0"
 
 [package.source]
 type = "directory"
@@ -2099,19 +2096,18 @@ pg = ["psycopg2"]
 
 [[package]]
 name = "sqlparse"
-version = "0.4.4"
+version = "0.5.1"
 description = "A non-validating SQL parser."
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.8"
 files = [
-    {file = "sqlparse-0.4.4-py3-none-any.whl", hash = "sha256:5430a4fe2ac7d0f93e66f1efc6e1338a41884b7ddf2a350cedd20ccc4d9d28f3"},
-    {file = "sqlparse-0.4.4.tar.gz", hash = "sha256:d446183e84b8349fa3061f0fe7f06ca94ba65b426946ffebe6e3e8295332420c"},
+    {file = "sqlparse-0.5.1-py3-none-any.whl", hash = "sha256:773dcbf9a5ab44a090f3441e2180efe2560220203dc2f8c0b0fa141e18b505e4"},
+    {file = "sqlparse-0.5.1.tar.gz", hash = "sha256:bb6b4df465655ef332548e24f08e205afc81b9ab86cb1c45657a7ff173a3a00e"},
 ]
 
 [package.extras]
-dev = ["build", "flake8"]
+dev = ["build", "hatch"]
 doc = ["sphinx"]
-test = ["pytest", "pytest-cov"]
 
 [[package]]
 name = "starlette"
