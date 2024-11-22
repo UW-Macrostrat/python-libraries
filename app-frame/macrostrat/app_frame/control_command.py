@@ -8,14 +8,12 @@ from time import sleep
 import click
 import typer
 from click import Group
-from pydantic.dataclasses import dataclass
-from typer import rich_utils
 from typer import Context, Option, Typer
+from typer import rich_utils
 from typer.core import TyperGroup
 from typer.models import TyperInfo
 
 from macrostrat.utils import get_logger
-
 from .compose import check_status, compose
 from .core import Application
 from .follow_logs import Result, command_stream, follow_logs
@@ -36,10 +34,14 @@ class OrderCommands(TyperGroup):
                 commands.append(name)
         return commands + deprecated
 
-
     def get_params(self, ctx: Context) -> t.List["Parameter"]:
-        """ Don't show the completion options in the help text, to avoid cluttering the output """
-        return [p for p in self.params if not p.name in ("install_completion", "show_completion")]
+        """Don't show the completion options in the help text, to avoid cluttering the output"""
+        return [
+            p
+            for p in self.params
+            if not p.name in ("install_completion", "show_completion")
+        ]
+
 
 class ControlCommand(Typer):
     name: str
@@ -63,7 +65,6 @@ class ControlCommand(Typer):
         # Make sure the help text is not dimmed after the first line
         rich_utils.STYLE_HELPTEXT = None
 
-
         verbose_envvar = self.app.envvar_prefix + "VERBOSE"
 
         def callback(
@@ -81,14 +82,15 @@ class ControlCommand(Typer):
 
         self.registered_callback = TyperInfo(callback=callback)
 
-        self.build_commands()
+        self.build_docker_compose_commands()
 
-    def build_commands(self):
+    def build_docker_compose_commands(self):
+        rich_help_panel = "System (Docker Compose)"
         for cmd in [up, down, restart]:
             if cmd.__doc__ is not None:
                 cmd.__doc__ = self.app.replace_names(cmd.__doc__)
-            self.command(rich_help_panel="System")(cmd)
-        self.add_click_command(_compose, "compose", rich_help_panel="System")
+            self.command(rich_help_panel=rich_help_panel)(cmd)
+        self.add_click_command(_compose, "compose", rich_help_panel=rich_help_panel)
 
     def add_command(self, cmd, *args, **kwargs):
         """Simple wrapper around command"""
@@ -101,6 +103,7 @@ class ControlCommand(Typer):
             args: arguments to pass to typer.command
             kwargs: keyword arguments to pass to typer.command
         """
+
         def _click_command(ctx: typer.Context):
             cmd(ctx.args)
 
@@ -113,8 +116,7 @@ class ControlCommand(Typer):
             **kwargs.get("context_settings", {}),
         }
 
-        self.add_command(_click_command,*args, **kwargs)
-
+        self.add_command(_click_command, *args, **kwargs)
 
 
 def up(
@@ -184,6 +186,7 @@ def start_app(
         fail_with_message(app, res, "Start :app_name:")
 
     run_restart_commands(app, running_containers)
+
 
 def fail_with_message(app, res, stage_name):
     if res.returncode != 0:

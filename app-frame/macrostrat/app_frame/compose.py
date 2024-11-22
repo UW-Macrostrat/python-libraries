@@ -1,3 +1,6 @@
+"""
+Integration with docker-compose
+"""
 from rich.console import Console
 
 from macrostrat.utils import cmd, get_logger
@@ -30,4 +33,3 @@ def check_status(app_name: str, command_name: str) -> list[str]:
     )
 
     return containers
-
