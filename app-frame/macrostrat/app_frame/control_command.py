@@ -1,7 +1,6 @@
 # Typer command-line application
 
 import sys
-import typing as t
 from os import environ
 from time import sleep
 
@@ -10,37 +9,15 @@ import typer
 from click import Group
 from typer import Context, Option, Typer
 from typer import rich_utils
-from typer.core import TyperGroup
 from typer.models import TyperInfo
 
 from macrostrat.utils import get_logger
 from .compose import check_status, compose
 from .core import Application
 from .follow_logs import Result, command_stream, follow_logs
+from .utils import OrderCommands, add_click_command
 
 log = get_logger(__name__)
-
-
-class OrderCommands(TyperGroup):
-    def list_commands(self, ctx: Context):
-        """Return list of commands in the order of appearance."""
-        deprecated = []
-        commands = []
-
-        for name, command in self.commands.items():
-            if command.deprecated:
-                deprecated.append(name)
-            else:
-                commands.append(name)
-        return commands + deprecated
-
-    def get_params(self, ctx: Context) -> t.List["Parameter"]:
-        """Don't show the completion options in the help text, to avoid cluttering the output"""
-        return [
-            p
-            for p in self.params
-            if not p.name in ("install_completion", "show_completion")
-        ]
 
 
 class ControlCommand(Typer):
@@ -99,30 +76,6 @@ class ControlCommand(Typer):
 
     def add_click_command(self, cmd, *args, **kwargs):
         add_click_command(self, cmd, *args, **kwargs)
-
-
-def add_click_command(base: Typer, cmd, *args, **kwargs):
-    """Add a click command
-    params:
-        base: Typer
-        cmd: callable
-        args: arguments to pass to typer.command
-        kwargs: keyword arguments to pass to typer.command
-    """
-
-    def _click_command(ctx: typer.Context):
-        cmd(ctx.args)
-
-    _click_command.__doc__ = cmd.__doc__
-
-    kwargs["context_settings"] = {
-        "allow_extra_args": True,
-        "ignore_unknown_options": True,
-        "help_option_names": [],
-        **kwargs.get("context_settings", {}),
-    }
-
-    base.command(*args, **kwargs)(_click_command)
 
 
 def add_docker_compose_commands(command: Typer):
