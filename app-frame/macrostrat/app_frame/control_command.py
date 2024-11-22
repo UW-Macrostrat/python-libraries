@@ -71,6 +71,7 @@ class ControlCommand(Typer):
             ctx: Context,
             verbose: bool = Option(False, "--verbose", envvar=verbose_envvar),
         ):
+            """:app_name: command-line interface"""
             ctx.obj = self.app
             # Setting the environment variable allows nested commands to pick up
             # the verbosity setting, if needed.
@@ -78,45 +79,57 @@ class ControlCommand(Typer):
                 environ[verbose_envvar] = "1"
             self.app.setup_logs(verbose=verbose)
 
-        callback.__doc__ = f"""{self.app.name} command-line interface"""
+        self.registered_callback = TyperInfo(callback=self._update_docstring(callback))
 
-        self.registered_callback = TyperInfo(callback=callback)
+        add_docker_compose_commands(self)
 
-        self.build_docker_compose_commands()
+    def _update_docstring(self, func):
+        if func.__doc__ is not None:
+            func.__doc__ = self.app.replace_names(func.__doc__)
+        return func
 
-    def build_docker_compose_commands(self):
-        rich_help_panel = "System (Docker Compose)"
-        for cmd in [up, down, restart]:
-            if cmd.__doc__ is not None:
-                cmd.__doc__ = self.app.replace_names(cmd.__doc__)
-            self.command(rich_help_panel=rich_help_panel)(cmd)
-        self.add_click_command(_compose, "compose", rich_help_panel=rich_help_panel)
+    def command(self, *args, **kwargs):
+        """Simple wrapper around command that replaces names in the docstring"""
+        wrapper = super().command(*args, **kwargs)
+        return lambda func: wrapper(self._update_docstring(func))
 
     def add_command(self, cmd, *args, **kwargs):
         """Simple wrapper around command"""
         self.command(*args, **kwargs)(cmd)
 
     def add_click_command(self, cmd, *args, **kwargs):
-        """Add a click command
-        params:
-            cmd: callable
-            args: arguments to pass to typer.command
-            kwargs: keyword arguments to pass to typer.command
-        """
+        add_click_command(self, cmd, *args, **kwargs)
 
-        def _click_command(ctx: typer.Context):
-            cmd(ctx.args)
 
-        _click_command.__doc__ = cmd.__doc__
+def add_click_command(base: Typer, cmd, *args, **kwargs):
+    """Add a click command
+    params:
+        base: Typer
+        cmd: callable
+        args: arguments to pass to typer.command
+        kwargs: keyword arguments to pass to typer.command
+    """
 
-        kwargs["context_settings"] = {
-            "allow_extra_args": True,
-            "ignore_unknown_options": True,
-            "help_option_names": [],
-            **kwargs.get("context_settings", {}),
-        }
+    def _click_command(ctx: typer.Context):
+        cmd(ctx.args)
 
-        self.add_command(_click_command, *args, **kwargs)
+    _click_command.__doc__ = cmd.__doc__
+
+    kwargs["context_settings"] = {
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+        **kwargs.get("context_settings", {}),
+    }
+
+    base.command(*args, **kwargs)(_click_command)
+
+
+def add_docker_compose_commands(command: Typer):
+    rich_help_panel = "System (Docker Compose)"
+    for cmd in [up, down, restart]:
+        command.command(rich_help_panel=rich_help_panel)(cmd)
+    add_click_command(command, _compose, "compose", rich_help_panel=rich_help_panel)
 
 
 def up(
