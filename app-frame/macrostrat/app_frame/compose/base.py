@@ -1,6 +1,3 @@
-"""
-Integration with docker-compose
-"""
 from rich.console import Console
 
 from macrostrat.utils import cmd, get_logger
