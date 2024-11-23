@@ -1,5 +1,6 @@
 """Utilities for Typer and Click command-line interfaces."""
 
+import re
 from typing import List
 
 import typer
@@ -12,7 +13,44 @@ from macrostrat.utils import get_logger
 log = get_logger(__name__)
 
 
-class OrderCommands(TyperGroup):
+class CommandBase(Typer):
+    def __init__(
+        self,
+        **kwargs,
+    ):
+        kwargs.setdefault("add_completion", False)
+        kwargs.setdefault("no_args_is_help", True)
+        kwargs.setdefault("cls", ControlCommandGroup)
+        super().__init__(**kwargs)
+
+    def add_command(self, cmd, *args, **kwargs):
+        """Simple wrapper around command"""
+        self.command(*args, **kwargs)(cmd)
+
+    def add_click_command(self, cmd, *args, **kwargs):
+        add_click_command(self, cmd, *args, **kwargs)
+
+
+class ControlCommandGroup(TyperGroup):
+    """A Typer group that lists commands in the order they were added, and
+    also allows for aliases.
+    """
+
+    _CMD_SPLIT_P = re.compile(r" ?[,|] ?")
+
+    def get_command(self, ctx, cmd_name):
+        cmd_name = self._group_cmd_name(cmd_name)
+        return super().get_command(ctx, cmd_name)
+
+    # Command names
+    # https://github.com/fastapi/typer/issues/132
+    def _group_cmd_name(self, default_name):
+        for cmd in self.commands.values():
+            name = cmd.name
+            if name and default_name in self._CMD_SPLIT_P.split(name):
+                return name
+        return default_name
+
     def list_commands(self, ctx: Context):
         """Return list of commands in the order of appearance."""
         deprecated = []

@@ -1,35 +1,38 @@
 # Typer command-line application
 
+from enum import Enum
 from os import environ
 
-from click import Group
-from typer import Context, Option, Typer
+from typer import Context, Option
 from typer import rich_utils
 from typer.models import TyperInfo
 
 from macrostrat.utils import get_logger
 from .compose import add_docker_compose_commands
 from .core import Application
-from .utils import OrderCommands, add_click_command
+from .utils import CommandBase, ControlCommandGroup  # noqa
 
 log = get_logger(__name__)
 
 
-class ControlCommand(Typer):
-    name: str
+class BackendType(str, Enum):
+    DockerCompose = "docker-compose"
+    Kubernetes = "kubernetes"
 
+
+class ControlCommand(CommandBase):
+    name: str
     app: Application
-    _click: Group
 
     def __init__(
         self,
         app: Application,
+        *,
+        backend: BackendType = BackendType.DockerCompose,
         **kwargs,
     ):
-        kwargs.setdefault("add_completion", False)
-        kwargs.setdefault("no_args_is_help", True)
-        kwargs.setdefault("cls", OrderCommands)
         kwargs.setdefault("name", app.name)
+
         super().__init__(**kwargs)
         self.app = app
         self.name = app.name
@@ -53,7 +56,8 @@ class ControlCommand(Typer):
 
         self.registered_callback = TyperInfo(callback=self._update_docstring(callback))
 
-        add_docker_compose_commands(self)
+        if backend == BackendType.DockerCompose:
+            add_docker_compose_commands(self)
 
     def _update_docstring(self, func):
         if func.__doc__ is not None:
@@ -64,10 +68,3 @@ class ControlCommand(Typer):
         """Simple wrapper around command that replaces names in the docstring"""
         wrapper = super().command(*args, **kwargs)
         return lambda func: wrapper(self._update_docstring(func))
-
-    def add_command(self, cmd, *args, **kwargs):
-        """Simple wrapper around command"""
-        self.command(*args, **kwargs)(cmd)
-
-    def add_click_command(self, cmd, *args, **kwargs):
-        add_click_command(self, cmd, *args, **kwargs)
