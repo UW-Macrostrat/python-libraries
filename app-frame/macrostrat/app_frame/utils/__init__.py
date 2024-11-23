@@ -12,6 +12,8 @@ from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
 
+DELIMITER = ", "
+
 
 class CommandBase(Typer):
     def __init__(
@@ -27,6 +29,29 @@ class CommandBase(Typer):
         """Simple wrapper around command"""
         self.command(*args, **kwargs)(cmd)
 
+    # Aliased command names
+    # https://github.com/fastapi/typer/issues/132
+    def add_typer(self, typer, **kwargs):
+        name = kwargs.pop("name", None)
+        aliases = kwargs.pop("aliases", None)
+        _name = self._name_modifier(name, aliases)
+        super().add_typer(typer, name=_name, **kwargs)
+
+    def _name_modifier(self, name, aliases: list[str] = None):
+        """Return a function that modifies the name for a command to include aliases"""
+        if aliases is None:
+            return name
+        if name is None:
+            raise ValueError("name must be provided if aliases are set")
+        if isinstance(name, str):
+            return DELIMITER.join([name, *aliases])
+        return lambda: DELIMITER.join([name(), *aliases])
+
+    def command(self, name=None, **kwargs):
+        """Simple wrapper around command that replaces names in the docstring"""
+        _name = self._name_modifier(name, kwargs.pop("aliases", None))
+        return super().command(_name, **kwargs)
+
     def add_click_command(self, cmd, *args, **kwargs):
         add_click_command(self, cmd, *args, **kwargs)
 
@@ -36,18 +61,15 @@ class ControlCommandGroup(TyperGroup):
     also allows for aliases.
     """
 
-    _CMD_SPLIT_P = re.compile(r" ?[,|] ?")
-
     def get_command(self, ctx, cmd_name):
         cmd_name = self._group_cmd_name(cmd_name)
         return super().get_command(ctx, cmd_name)
 
-    # Command names
-    # https://github.com/fastapi/typer/issues/132
+
     def _group_cmd_name(self, default_name):
         for cmd in self.commands.values():
             name = cmd.name
-            if name and default_name in self._CMD_SPLIT_P.split(name):
+            if name and default_name in name.split(DELIMITER):
                 return name
         return default_name
 
