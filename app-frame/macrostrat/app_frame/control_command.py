@@ -58,6 +58,7 @@ class ControlCommand(CommandBase):
 
         if backend == BackendType.DockerCompose:
             add_docker_compose_commands(self)
+        # We don't have Kubernetes support yet, but will work to add it.
 
     def _update_docstring(self, func):
         if func.__doc__ is not None:

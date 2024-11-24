@@ -2,6 +2,7 @@
 Integration with docker-compose
 """
 import sys
+from os import environ
 from time import sleep
 
 import click
@@ -27,12 +28,21 @@ def add_docker_compose_commands(command: Typer):
 
 
 def up(
-    ctx: Context, container: str = typer.Argument(None), force_recreate: bool = False
+    ctx: Context,
+    container: str = typer.Argument(None),
+    force_recreate: bool = False,
+    offline: bool = False,
 ):
     """Start the :app_name: server and follow logs."""
     app = ctx.find_object(Application)
     if app is None:
         raise ValueError("Could not find application config")
+
+    # Remove DOCKER_BUILDKIT=1 from the environment if we are in offline mode
+    # This should possible be merged in upstream
+    if offline:
+        environ["DOCKER_BUILDKIT"] = "0"
+        log.info("Disabling Docker BuildKit for offline mode")
 
     start_app(app, container=container, force_recreate=force_recreate)
     proc = follow_logs(app, container)
@@ -124,9 +134,9 @@ def down(ctx: Context):
     compose("down", "--remove-orphans")
 
 
-def restart(ctx: Context, container: str = typer.Argument(None)):
+def restart(ctx: Context, container: str = typer.Argument(None), offline: bool = False):
     """Restart the :app_name: server and follow logs."""
-    ctx.invoke(up, ctx, container, force_recreate=True)
+    ctx.invoke(up, ctx, container, force_recreate=True, offline=offline)
 
 
 @click.command(
