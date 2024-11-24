@@ -3,10 +3,10 @@ authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "A control script framework for containerized applications."
 name = "macrostrat.app_frame"
 packages = [
-  {include = "macrostrat"},
-  {include = "test_app"},
+    { include = "macrostrat" },
+    { include = "test_app" },
 ]
-version = "2.0.0"
+version = "2.1.0"
 
 [tool.poetry.dependencies]
 "macrostrat.utils" = "^1.1.0"
