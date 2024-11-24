@@ -25,20 +25,25 @@ class CommandBase(Typer):
         kwargs.setdefault("cls", ControlCommandGroup)
         super().__init__(**kwargs)
 
-    def add_command(self, cmd, *args, **kwargs):
-        """Simple wrapper around command"""
-        self.command(*args, **kwargs)(cmd)
-
     # Aliased command names
-    # https://github.com/fastapi/typer/issues/132
     def add_typer(self, typer, **kwargs):
         name = kwargs.pop("name", None)
         aliases = kwargs.pop("aliases", None)
         _name = self._name_modifier(name, aliases)
-        super().add_typer(typer, name=_name, **kwargs)
+        if _name is not None:
+            kwargs["name"] = _name
+        super().add_typer(typer, **kwargs)
+
+    def command(self, name=None, **kwargs):
+        """Simple wrapper around command that replaces names in the docstring"""
+        _name = self._name_modifier(name, kwargs.pop("aliases", None))
+        return super().command(_name, **kwargs)
+
 
     def _name_modifier(self, name, aliases: list[str] = None):
-        """Return a function that modifies the name for a command to include aliases"""
+        """Return a function that modifies the name for a command to include aliases
+        https://github.com/fastapi/typer/issues/132
+        """
         if aliases is None:
             return name
         if name is None:
@@ -47,10 +52,9 @@ class CommandBase(Typer):
             return DELIMITER.join([name, *aliases])
         return lambda: DELIMITER.join([name(), *aliases])
 
-    def command(self, name=None, **kwargs):
-        """Simple wrapper around command that replaces names in the docstring"""
-        _name = self._name_modifier(name, kwargs.pop("aliases", None))
-        return super().command(_name, **kwargs)
+    def add_command(self, cmd, *args, **kwargs):
+        """Simple wrapper around command"""
+        self.command(*args, **kwargs)(cmd)
 
     def add_click_command(self, cmd, *args, **kwargs):
         add_click_command(self, cmd, *args, **kwargs)
