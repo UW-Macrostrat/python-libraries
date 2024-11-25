@@ -6,6 +6,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
+from .exc import BaseError, ApplicationError
 from .logs import get_logger, setup_stderr_logs
 from .shell import cmd, split_args
 
@@ -25,6 +26,7 @@ def working_directory(path: Path):
     os.chdir(str(path))
     yield
     os.chdir(prev_cwd)
+
 
 @contextmanager
 def override_environment(**kwargs):

@@ -6,7 +6,7 @@ packages = [
     { include = "macrostrat" },
     { include = "test_app" },
 ]
-version = "2.1.0"
+version = "2.1.1"
 
 [tool.poetry.dependencies]
 "macrostrat.utils" = "^1.1.0"
