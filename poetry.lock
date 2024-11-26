@@ -749,7 +749,7 @@ i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "2.0.0"
+version = "2.1.1"
 description = "A control script framework for containerized applications."
 optional = false
 python-versions = "^3.8"
@@ -798,7 +798,7 @@ name = "macrostrat-database"
 version = "3.4.1"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
-python-versions = "^3.8"
+python-versions = "^3.10"
 files = []
 develop = true
 
@@ -861,7 +861,7 @@ url = "package-tools"
 
 [[package]]
 name = "macrostrat-utils"
-version = "1.2.2"
+version = "1.2.3"
 description = "Core utilities for Macrostrat and Sparrow"
 optional = false
 python-versions = "^3.8"

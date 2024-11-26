@@ -12,7 +12,7 @@ log = get_logger(__name__)
 
 async def print_stream_progress(
     input: asyncio.StreamReader | asyncio.subprocess.Process,
-    out_stream: asyncio.StreamWriter | None,
+    out_stream: asyncio.StreamWriter | None | AsyncBufferedIOBase = None,
     *,
     verbose: bool = False,
     chunk_size: int = 1024,

@@ -51,11 +51,13 @@ async def pg_restore(
     )
 
 
-async def pg_restore_from_file(dumpfile: Path, *args, **kwargs):
-    proc = await pg_restore(*args, **kwargs)
+async def pg_restore_from_file(dumpfile: Path, engine: Engine, **kwargs):
+    proc = await pg_restore(engine, **kwargs)
     # Open dump file as an async stream
     async with aiofiles.open(dumpfile, mode="rb") as source:
         await asyncio.gather(
-            asyncio.create_task(print_stream_progress(source, proc.stdin)),
+            asyncio.create_task(
+                print_stream_progress(source, proc.stdin, prefix="Restored")
+            ),
             asyncio.create_task(print_stdout(proc.stderr)),
         )
