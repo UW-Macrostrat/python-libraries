@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.5.0] - 2024-11-25
+
+- Add database transfer utilities for asynchronous `pg_load` and `pg_dump`
+  operations.
+
 ## [3.4.1] - 2024-10-28
 
 - Update the underlying version of `sqlparse` and `geoalchemy2`.

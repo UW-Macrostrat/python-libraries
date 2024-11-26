@@ -150,7 +150,7 @@ test = ["objgraph", "psutil"]
 
 [[package]]
 name = "macrostrat-utils"
-version = "1.2.2"
+version = "1.3.0"
 description = "Core utilities for Macrostrat and Sparrow"
 optional = false
 python-versions = "^3.8"
@@ -363,7 +363,6 @@ files = [
 [package.dependencies]
 markdown-it-py = ">=2.2.0"
 pygments = ">=2.13.0,<3.0.0"
-typing-extensions = {version = ">=4.0.0,<5.0", markers = "python_version < \"3.9\""}
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
@@ -511,5 +510,5 @@ files = [
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.8"
-content-hash = "a23c5334efeeaba78663e45d31c6372a28e88004e087fdb875a8fbd652f3d483"
+python-versions = "^3.10"
+content-hash = "6bf771a91847252b1c3b47d309070e3acfbf421104e78753a8fa46bebae54841"
