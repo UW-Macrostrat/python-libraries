@@ -7,13 +7,8 @@ from rich.console import Console
 from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
-
-from .utils import (
-    _create_command,
-    _create_database_if_not_exists,
-    print_stdout,
-    print_stream_progress,
-)
+from .stream_utils import print_stdout, print_stream_progress
+from .utils import _create_command, _create_database_if_not_exists
 
 console = Console()
 
@@ -56,11 +51,13 @@ async def pg_restore(
     )
 
 
-async def pg_restore_from_file(dumpfile: Path, *args, **kwargs):
-    proc = await pg_restore(*args, **kwargs)
+async def pg_restore_from_file(dumpfile: Path, engine: Engine, **kwargs):
+    proc = await pg_restore(engine, **kwargs)
     # Open dump file as an async stream
     async with aiofiles.open(dumpfile, mode="rb") as source:
         await asyncio.gather(
-            asyncio.create_task(print_stream_progress(source, proc.stdin)),
+            asyncio.create_task(
+                print_stream_progress(source, proc.stdin, prefix="Restored")
+            ),
             asyncio.create_task(print_stdout(proc.stderr)),
         )

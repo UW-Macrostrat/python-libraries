@@ -3,10 +3,9 @@ import asyncio
 from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
-
 from .dump_database import pg_dump
 from .restore_database import pg_restore
-from .utils import print_stdout, print_stream_progress
+from .stream_utils import print_stdout, print_stream_progress
 
 log = get_logger(__name__)
 
