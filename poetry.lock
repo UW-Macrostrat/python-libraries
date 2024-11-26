@@ -749,7 +749,7 @@ i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "2.1.1"
+version = "2.2.0"
 description = "A control script framework for containerized applications."
 optional = false
 python-versions = "^3.10"
@@ -795,7 +795,7 @@ url = "auth-system"
 
 [[package]]
 name = "macrostrat-database"
-version = "3.4.1"
+version = "3.5.0"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
 python-versions = "^3.10"
@@ -819,7 +819,7 @@ url = "database"
 
 [[package]]
 name = "macrostrat-dinosaur"
-version = "3.1.1"
+version = "3.2.0"
 description = "Diff-based database migrations"
 optional = false
 python-versions = "^3.10"
