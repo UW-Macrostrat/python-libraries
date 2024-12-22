@@ -128,7 +128,7 @@ class Database(object):
         Returns: Iterator of results from the query.
         """
         params = self._setup_params(params, kwargs)
-        return iter(run_sql(self.session, fn, params, **kwargs))
+        return run_sql(self.session, fn, params, **kwargs)
 
     def run_query(self, sql, params=None, **kwargs):
         """Run a single query on the database object, returning the result.

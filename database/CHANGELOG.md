@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.1] - 2024-12-21
+
+- Add a `statement_filter` parameter to the `run_sql` function to allow for
+  filtering of statements in a SQL file.
+- Improved the consistency of the `Database.run_sql` function with the `run_sql`
+  utility function.
+
 ## [3.5.0] - 2024-11-25
 
 - Add database transfer utilities for asynchronous `pg_load` and `pg_dump`

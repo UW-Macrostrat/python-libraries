@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from psycopg2.errors import SyntaxError
 from psycopg2.extensions import AsIs
 from psycopg2.sql import SQL, Identifier, Literal, Placeholder
-from pytest import fixture, mark, raises, warns
+from pytest import fixture, raises, warns
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
@@ -104,6 +104,40 @@ insert_sample_query = "INSERT INTO sample (name) VALUES (:name)"
 
 def test_sql_text_inference_6():
     assert infer_is_sql_text(insert_sample_query)
+
+
+def test_sql_statement_filtering(db):
+    sql = """
+    INSERT INTO sample (name) VALUES (:name);
+
+    DELETE FROM sample WHERE name = :name;
+    """
+
+    assert infer_is_sql_text(sql)
+
+    with db.transaction(rollback="always"):
+        # Make sure there are no samples
+        assert _get_sample_count(db) == 0
+
+        # Run the SQL, filtering out the DELETE statement
+
+        def filter_func(statement, params):
+            return not statement.startswith("DELETE")
+
+        res = db.run_sql(
+            sql,
+            params=dict(name="Test"),
+            raise_errors=True,
+            statement_filter=filter_func,
+            yield_results=False,
+        )
+
+        assert len(res) == 1
+        assert _get_sample_count(db) == 1
+
+
+def _get_sample_count(db):
+    return db.run_query("SELECT count(*) FROM sample").scalar()
 
 
 def test_sql_interpolation_psycopg(db):
