@@ -5,11 +5,11 @@ from time import sleep
 from typing import IO, Union
 from warnings import warn
 
+import psycopg2.errors
 from click import echo, secho
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
 from psycopg2.sql import SQL, Composable, Composed
-import psycopg2.errors
 from rich.console import Console
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import Connection, Engine
@@ -18,7 +18,7 @@ from sqlalchemy.exc import (
     InternalError,
     InvalidRequestError,
     ProgrammingError,
-    OperationalError
+    OperationalError,
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
@@ -232,6 +232,9 @@ def infer_has_server_binds(sql):
     return "%s" in sql or search(r"%\(\w+\)s", sql)
 
 
+_default_statement_filter = lambda sql_text, params: True
+
+
 def _run_sql(connectable, sql, params=None, **kwargs):
     """
     Internal function for running a query on a SQLAlchemy connectable,
@@ -247,6 +250,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
     raise_errors = kwargs.pop("raise_errors", False)
     has_server_binds = kwargs.pop("has_server_binds", None)
     ensure_single_query = kwargs.pop("ensure_single_query", False)
+    statement_filter = kwargs.pop("statement_filter", _default_statement_filter)
 
     if stop_on_error:
         raise_errors = True
@@ -288,6 +292,11 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             if has_server_binds is None:
                 has_server_binds = infer_has_server_binds(sql_text)
 
+        should_run = statement_filter(sql_text, params)
+        if not should_run:
+            pretty_print(sql_text, dim=True, strikethrough=True)
+            continue
+
         # This only does something for postgresql, but it's harmless to run it for other engines
         set_wait_callback(wait_select)
 
@@ -325,7 +334,9 @@ def _run_sql(connectable, sql, params=None, **kwargs):
 
 def _should_raise_query_error(err):
     """Determine if an error should be raised for a query or not."""
-    if not isinstance(err, (ProgrammingError, IntegrityError, InternalError, OperationalError)):
+    if not isinstance(
+        err, (ProgrammingError, IntegrityError, InternalError, OperationalError)
+    ):
         return True
 
     orig_err = getattr(err, "orig", None)
@@ -336,7 +347,10 @@ def _should_raise_query_error(err):
     # We might want to change this behavior in the future, or support more graceful handling of errors from other
     # database backends.
     # Ideally we could handle operational errors more gracefully
-    if isinstance(orig_err, psycopg2.errors.QueryCanceled) or getattr(orig_err, "pgcode", None) == "57014":
+    if (
+        isinstance(orig_err, psycopg2.errors.QueryCanceled)
+        or getattr(orig_err, "pgcode", None) == "57014"
+    ):
         return True
 
     return False
@@ -444,6 +458,9 @@ def run_sql(*args, **kwargs):
         returning a list after completion.
     ensure_single_query : bool
         If True, raise an error if multiple queries are passed when only one is expected.
+    statement_filter : Callable
+        A function that takes a SQL statement and parameters and returns True if the statement
+        should be run, and False if it should be skipped.
     """
     res = _run_sql(*args, **kwargs)
     if kwargs.pop("yield_results", False):
