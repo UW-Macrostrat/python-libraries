@@ -1,6 +1,8 @@
 from contextlib import contextmanager
+from enum import Enum
 from pathlib import Path
 from re import search
+from sys import stderr
 from time import sleep
 from typing import IO, Union
 from warnings import warn
@@ -17,8 +19,8 @@ from sqlalchemy.exc import (
     IntegrityError,
     InternalError,
     InvalidRequestError,
-    ProgrammingError,
     OperationalError,
+    ProgrammingError,
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
@@ -46,23 +48,11 @@ def infer_is_sql_text(_string: str) -> bool:
     if isinstance(_string, bytes):
         _string = _string.decode("utf-8")
 
-    keywords = [
-        "SELECT",
-        "INSERT",
-        "UPDATE",
-        "CREATE",
-        "DROP",
-        "DELETE",
-        "ALTER",
-        "SET",
-        "GRANT",
-        "WITH",
-    ]
     lines = _string.split("\n")
     if len(lines) > 1:
         return True
     _string = _string.lower()
-    for i in keywords:
+    for i in _sql_keywords:
         if _string.strip().startswith(i.lower() + " "):
             return True
     return False
@@ -97,26 +87,40 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 
 
 def pretty_print(sql, **kwargs):
+    """Print and optionally summarize an SQL query"""
+    summarize = kwargs.pop("summarize", True)
+    if summarize:
+        sql = summarize_statement(sql)
+    secho(sql, **kwargs)
+
+
+_sql_keywords = [
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "CREATE",
+    "DROP",
+    "DELETE",
+    "ALTER",
+    "SET",
+    "GRANT",
+    "WITH",
+    "NOTIFY",
+    "COPY",
+]
+
+
+def summarize_statement(sql):
     for line in sql.split("\n"):
-        for i in [
-            "SELECT",
-            "INSERT",
-            "UPDATE",
-            "CREATE",
-            "DROP",
-            "DELETE",
-            "ALTER",
-            "SET",
-            "GRANT",
-            "WITH",
-            "NOTIFY",
-            "COPY",
-        ]:
+        for i in _sql_keywords:
             if not line.startswith(i):
                 continue
-            start = line.split("(")[0].strip().rstrip(";").replace(" AS", "")
-            secho(start, **kwargs)
-            return
+            return line.split("(")[0].strip().rstrip(";").replace(" AS", "")
+
+
+class DevNull(object):
+    def write(self, *_):
+        pass
 
 
 def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
@@ -235,6 +239,13 @@ def infer_has_server_binds(sql):
 _default_statement_filter = lambda sql_text, params: True
 
 
+class PrintMode(Enum):
+    NONE = "none"
+    ERRORS = "errors"
+    SUMMARY = "summary"
+    ALL = "all"
+
+
 def _run_sql(connectable, sql, params=None, **kwargs):
     """
     Internal function for running a query on a SQLAlchemy connectable,
@@ -251,6 +262,11 @@ def _run_sql(connectable, sql, params=None, **kwargs):
     has_server_binds = kwargs.pop("has_server_binds", None)
     ensure_single_query = kwargs.pop("ensure_single_query", False)
     statement_filter = kwargs.pop("statement_filter", _default_statement_filter)
+    output_mode = kwargs.pop("output_mode", PrintMode.SUMMARY)
+    output_file = kwargs.pop("output_file", stderr)
+
+    if output_mode == PrintMode.NONE:
+        output_file = DevNull()
 
     if stop_on_error:
         raise_errors = True
@@ -283,6 +299,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             query = _render_query(query, connectable)
 
         sql_text = str(query)
+
         if isinstance(query, str):
             sql_text = format(query, strip_comments=True).strip()
             if sql_text == "":
@@ -293,8 +310,18 @@ def _run_sql(connectable, sql, params=None, **kwargs):
                 has_server_binds = infer_has_server_binds(sql_text)
 
         should_run = statement_filter(sql_text, params)
+
+        # Shorten summary text for printing
+        if output_mode != PrintMode.ALL:
+            sql_text = summarize_statement(sql_text)
+
         if not should_run:
-            pretty_print(sql_text, dim=True, strikethrough=True)
+            secho(
+                sql_text,
+                dim=True,
+                strikethrough=True,
+                file=output_file,
+            )
             continue
 
         # This only does something for postgresql, but it's harmless to run it for other engines
@@ -318,7 +345,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
                 trans.commit()
             elif hasattr(connectable, "commit"):
                 connectable.commit()
-            pretty_print(sql_text, dim=True)
+            secho(sql_text, dim=True, file=output_file)
         except Exception as err:
             if trans is not None:
                 trans.rollback()
@@ -327,7 +354,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             if raise_errors or _should_raise_query_error(err):
                 raise err
 
-            _print_error(sql_text, err)
+            _print_error(sql_text, err, file=output_file)
         finally:
             set_wait_callback(None)
 
@@ -356,17 +383,18 @@ def _should_raise_query_error(err):
     return False
 
 
-def _print_error(sql_text, err):
+def _print_error(sql_text, err, **kwargs):
     if orig := getattr(err, "orig", None):
         _err = str(orig)
     else:
         _err = str(err)
     _err = _err.strip()
-    dim = "already exists" in _err
-    pretty_print(sql_text, fg=None if dim else "red", dim=True)
+    # Decide whether error should be dimmed
+    dim = kwargs.pop("dim", "already exists" in _err)
+    secho(sql_text, fg=None if dim else "red", dim=True, **kwargs)
     if dim:
         _err = "  " + _err
-    secho(_err, fg="red", dim=dim)
+    secho(_err, fg="red", dim=dim, **kwargs)
     log.error(err)
 
 
@@ -468,7 +496,9 @@ def run_sql(*args, **kwargs):
     return list(res)
 
 
-def execute(connectable, sql, params=None, stop_on_error=False):
+def execute(connectable, sql, params=None, stop_on_error=False, **kwargs):
+    output_file = kwargs.pop("output_file", None)
+    output_mode = kwargs.pop("output_mode", None)
     sql = format(sql, strip_comments=True).strip()
     if sql == "":
         return
@@ -477,17 +507,12 @@ def execute(connectable, sql, params=None, stop_on_error=False):
         res = connectable.execute(text(sql), params=params)
         if hasattr(connectable, "commit"):
             connectable.commit()
-        pretty_print(sql, dim=True)
+        pretty_print(sql, dim=True, file=output_file, mode=output_mode)
         return res
     except (ProgrammingError, IntegrityError) as err:
-        err = str(err.orig).strip()
-        dim = "already exists" in err
         if hasattr(connectable, "rollback"):
             connectable.rollback()
-        pretty_print(sql, fg=None if dim else "red", dim=True)
-        if dim:
-            err = "  " + err
-        secho(err, fg="red", dim=dim)
+        _print_error(sql, dim=True, file=output_file, mode=output_mode)
         if stop_on_error:
             return
     finally:

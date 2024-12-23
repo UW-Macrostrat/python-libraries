@@ -39,7 +39,6 @@ class CommandBase(Typer):
         _name = self._name_modifier(name, kwargs.pop("aliases", None))
         return super().command(_name, **kwargs)
 
-
     def _name_modifier(self, name, aliases: list[str] = None):
         """Return a function that modifies the name for a command to include aliases
         https://github.com/fastapi/typer/issues/132
@@ -68,7 +67,6 @@ class ControlCommandGroup(TyperGroup):
     def get_command(self, ctx, cmd_name):
         cmd_name = self._group_cmd_name(cmd_name)
         return super().get_command(ctx, cmd_name)
-
 
     def _group_cmd_name(self, default_name):
         for cmd in self.commands.values():

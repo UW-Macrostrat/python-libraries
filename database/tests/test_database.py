@@ -17,7 +17,7 @@ from sqlalchemy.sql import text
 
 from macrostrat.database import Database, run_sql
 from macrostrat.database.postgresql import table_exists
-from macrostrat.database.utils import infer_is_sql_text, temp_database
+from macrostrat.database.utils import _print_error, infer_is_sql_text, temp_database
 from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
@@ -398,3 +398,17 @@ def test_check_table_exists(db):
 def test_check_table_exists_postgresql(db):
     assert table_exists(db, "sample")
     assert not table_exists(db, "samplea")
+
+
+def test_database_schema_refresh(db):
+    # Create a new table
+    sql = "CREATE TABLE new_table (name TEXT)"
+    db.run_sql(sql)
+    names = db.inspector.get_table_names()
+    assert "new_table" not in names
+    db.refresh_schema(automap=False)
+    assert "new_table" in db.inspector.get_table_names()
+
+
+def test_print_error():
+    _print_error("SELECT * FROM test", Exception("Test error"))

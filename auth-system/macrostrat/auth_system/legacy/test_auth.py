@@ -12,7 +12,7 @@ from starlette.websockets import WebSocket
 
 from . import get_backend
 from .api import AuthAPI
-from .context import create_backend, set_identity_provider, get_identity_provider
+from .context import create_backend, get_identity_provider, set_identity_provider
 from .identity import BaseUser, IdentityProvider
 
 

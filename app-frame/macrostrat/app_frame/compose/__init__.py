@@ -10,10 +10,11 @@ import typer
 from typer import Context, Typer
 
 from macrostrat.utils import get_logger
-from .base import check_status, compose
-from .follow_logs import Result, command_stream, follow_logs
+
 from ..core import Application
 from ..utils import add_click_command
+from .base import check_status, compose
+from .follow_logs import Result, command_stream, follow_logs
 
 # Typer command-line application
 

@@ -5,7 +5,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from macrostrat.utils import get_logger, ApplicationError
+from macrostrat.utils import ApplicationError, get_logger
 
 console = Console()
 

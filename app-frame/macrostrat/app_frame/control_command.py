@@ -3,11 +3,11 @@
 from enum import Enum
 from os import environ
 
-from typer import Context, Option
-from typer import rich_utils
+from typer import Context, Option, rich_utils
 from typer.models import TyperInfo
 
 from macrostrat.utils import get_logger
+
 from .compose import add_docker_compose_commands
 from .core import Application
 from .utils import CommandBase, ControlCommandGroup  # noqa
