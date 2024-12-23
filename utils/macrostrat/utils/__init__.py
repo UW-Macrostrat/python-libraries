@@ -6,7 +6,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
-from .exc import BaseError, ApplicationError
+from .exc import ApplicationError, BaseError
 from .logs import get_logger, setup_stderr_logs
 from .shell import cmd, split_args
 

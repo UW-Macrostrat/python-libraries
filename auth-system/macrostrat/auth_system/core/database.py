@@ -2,11 +2,11 @@ import datetime
 from contextvars import ContextVar
 from typing import Optional
 
-from sqlalchemy import Engine
-from sqlalchemy import select, update
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy import Engine, select, update
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from macrostrat.database import Database
+
 from .schema import Token
 
 

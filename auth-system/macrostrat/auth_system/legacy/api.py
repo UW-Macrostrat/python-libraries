@@ -1,9 +1,10 @@
-from starlette.routing import Route, Router
+from starlette.authentication import AuthenticationError, requires
 from starlette.responses import JSONResponse
-from starlette.authentication import requires, AuthenticationError
+from starlette.routing import Route, Router
+from webargs_starlette import use_annotations
+
 from macrostrat.utils import get_logger
 
-from webargs_starlette import use_annotations
 from .context import get_backend, get_identity_provider
 
 log = get_logger(__name__)

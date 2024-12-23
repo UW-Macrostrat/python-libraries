@@ -121,12 +121,10 @@ def wait_for_cluster(container: Container, url: str):
         else:
             time_running = 0
 
-
-
     if container.status == "exited":
-            raise RuntimeError(
-                "Container exited unexpectedly:\n" + container.logs().decode("utf-8")
-            )
+        raise RuntimeError(
+            "Container exited unexpectedly:\n" + container.logs().decode("utf-8")
+        )
 
     wait_for_ready(create_engine(url))
     print("Database cluster is ready")

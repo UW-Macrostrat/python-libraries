@@ -5,13 +5,14 @@ from typing import Optional, Union
 
 from psycopg2.errors import InvalidSavepointSpecification
 from psycopg2.sql import Identifier
-from sqlalchemy import URL, MetaData, create_engine, inspect, Engine
+from sqlalchemy import URL, Engine, MetaData, create_engine, inspect
 from sqlalchemy.exc import IntegrityError, InternalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
+
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
 from .utils import (  # noqa
@@ -183,6 +184,29 @@ class Database(object):
         if self.__inspector__ is None:
             self.__inspector__ = inspect(self.engine)
         return self.__inspector__
+
+    def refresh_schema(self, *, automap=None):
+        """
+        Refresh the current database connection
+
+        - closes the session and flushes
+        - removes the inspector
+
+        If automap is True, will automap the database after refreshing.
+        If automap is False, will not automap the database after refreshing.
+        If automap is None, it will re-map the database if it was previously mapped.
+        """
+        # Close the session
+        self.session.flush()
+        self.session.close()
+        # Remove the inspector
+        self.__inspector__ = None
+
+        if automap is None:
+            automap = self.mapper is not None
+
+        if automap:
+            self.automap()
 
     def entity_names(self, **kwargs):
         """

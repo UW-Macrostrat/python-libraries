@@ -7,6 +7,7 @@ from rich.console import Console
 from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
+
 from .stream_utils import print_stdout, print_stream_progress
 from .utils import _create_command, _create_database_if_not_exists
 

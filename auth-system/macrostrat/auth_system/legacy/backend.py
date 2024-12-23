@@ -4,15 +4,15 @@ JSON Web Token authentication.
 """
 import time
 import warnings
-from typing import Tuple, Any
+from typing import Any, Tuple
 
 import jwt
 from starlette.authentication import (
+    AuthCredentials,
+    AuthenticationBackend,
+    AuthenticationError,
     BaseUser,
     SimpleUser,
-    AuthenticationBackend,
-    AuthCredentials,
-    AuthenticationError,
     UnauthenticatedUser,
 )
 from starlette.requests import Request

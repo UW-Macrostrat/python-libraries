@@ -97,7 +97,9 @@ class SubsystemManager:
     def __load_plugin(self, plugin, app: ApplicationBase):
         if isinstance(plugin, Subsystem):
             if plugin.app is not app:
-                raise SubsystemError(f"Subsystem {plugin.name} was initialized against the wrong app")
+                raise SubsystemError(
+                    f"Subsystem {plugin.name} was initialized against the wrong app"
+                )
             return plugin
         if issubclass(plugin, Subsystem):
             return plugin(app)

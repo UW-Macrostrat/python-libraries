@@ -7,6 +7,7 @@ import aiofiles
 from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
+
 from .stream_utils import print_stdout, print_stream_progress
 from .utils import _create_command
 
