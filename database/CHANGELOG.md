@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.5.2] - 2024-12-23
+
+- Add the ability to print less with the `run_sql` function
+- Add a `Database.refresh_schema` method
+
 ## [3.5.1] - 2024-12-21
 
 - Add a `statement_filter` parameter to the `run_sql` function to allow for
