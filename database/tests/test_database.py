@@ -4,6 +4,7 @@ Test the database module.
 NOTE: At the moment, these tests are not independent and must run in order.
 """
 
+from io import StringIO, TextIOWrapper
 from pathlib import Path
 from sys import stdout
 
@@ -17,7 +18,12 @@ from sqlalchemy.sql import text
 
 from macrostrat.database import Database, run_sql
 from macrostrat.database.postgresql import table_exists
-from macrostrat.database.utils import _print_error, infer_is_sql_text, temp_database
+from macrostrat.database.utils import (
+    _print_error,
+    infer_is_sql_text,
+    temp_database,
+    run_fixtures,
+)
 from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
@@ -412,3 +418,34 @@ def test_database_schema_refresh(db):
 
 def test_print_error():
     _print_error("SELECT * FROM test", Exception("Test error"))
+
+
+def _check_text(_stdout: TextIOWrapper, _text: str):
+    _stdout.seek(0)
+    assert _stdout.read() == _text
+
+
+def test_printing(db):
+    # Check that nothing was printed to stderr
+    # Collect printed statements
+    with StringIO() as _stdout:
+        run_sql(db.session, "SELECT 1", output_file=_stdout)
+        _check_text(_stdout, "SELECT 1\n")
+
+
+def test_no_printing(db):
+    # Check that nothing was printed to stderr
+    # Collect printed statements
+    with StringIO() as _stdout:
+        run_sql(db.session, "SELECT 1", output_mode="none", output_file=_stdout)
+        _check_text(_stdout, "")
+
+
+def test_no_printing_fixtures(db, capsys):
+    # Check that nothing was printed to stderr
+    # Collect printed statements
+
+    fd = Path(relative_path(__file__, "fixtures"))
+    with StringIO() as _stdout:
+        run_fixtures(db.session, fd, output_mode="none", output_file=_stdout)
+        _check_text(_stdout, "")

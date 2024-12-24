@@ -793,7 +793,7 @@ url = "auth-system"
 
 [[package]]
 name = "macrostrat-database"
-version = "3.5.2"
+version = "3.5.3"
 description = "A SQLAlchemy-based database toolkit."
 optional = false
 python-versions = "^3.10"

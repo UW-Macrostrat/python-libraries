@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.5.3] - 2024-12-23
+
+- Fix errors and add tests for `run_sql` changes
+- Rename `PrintMode` -> `OutputMode`
+
 ## [3.5.2] - 2024-12-23
 
 - Add the ability to print less with the `run_sql` function

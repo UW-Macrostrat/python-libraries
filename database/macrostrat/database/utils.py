@@ -1,3 +1,4 @@
+import os
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
@@ -118,11 +119,6 @@ def summarize_statement(sql):
             return line.split("(")[0].strip().rstrip(";").replace(" AS", "")
 
 
-class DevNull(object):
-    def write(self, *_):
-        pass
-
-
 def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
     if interpret_as_file:
         sql = Path(sql).read_text()
@@ -239,11 +235,23 @@ def infer_has_server_binds(sql):
 _default_statement_filter = lambda sql_text, params: True
 
 
-class PrintMode(Enum):
+class OutputMode(Enum):
     NONE = "none"
     ERRORS = "errors"
     SUMMARY = "summary"
     ALL = "all"
+
+
+def _normalize_output_args(kwargs):
+    output_mode = kwargs.pop("output_mode", OutputMode.SUMMARY)
+    output_file = kwargs.pop("output_file", stderr)
+
+    if not isinstance(output_mode, OutputMode):
+        output_mode = OutputMode(output_mode)
+
+    if output_mode == OutputMode.NONE:
+        output_file = open(os.devnull, "w")
+    return output_mode, output_file
 
 
 def _run_sql(connectable, sql, params=None, **kwargs):
@@ -262,11 +270,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
     has_server_binds = kwargs.pop("has_server_binds", None)
     ensure_single_query = kwargs.pop("ensure_single_query", False)
     statement_filter = kwargs.pop("statement_filter", _default_statement_filter)
-    output_mode = kwargs.pop("output_mode", PrintMode.SUMMARY)
-    output_file = kwargs.pop("output_file", stderr)
-
-    if output_mode == PrintMode.NONE:
-        output_file = DevNull()
+    output_mode, output_file = _normalize_output_args(kwargs)
 
     if stop_on_error:
         raise_errors = True
@@ -312,7 +316,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
         should_run = statement_filter(sql_text, params)
 
         # Shorten summary text for printing
-        if output_mode != PrintMode.ALL:
+        if output_mode != OutputMode.ALL:
             sql_text = summarize_statement(sql_text)
 
         if not should_run:
@@ -448,11 +452,17 @@ def run_fixtures(connectable, fixtures: Union[Path, list[Path]], params=None, **
     """
     recursive = kwargs.pop("recursive", False)
     order_by_name = kwargs.pop("order_by_name", True)
-    console = kwargs.pop("console", Console(stderr=True))
+    output_mode, output_file = _normalize_output_args(kwargs)
+
+    console = kwargs.pop("console", Console(stderr=True, file=output_file))
     files = get_sql_files(fixtures, recursive=recursive, order_by_name=order_by_name)
 
+    prefix = os.path.commonpath(files)
+
+    console.print(f"Running fixtures in [cyan bold]{prefix}[/]")
     for fixture in files:
-        console.print(f"[cyan bold]{fixture}[/]")
+        fn = fixture.relative_to(prefix)
+        console.print(f"[cyan bold]{fn}[/]")
         run_sql_file(connectable, fixture, params, **kwargs)
         console.print()
 
