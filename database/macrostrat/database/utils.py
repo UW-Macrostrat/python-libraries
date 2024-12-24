@@ -463,7 +463,14 @@ def run_fixtures(connectable, fixtures: Union[Path, list[Path]], params=None, **
     for fixture in files:
         fn = fixture.relative_to(prefix)
         console.print(f"[cyan bold]{fn}[/]")
-        run_sql_file(connectable, fixture, params, **kwargs)
+        run_sql_file(
+            connectable,
+            fixture,
+            params,
+            output_mode=output_mode,
+            output_file=output_file,
+            **kwargs,
+        )
         console.print()
 
 
