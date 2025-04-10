@@ -1,17 +1,17 @@
 import warnings
-import psycopg
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
+import psycopg
 from psycopg.errors import InvalidSavepointSpecification
 from psycopg.sql import Identifier
 from sqlalchemy import URL, MetaData, create_engine, inspect, text
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
-from sqlalchemy.engine.url import make_url
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
@@ -59,7 +59,6 @@ class Database(object):
                 pass to queries and other database operations.
         """
 
-
         compiles(Insert, "postgresql")(prefix_inserts)
 
         self.instance_params = kwargs.pop("instance_params", {})
@@ -71,8 +70,6 @@ class Database(object):
             url = make_url(url)
 
         # Prefer the psycopg3 driver for PostgreSQL
-
-
 
         if url.drivername.startswith("postgresql"):
             # Use the psycopg3 driver if available

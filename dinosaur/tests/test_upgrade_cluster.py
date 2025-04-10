@@ -45,8 +45,10 @@ new_postgres_image = environ.get("POSTGRES_IMAGE", "postgis/postgis:14-3.3")
 version_images = {}
 # Extract versions from image names
 
+
 def get_major_version(image_name):
     return int(match(r".*:(\d+)", image_name).group(1))
+
 
 old_postgres_major_version = get_major_version(old_postgres_image)
 new_postgres_major_version = get_major_version(new_postgres_image)
@@ -113,7 +115,9 @@ def test_schema_clone(postgres_11_db):
     url_clone = url.set(database="test_schema_clone")
 
     with create_schema_clone(
-        postgres_11_db.engine, url_clone, image_name=version_images[old_postgres_major_version]
+        postgres_11_db.engine,
+        url_clone,
+        image_name=version_images[old_postgres_major_version],
     ) as clone:
         conn = clone.connect()
         assert conn.execute(text("SELECT 1")).fetchone()[0] == 1
@@ -126,8 +130,20 @@ def test_schema_clone(postgres_11_db):
 def test_upgrade_cluster(postgres_11_cluster_volume):
     """Test upgrade of a PostgreSQL cluster."""
 
-    assert check_database_cluster_version(client, postgres_11_cluster_volume) == old_postgres_major_version
+    assert (
+        check_database_cluster_version(client, postgres_11_cluster_volume)
+        == old_postgres_major_version
+    )
 
-    upgrade_database_cluster(client, postgres_11_cluster_volume, new_postgres_major_version, ["test_database"], version_images)
+    upgrade_database_cluster(
+        client,
+        postgres_11_cluster_volume,
+        new_postgres_major_version,
+        ["test_database"],
+        version_images,
+    )
 
-    assert check_database_cluster_version(client, postgres_11_cluster_volume) == new_postgres_major_version
+    assert (
+        check_database_cluster_version(client, postgres_11_cluster_volume)
+        == new_postgres_major_version
+    )

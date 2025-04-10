@@ -5,12 +5,11 @@ from time import sleep
 from typing import IO, Union
 from warnings import warn
 
+import psycopg2.errors
 from click import echo, secho
-
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
 from psycopg.sql import SQL, Composable, Composed
-import psycopg2.errors
 from rich.console import Console
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import Connection, Engine
@@ -18,8 +17,8 @@ from sqlalchemy.exc import (
     IntegrityError,
     InternalError,
     InvalidRequestError,
+    OperationalError,
     ProgrammingError,
-    OperationalError
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
@@ -328,7 +327,9 @@ def _run_sql(connectable, sql, params=None, **kwargs):
 
 def _should_raise_query_error(err):
     """Determine if an error should be raised for a query or not."""
-    if not isinstance(err, (ProgrammingError, IntegrityError, InternalError, OperationalError)):
+    if not isinstance(
+        err, (ProgrammingError, IntegrityError, InternalError, OperationalError)
+    ):
         return True
 
     orig_err = getattr(err, "orig", None)
@@ -338,7 +339,10 @@ def _should_raise_query_error(err):
     # If we cancel statements midstream, we should raise the error.
     # We might want to change this behavior in the future.
     # Ideally we could handle operational errors more gracefully
-    if isinstance(orig_err, psycopg2.errors.QueryCanceled) or orig_err.pgcode == "57014":
+    if (
+        isinstance(orig_err, psycopg2.errors.QueryCanceled)
+        or orig_err.pgcode == "57014"
+    ):
         return True
 
     return False

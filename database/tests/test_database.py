@@ -11,7 +11,8 @@ from typing import Any
 from dotenv import load_dotenv
 from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
-#from psycopg2.extensions import AsIs
+
+# from psycopg2.extensions import AsIs
 from pytest import fixture, mark, raises, warns
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
@@ -239,7 +240,8 @@ def test_server_bound_parameters_dbapi_extensions(db):
     res = db.run_query(sql, {"name": "Test", "table_name": AsIs("sample")})
     assert res.scalar() == "Test"
 
-from psycopg.adapt import Dumper, Buffer
+
+from psycopg.adapt import Buffer, Dumper
 
 
 class AsIs(Dumper):
