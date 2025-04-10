@@ -9,9 +9,8 @@ from subprocess import Popen
 from time import sleep
 from typing import Generator
 
+from macrostrat.app_frame.core import Application
 from macrostrat.utils import get_logger
-
-from .core import Application
 
 log = get_logger(__name__)
 

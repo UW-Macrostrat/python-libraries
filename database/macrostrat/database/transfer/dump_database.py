@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -7,7 +8,8 @@ from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
 
-from .utils import _create_command, print_stdout, print_stream_progress
+from .stream_utils import print_stdout, print_stream_progress
+from .utils import _create_command
 
 log = get_logger(__name__)
 
@@ -45,11 +47,22 @@ async def pg_dump(
     )
 
 
-async def pg_dump_to_file(dumpfile: Path, *args, **kwargs):
-    proc = await pg_dump(*args, **kwargs)
+async def pg_dump_to_file(engine: Engine, dumpfile: Path | None, **kwargs):
+    proc = await pg_dump(engine, **kwargs)
+    if dumpfile is None or dumpfile == sys.stdout:
+        # If we have no dumpfile, just print to stdout
+        await _monitor_stdout(proc)
+        return
     # Open dump file as an async stream
     async with aiofiles.open(dumpfile, mode="wb") as dest:
         await asyncio.gather(
             asyncio.create_task(print_stream_progress(proc.stdout, dest)),
             asyncio.create_task(print_stdout(proc.stderr)),
         )
+
+
+async def _monitor_stdout(proc):
+    await asyncio.gather(
+        asyncio.create_task(print_stdout(proc.stdout)),
+        asyncio.create_task(print_stream_progress(proc.stderr, None)),
+    )

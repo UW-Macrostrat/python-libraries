@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "macrostrat.auth_system"
+version = "1.0.3"
+description = "Authentication system for Macrostrat and related apps"
+authors = ["Daven Quinn <code@davenquinn.com>"]
+readme = "README.md"
+packages = [{ include = "macrostrat" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+"macrostrat.database" = "^3.3.1"
+"macrostrat.utils" = "^1.2.0"
+PyJWT = "^1.7.1 || ^2.0"
+werkzeug = "^2.3.7 || ^3.0"
+starlette = "^0.27.0"
+webargs-starlette = "^2.0.0"
+fastapi = "^0.104.0"
+python-jose = { extras = ["cryptography"], version = "^3.3.0" }
+bcrypt = "^4.1.1"
+httpx = "^0.25.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^8.3.2"
+pytest-asyncio = "^0.21.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+

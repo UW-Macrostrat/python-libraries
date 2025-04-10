@@ -3,20 +3,17 @@ authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Diff-based database migrations"
 name = "macrostrat.dinosaur"
 packages = [{ include = "macrostrat" }]
-version = "3.0.1"
+version = "3.2.0"
 
 [tool.poetry.dependencies]
-GeoAlchemy2 = "^0.14.0"
 SQLAlchemy = "^2.0.0"
-SQLAlchemy-Utils = "^0.41.1"
-docker = "^6.0.1"
-"macrostrat.database" = "^3.1.2"
+docker = "^7.0.0"
+"macrostrat.database" = "^3.4.1"
 "macrostrat.utils" = "^1.2.1"
 migra = "^3.0.1621480950"
 psycopg2-binary = "^2.9.1"
-python = "^3.8"
+python = "^3.10"
 schemainspect = "^3.0.1616029793"
-sqlparse = "^0.4.0"
 
 [tool.poetry.dev-dependencies]
 "macrostrat.database" = { path = "../database", develop = true }

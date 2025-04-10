@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.5.3] - 2024-12-23
+
+- Fix errors and add tests for `run_sql` changes
+- Rename `PrintMode` -> `OutputMode`
+
+## [3.5.2] - 2024-12-23
+
+- Add the ability to print less with the `run_sql` function
+- Add a `Database.refresh_schema` method
+
+## [3.5.1] - 2024-12-21
+
+- Add a `statement_filter` parameter to the `run_sql` function to allow for
+  filtering of statements in a SQL file.
+- Improved the consistency of the `Database.run_sql` function with the `run_sql`
+  utility function.
+
+## [3.5.0] - 2024-11-25
+
+- Add database transfer utilities for asynchronous `pg_load` and `pg_dump`
+  operations.
+
+## [3.4.1] - 2024-10-28
+
+- Update the underlying version of `sqlparse` and `geoalchemy2`.
+
+## [3.4.0] - 2024-10-17
+
+- Add capability to instantiate the `Database` wrapper class from an engine as
+  well as a URL.
+
 ## [3.3.0] - 2024-03-30
 
 This release focuses on nicer semantics for applying database fixtures.

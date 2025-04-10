@@ -4,6 +4,7 @@ Test the database module.
 NOTE: At the moment, these tests are not independent and must run in order.
 """
 
+from io import StringIO, TextIOWrapper
 from pathlib import Path
 from sys import stdout
 from typing import Any
@@ -13,13 +14,18 @@ from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
 
 # from psycopg2.extensions import AsIs
-from pytest import fixture, mark, raises, warns
+from pytest import fixture, raises, warns
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
 from macrostrat.database import Database, run_sql
 from macrostrat.database.postgresql import table_exists
-from macrostrat.database.utils import infer_is_sql_text, temp_database
+from macrostrat.database.utils import (
+    _print_error,
+    infer_is_sql_text,
+    run_fixtures,
+    temp_database,
+)
 from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
@@ -106,6 +112,40 @@ insert_sample_query = "INSERT INTO sample (name) VALUES (:name)"
 
 def test_sql_text_inference_6():
     assert infer_is_sql_text(insert_sample_query)
+
+
+def test_sql_statement_filtering(db):
+    sql = """
+    INSERT INTO sample (name) VALUES (:name);
+
+    DELETE FROM sample WHERE name = :name;
+    """
+
+    assert infer_is_sql_text(sql)
+
+    with db.transaction(rollback="always"):
+        # Make sure there are no samples
+        assert _get_sample_count(db) == 0
+
+        # Run the SQL, filtering out the DELETE statement
+
+        def filter_func(statement, params):
+            return not statement.startswith("DELETE")
+
+        res = db.run_sql(
+            sql,
+            params=dict(name="Test"),
+            raise_errors=True,
+            statement_filter=filter_func,
+            yield_results=False,
+        )
+
+        assert len(res) == 1
+        assert _get_sample_count(db) == 1
+
+
+def _get_sample_count(db):
+    return db.run_query("SELECT count(*) FROM sample").scalar()
 
 
 def test_sql_interpolation_psycopg(db):
@@ -383,3 +423,48 @@ def test_check_table_exists(db):
 def test_check_table_exists_postgresql(db):
     assert table_exists(db, "sample")
     assert not table_exists(db, "samplea")
+
+
+def test_database_schema_refresh(db):
+    # Create a new table
+    sql = "CREATE TABLE new_table (name TEXT)"
+    db.run_sql(sql)
+    names = db.inspector.get_table_names()
+    assert "new_table" not in names
+    db.refresh_schema(automap=False)
+    assert "new_table" in db.inspector.get_table_names()
+
+
+def test_print_error():
+    _print_error("SELECT * FROM test", Exception("Test error"))
+
+
+def _check_text(_stdout: TextIOWrapper, _text: str):
+    _stdout.seek(0)
+    assert _stdout.read() == _text
+
+
+def test_printing(db):
+    # Check that nothing was printed to stderr
+    # Collect printed statements
+    with StringIO() as _stdout:
+        run_sql(db.session, "SELECT 1", output_file=_stdout)
+        _check_text(_stdout, "SELECT 1\n")
+
+
+def test_no_printing(db):
+    # Check that nothing was printed to stderr
+    # Collect printed statements
+    with StringIO() as _stdout:
+        run_sql(db.session, "SELECT 1", output_mode="none", output_file=_stdout)
+        _check_text(_stdout, "")
+
+
+def test_no_printing_fixtures(db, capsys):
+    # Check that nothing was printed to stderr
+    # Collect printed statements
+
+    fd = Path(relative_path(__file__, "fixtures"))
+    with StringIO() as _stdout:
+        run_fixtures(db.session, fd, output_mode="none", output_file=_stdout)
+        _check_text(_stdout, "")

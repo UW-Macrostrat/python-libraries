@@ -1,15 +1,14 @@
 import warnings
 from contextlib import contextmanager
-from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
 
 import psycopg
 from psycopg.errors import InvalidSavepointSpecification
 from psycopg.sql import Identifier
-from sqlalchemy import URL, MetaData, create_engine, inspect, text
+from sqlalchemy import URL, Engine, MetaData, create_engine, inspect, text
 from sqlalchemy.engine.url import make_url
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, InternalError, OperationalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
@@ -43,14 +42,14 @@ class Database(object):
 
     __inspector__ = None
 
-    def __init__(self, db_conn: Union[str, URL], *, echo_sql=False, **kwargs):
+    def __init__(self, db_conn: Union[str, URL, Engine], *, echo_sql=False, **kwargs):
         """
         Wrapper for interacting with a database using SQLAlchemy.
         Optimized for use with PostgreSQL, but usable with SQLite
         as well.
 
         Args:
-            db_conn (str): Connection string for the database.
+            db_conn (str | URL | Engine): Connection string or engine for the database.
 
         Keyword Args:
             echo_sql (bool): If True, will echo SQL commands to the
@@ -63,24 +62,13 @@ class Database(object):
 
         self.instance_params = kwargs.pop("instance_params", {})
 
-        log.info(f"Setting up database connection '{db_conn}'")
+        if isinstance(db_conn, Engine):
+            log.info(f"Set up database connection with engine {db_conn.url}")
+            self.engine = db_conn
+        else:
+            log.info(f"Setting up database connection with URL '{db_conn}'")
+            self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
 
-        url = db_conn
-        if not isinstance(url, URL):
-            url = make_url(url)
-
-        # Prefer the psycopg3 driver for PostgreSQL
-
-        if url.drivername.startswith("postgresql"):
-            # Use the psycopg3 driver if available
-            try:
-                from psycopg import connect
-            except ImportError:
-                pass
-            else:
-                url = url.set(drivername="postgresql+psycopg")
-
-        self.engine = create_engine(url, echo=echo_sql, **kwargs)
         self.metadata = kwargs.get("metadata", metadata)
 
         # Scoped session for database
@@ -144,7 +132,7 @@ class Database(object):
         Returns: Iterator of results from the query.
         """
         params = self._setup_params(params, kwargs)
-        return iter(run_sql(self.session, fn, params, **kwargs))
+        return run_sql(self.session, fn, params, **kwargs)
 
     def run_query(self, sql, params=None, **kwargs):
         """Run a single query on the database object, returning the result.
@@ -199,6 +187,29 @@ class Database(object):
         if self.__inspector__ is None:
             self.__inspector__ = inspect(self.engine)
         return self.__inspector__
+
+    def refresh_schema(self, *, automap=None):
+        """
+        Refresh the current database connection
+
+        - closes the session and flushes
+        - removes the inspector
+
+        If automap is True, will automap the database after refreshing.
+        If automap is False, will not automap the database after refreshing.
+        If automap is None, it will re-map the database if it was previously mapped.
+        """
+        # Close the session
+        self.session.flush()
+        self.session.close()
+        # Remove the inspector
+        self.__inspector__ = None
+
+        if automap is None:
+            automap = self.mapper is not None
+
+        if automap:
+            self.automap()
 
     def entity_names(self, **kwargs):
         """
