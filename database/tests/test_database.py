@@ -275,8 +275,7 @@ def test_server_bound_parameters_invalid_3(db):
 
 @mark.skip(reason="This is based on older, psycopg2-style parameter binding.")
 def test_server_bound_parameters_dbapi_extensions(db):
-    from psycopg2.extensions import AsIs
-
+    # from psycopg2.extensions import AsIs
     sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
     res = db.run_query(sql, {"name": "Test", "table_name": AsIs("sample")})
     assert res.scalar() == "Test"

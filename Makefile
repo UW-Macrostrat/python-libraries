@@ -14,4 +14,4 @@ format:
 	poetry run black .
 
 test:
-	poetry run pytest -s -x --capture=no --tb=short
+	poetry run pytest -s -x
