@@ -5,8 +5,7 @@ from typing import Optional, Union
 
 from psycopg.errors import InvalidSavepointSpecification
 from psycopg.sql import Identifier
-from sqlalchemy import URL, Engine, MetaData, create_engine, inspect
-from sqlalchemy.engine.url import make_url
+from sqlalchemy import URL, Engine, MetaData, inspect
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
@@ -25,6 +24,7 @@ from .utils import (  # noqa
     run_fixtures,
     run_query,
     run_sql,
+    create_engine
 )
 
 metadata = MetaData()
@@ -60,23 +60,7 @@ class Database(object):
 
         self.instance_params = kwargs.pop("instance_params", {})
 
-        if isinstance(db_conn, Engine):
-            log.info(f"Set up database connection with engine {db_conn.url}")
-            if db_conn.driver == "psycopg2":
-                log.warning(
-                    "The psycopg2 driver is deprecated. Please use psycopg3 instead."
-                )
-            self.engine = db_conn
-        else:
-            log.info(f"Setting up database connection with URL '{db_conn}'")
-            url = db_conn
-            if isinstance(url, str):
-                url = make_url(url)
-            # Set the driver to psycopg if not already set
-            if url.drivername != "postgresql+psycopg":
-                url = url.set(drivername="postgresql+psycopg")
-
-            self.engine = create_engine(url, echo=echo_sql, **kwargs)
+        self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
 
         self.metadata = kwargs.get("metadata", metadata)
 

@@ -4,18 +4,16 @@ from enum import Enum
 from pathlib import Path
 from re import search
 from sys import stderr
-from time import sleep
 from typing import IO, Union
 from warnings import warn
 
-import psycopg2.errors
 from click import echo, secho
 from psycopg.sql import SQL, Composable, Composed
-from psycopg2.extensions import set_wait_callback
-from psycopg2.extras import wait_select
 from rich.console import Console
-from sqlalchemy import MetaData, create_engine, text
+from sqlalchemy import MetaData, text
+from sqlalchemy import create_engine as base_create_engine
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import (
     IntegrityError,
     InternalError,
@@ -29,6 +27,7 @@ from sqlalchemy.sql.elements import ClauseElement, TextClause
 from sqlalchemy_utils import create_database as _create_database
 from sqlalchemy_utils import database_exists, drop_database
 from sqlparse import format, split
+from time import sleep
 
 from macrostrat.utils import cmd, get_logger
 
@@ -330,9 +329,6 @@ def _run_sql(connectable, sql, params=None, **kwargs):
             )
             continue
 
-        # This only does something for postgresql, but it's harmless to run it for other engines
-        set_wait_callback(wait_select)
-
         try:
             trans = connectable.begin()
         except InvalidRequestError:
@@ -362,7 +358,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
 
             _print_error(sql_text, err, file=output_file)
         finally:
-            set_wait_callback(None)
+            pass
 
 
 def _should_raise_query_error(err):
@@ -604,6 +600,26 @@ def create_database(url, **kwargs):
     _create_database(url, **kwargs)
 
 
+def create_engine(db_conn, **kwargs):
+    if isinstance(db_conn, Engine):
+        log.info(f"Set up database connection with engine {db_conn.url}")
+        if db_conn.driver == "psycopg2":
+            log.warning(
+                "The psycopg2 driver is deprecated. Please use psycopg3 instead."
+            )
+        return db_conn
+    else:
+        log.info(f"Setting up database connection with URL '{db_conn}'")
+        url = db_conn
+        if isinstance(url, str):
+            url = make_url(url)
+        # Set the driver to psycopg if not already set
+        if url.drivername != "postgresql+psycopg":
+            url = url.set(drivername="postgresql+psycopg")
+
+        return base_create_engine(url, **kwargs)
+
+
 def connection_args(engine):
     """Get PostgreSQL connection arguments for an engine"""
     _psql_flags = {"-U": "username", "-h": "host", "-p": "port", "-P": "password"}
@@ -619,15 +635,24 @@ def connection_args(engine):
     return flags, engine.url.database
 
 
-def db_isready(engine_or_url):
-    args, _ = connection_args(engine_or_url)
-    c = cmd("pg_isready", args, capture_output=True)
-    return c.returncode == 0
+def db_isready(engine_or_url, use_shell_command=False):
+    if use_shell_command:
+        args, _ = connection_args(engine_or_url)
+        c = cmd("pg_isready", args, capture_output=True)
+        return c.returncode == 0
+    # Use a more typical sqlalchemy connection approach
+    engine = create_engine(engine_or_url)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except OperationalError:
+        return False
 
 
-def wait_for_database(engine_or_url, quiet=False):
+def wait_for_database(engine_or_url, *, quiet=False, use_shell_command=False):
     msg = "Waiting for database..."
-    while not db_isready(engine_or_url):
+    while not db_isready(engine_or_url, use_shell_command=use_shell_command):
         if not quiet:
             echo(msg, err=True)
         log.info(msg)
