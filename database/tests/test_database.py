@@ -21,8 +21,8 @@ from macrostrat.database.postgresql import table_exists
 from macrostrat.database.utils import (
     _print_error,
     infer_is_sql_text,
-    temp_database,
     run_fixtures,
+    temp_database,
 )
 from macrostrat.utils import get_logger, relative_path
 
