@@ -7,14 +7,12 @@ NOTE: At the moment, these tests are not independent and must run in order.
 from io import StringIO, TextIOWrapper
 from pathlib import Path
 from sys import stdout
-from typing import Any
 
 from dotenv import load_dotenv
 from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
-
-# from psycopg2.extensions import AsIs
 from pytest import fixture, raises, warns
+from pytest import mark
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
@@ -275,26 +273,13 @@ def test_server_bound_parameters_invalid_3(db):
         assert False
 
 
+@mark.skip(reason="This is based on older, psycopg2-style parameter binding.")
 def test_server_bound_parameters_dbapi_extensions(db):
+    from psycopg2.extensions import AsIs
+
     sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
     res = db.run_query(sql, {"name": "Test", "table_name": AsIs("sample")})
     assert res.scalar() == "Test"
-
-
-from psycopg.adapt import Buffer, Dumper
-
-
-class AsIs(Dumper):
-    adapted: str
-
-    def __init__(self, p_str):
-        super().__init__(p_str)
-
-    def dump(self, obj: Any):
-        raise NotImplementedError("AsIs cannot be used as a server-bound parameter")
-
-    def quote(self):
-        return self.adapted
 
 
 def test_server_parameters_function_def(db):

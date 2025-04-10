@@ -10,9 +10,9 @@ from warnings import warn
 
 import psycopg2.errors
 from click import echo, secho
+from psycopg.sql import SQL, Composable, Composed
 from psycopg2.extensions import set_wait_callback
 from psycopg2.extras import wait_select
-from psycopg.sql import SQL, Composable, Composed
 from rich.console import Console
 from sqlalchemy import MetaData, create_engine, text
 from sqlalchemy.engine import Connection, Engine

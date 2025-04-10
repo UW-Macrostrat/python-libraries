@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="JAVA_MODULE" version="4">
+  <component name="FacetManager">
+    <facet type="Python" name="Python">
+      <configuration sdkName="Poetry (python-libraries)" />
+    </facet>
+  </component>
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$">
@@ -18,6 +23,7 @@
     </content>
     <orderEntry type="jdk" jdkName="Poetry (python-libraries)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Poetry (python-libraries) interpreter library" level="application" />
   </component>
   <component name="PyNamespacePackagesService">
     <option name="namespacePackageFolders">

@@ -2,7 +2,7 @@
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Tools for managing Python packages in a monorepo"
 name = "macrostrat.package_tools"
-packages = [{include = "macrostrat"}]
+packages = [{ include = "macrostrat" }]
 readme = "README.md"
 version = "1.1.0"
 

@@ -3,18 +3,16 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Union
 
-import psycopg
 from psycopg.errors import InvalidSavepointSpecification
 from psycopg.sql import Identifier
-from sqlalchemy import URL, Engine, MetaData, create_engine, inspect, text
+from sqlalchemy import URL, Engine, MetaData, create_engine, inspect
 from sqlalchemy.engine.url import make_url
-from sqlalchemy.exc import IntegrityError, InternalError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
-
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
 from .utils import (  # noqa
@@ -64,10 +62,21 @@ class Database(object):
 
         if isinstance(db_conn, Engine):
             log.info(f"Set up database connection with engine {db_conn.url}")
+            if db_conn.driver == "psycopg2":
+                log.warning(
+                    "The psycopg2 driver is deprecated. Please use psycopg3 instead."
+                )
             self.engine = db_conn
         else:
             log.info(f"Setting up database connection with URL '{db_conn}'")
-            self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
+            url = db_conn
+            if isinstance(url, str):
+                url = make_url(url)
+            # Set the driver to psycopg if not already set
+            if url.drivername != "postgresql+psycopg":
+                url = url.set(drivername="postgresql+psycopg")
+
+            self.engine = create_engine(url, echo=echo_sql, **kwargs)
 
         self.metadata = kwargs.get("metadata", metadata)
 
