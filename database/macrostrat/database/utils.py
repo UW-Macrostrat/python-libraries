@@ -8,6 +8,7 @@ from typing import IO, Union
 from warnings import warn
 
 from click import echo, secho
+from psycopg.errors import QueryCanceled
 from psycopg.sql import SQL, Composable, Composed
 from rich.console import Console
 from sqlalchemy import MetaData, text
@@ -297,7 +298,7 @@ def _run_sql(connectable, sql, params=None, **kwargs):
         if pre_bind_params is not None:
             if not isinstance(query, SQL):
                 query = SQL(query)
-            # Pre-bind the parameters using PsycoPG2
+            # Pre-bind the parameters using psycopg
             query = query.format(**pre_bind_params)
 
         if isinstance(query, (SQL, Composed)):
@@ -377,7 +378,7 @@ def _should_raise_query_error(err):
     # database backends.
     # Ideally we could handle operational errors more gracefully
     if (
-        isinstance(orig_err, psycopg2.errors.QueryCanceled)
+        isinstance(orig_err, QueryCanceled)
         or getattr(orig_err, "pgcode", None) == "57014"
     ):
         return True
