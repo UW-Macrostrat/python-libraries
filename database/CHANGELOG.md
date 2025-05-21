@@ -2,6 +2,7 @@
 
 ## [4.0.0] - Unreleased
 
+- Upgrade to `psycopg` version 3 instead of Psycopg2
 - `psycopg`'s
   new [adaptation system](https://www.psycopg.org/psycopg3/docs/advanced/adapt.html)
   means that parameter

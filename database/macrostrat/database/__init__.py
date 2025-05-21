@@ -24,7 +24,7 @@ from .utils import (  # noqa
     run_fixtures,
     run_query,
     run_sql,
-    create_engine
+    create_engine,
 )
 
 metadata = MetaData()
