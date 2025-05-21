@@ -2,14 +2,13 @@
 PostgreSQL/PostGIS cluster upgrade tests reliant onto Docker.
 """
 import random
-import time
 from os import environ
 from pathlib import Path
 from re import match
 
 from docker.client import DockerClient
 from pytest import fixture
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import inspect, text
 
 from macrostrat.database import Database
 from macrostrat.database.utils import run_sql_file
@@ -21,7 +20,6 @@ log = get_logger(__name__)
 random_hex = lambda: "%08x" % random.randrange(16**8)
 
 from macrostrat.dinosaur.upgrade_cluster import (
-    default_version_images,
     upgrade_database_cluster,
 )
 from macrostrat.dinosaur.upgrade_cluster.describe import check_database_cluster_version

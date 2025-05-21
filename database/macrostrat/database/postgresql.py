@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
-import psycopg2
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import CompileError
 from sqlalchemy.ext.compiler import compiles
@@ -63,7 +62,7 @@ def prefix_inserts(insert, compiler, **kw):
 def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
     """Check if a table exists in a PostgreSQL database."""
     sql = """SELECT EXISTS (
-        SELECT FROM information_schema.tables 
+        SELECT FROM information_schema.tables
         WHERE table_schema = :schema
           AND table_name = :table_name
     );"""

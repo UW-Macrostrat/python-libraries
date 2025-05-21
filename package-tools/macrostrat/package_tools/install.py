@@ -4,7 +4,6 @@ from pathlib import Path
 from rich import print
 
 from macrostrat.utils import cmd
-
 from .dependencies import get_local_dependencies, load_poetry_config
 
 
@@ -13,12 +12,11 @@ def install_packages(
     omit: list[str] = [],
     skip_root: bool = False,
     virtualenvs: bool = False,
-    update: bool = False,
 ):
     """Install all packages in the root project's virtual environment."""
     cfg = load_poetry_config(path)
     local_deps = get_local_dependencies(cfg)
-    lock_cmd = "poetry lock" if update else "poetry lock --no-update"
+    lock_cmd = "poetry lock"
 
     extra_env = {}
     if not virtualenvs:

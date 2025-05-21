@@ -3,16 +3,15 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Union
 
-from psycopg2.errors import InvalidSavepointSpecification
-from psycopg2.sql import Identifier
-from sqlalchemy import URL, Engine, MetaData, create_engine, inspect
-from sqlalchemy.exc import IntegrityError, InternalError
+from psycopg.errors import InvalidSavepointSpecification
+from psycopg.sql import Identifier
+from sqlalchemy import URL, Engine, MetaData, inspect
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
-
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
 from .utils import (  # noqa
@@ -25,6 +24,7 @@ from .utils import (  # noqa
     run_fixtures,
     run_query,
     run_sql,
+    create_engine,
 )
 
 metadata = MetaData()
@@ -60,12 +60,8 @@ class Database(object):
 
         self.instance_params = kwargs.pop("instance_params", {})
 
-        if isinstance(db_conn, Engine):
-            log.info(f"Set up database connection with engine {db_conn.url}")
-            self.engine = db_conn
-        else:
-            log.info(f"Setting up database connection with URL '{db_conn}'")
-            self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
+        self.engine = create_engine(db_conn, echo=echo_sql, **kwargs)
+
         self.metadata = kwargs.get("metadata", metadata)
 
         # Scoped session for database
@@ -334,6 +330,7 @@ class Database(object):
 
         if connection is None:
             connection = self.session.connection()
+
         params = {"name": Identifier(name)}
         run_query(connection, "SAVEPOINT {name}", params)
         should_rollback = rollback == "always"
@@ -356,7 +353,7 @@ def _clear_savepoint(connection, name, rollback=True):
             run_query(connection, "ROLLBACK TO SAVEPOINT {name}", params)
         else:
             run_query(connection, "RELEASE SAVEPOINT {name}", params)
-    except InternalError as err:
+    except OperationalError as err:
         if isinstance(err.orig, InvalidSavepointSpecification):
             log.warning(
                 f"Savepoint {name} does not exist; we may have already rolled back."
