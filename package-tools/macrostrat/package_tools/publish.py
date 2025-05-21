@@ -5,17 +5,15 @@ from pathlib import Path
 
 import requests
 from rich import print
-from toml import load
 
 from macrostrat.utils import cmd, working_directory
 from macrostrat.utils.shell import git_has_changes
-
 from .dependencies import get_local_dependencies, load_poetry_config
 
 
 def prepare_module(fp: Path):
     with working_directory(fp):
-        cmd("poetry lock --no-update")
+        cmd("poetry lock")
         # cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
         cmd("poetry build")
 
