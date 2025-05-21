@@ -9,6 +9,7 @@ from typing import List
 
 from pydantic import BaseModel
 
+
 class Timing(BaseModel):
     name: str
     delta: float
@@ -41,9 +42,11 @@ class CodeTimer:
         timings.append(f"total;dur={round(self.timings[-1].total*1000, 1)}")
         return ", ".join(timings)
 
+
 # Context variable to hold the current timer instance for the
 # contextual timer. This is deprecated.
 code_timer = ContextVar("code_timer", default=None)
+
 
 class ContextualTimer(CodeTimer):
     @classmethod
@@ -60,6 +63,7 @@ class ContextualTimer(CodeTimer):
             yield self
         finally:
             code_timer.reset(token)
+
 
 # Legacy support for the contextual timer
 # We use the contextual timer as the default, but prefer the basic timer
