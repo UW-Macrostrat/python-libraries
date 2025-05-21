@@ -2,9 +2,9 @@
 authors = ["Daven Quinn <dev@davenquinn.com>"]
 description = "Tools for managing Python packages in a monorepo"
 name = "macrostrat.package_tools"
-packages = [{include = "macrostrat"}]
+packages = [{ include = "macrostrat" }]
 readme = "README.md"
-version = "1.1.0"
+version = "1.1.1"
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -14,7 +14,7 @@ toml = "^0.10.2"
 typer = "^0.12.0"
 "macrostrat.utils" = "^1.0.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 "macrostrat.utils" = { path = "../utils", develop = true }
 
 [build-system]
