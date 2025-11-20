@@ -4,11 +4,11 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
-import psycopg2
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import CompileError
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql.expression import Insert, text
+from sqlalchemy.sql.dml import Insert
+from sqlalchemy.sql.expression import text
 
 if TYPE_CHECKING:
     from ..database import Database
@@ -26,9 +26,10 @@ def on_conflict(action="restrict"):
         _insert_mode.reset(token)
 
 
-# @compiles(Insert, "postgresql")
+@compiles(Insert, "postgresql")
 def prefix_inserts(insert, compiler, **kw):
     """Conditionally adapt insert statements to use on-conflict resolution (a PostgreSQL feature)"""
+
     if insert._post_values_clause is not None:
         return compiler.visit_insert(insert, **kw)
 
@@ -63,7 +64,7 @@ def prefix_inserts(insert, compiler, **kw):
 def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:
     """Check if a table exists in a PostgreSQL database."""
     sql = """SELECT EXISTS (
-        SELECT FROM information_schema.tables 
+        SELECT FROM information_schema.tables
         WHERE table_schema = :schema
           AND table_name = :table_name
     );"""

@@ -3,9 +3,9 @@ from os import environ
 from docker.client import DockerClient
 from dotenv import load_dotenv
 from pytest import fixture
-from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 
+from macrostrat.database.utils import create_engine
 from macrostrat.dinosaur.upgrade_cluster.utils import database_cluster, get_unused_port
 
 load_dotenv()

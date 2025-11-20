@@ -4,7 +4,6 @@ from pathlib import Path
 from rich import print
 
 from macrostrat.utils import cmd
-
 from .dependencies import get_local_dependencies, load_poetry_config
 
 

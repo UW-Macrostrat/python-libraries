@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.0] - Unreleased
+
+- Upgrade to `psycopg` version 3 instead of Psycopg2
+- `psycopg`'s new
+  [adaptation system](https://www.psycopg.org/psycopg3/docs/advanced/adapt.html)
+  means that parameter binding has changed substantially. Consequently, `AsIs`
+  and other parameter-binding extensions are no longer supported.
+- `psycopg`'s new
+  [async mode](https://www.psycopg.org/psycopg3/docs/advanced/async.html#interrupting-async-operations)
+  allows us to remove the `set_wait_callback` approach to waiting for
+  long-running operations
+- This is a major breaking change, but it should be mostly transparent, except
+  for a need to update custom parameter binding code.
+
 ## [3.5.3] - 2024-12-23
 
 - Fix errors and add tests for `run_sql` changes

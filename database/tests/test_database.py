@@ -9,13 +9,6 @@ from pathlib import Path
 from sys import stdout
 
 from dotenv import load_dotenv
-from psycopg2.errors import SyntaxError
-from psycopg2.extensions import AsIs
-from psycopg2.sql import SQL, Identifier, Literal, Placeholder
-from pytest import fixture, raises, warns
-from sqlalchemy.exc import ProgrammingError
-from sqlalchemy.sql import text
-
 from macrostrat.database import Database, run_sql
 from macrostrat.database.postgresql import table_exists
 from macrostrat.database.utils import (
@@ -25,6 +18,12 @@ from macrostrat.database.utils import (
     temp_database,
 )
 from macrostrat.utils import get_logger, relative_path
+from psycopg.errors import SyntaxError
+from psycopg.sql import SQL, Identifier, Literal, Placeholder
+from pytest import fixture, raises, warns
+from pytest import mark
+from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.sql import text
 
 load_dotenv()
 
@@ -249,7 +248,7 @@ def test_server_bound_parameters_mixed(db):
 
 def test_server_bound_parameters_invalid(db):
     sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
-    with raises(KeyError):
+    with raises(ProgrammingError):
         db.run_query(sql, {"name": "Test", "table_name": Identifier("sample")})
 
 
@@ -273,7 +272,9 @@ def test_server_bound_parameters_invalid_3(db):
         assert False
 
 
+@mark.skip(reason="This is based on older, psycopg2-style parameter binding.")
 def test_server_bound_parameters_dbapi_extensions(db):
+    # from psycopg2.extensions import AsIs
     sql = "SELECT name FROM %(table_name)s WHERE name = %(name)s"
     res = db.run_query(sql, {"name": "Test", "table_name": AsIs("sample")})
     assert res.scalar() == "Test"
@@ -291,7 +292,7 @@ def test_server_parameters_function_def(db):
     END;
     $$ LANGUAGE plpgsql;
     """
-    with raises(TypeError):
+    with raises(ProgrammingError):
         db.run_sql(sql, raise_errors=True)
     # This should not raise
     db.run_sql(sql, raise_errors=True, has_server_binds=False)
@@ -333,7 +334,7 @@ def test_copy_statement(db):
     pg_conn = db.engine.connect().connection
     cur = pg_conn.cursor()
 
-    cur.copy_expert("COPY sample (name) TO STDOUT", stdout)
+    cur.copy("COPY sample (name) TO STDOUT", stdout)
 
 
 def test_close_connection(conn):
@@ -344,7 +345,7 @@ def test_close_connection(conn):
 
     import threading
 
-    from psycopg2.extensions import QueryCanceledError
+    from psycopg.errors import QueryCanceled
     from sqlalchemy.exc import DBAPIError
 
     sql = text("SELECT pg_sleep(10)")
@@ -357,7 +358,7 @@ def test_close_connection(conn):
         conn.execute(sql)
         assert False
     except DBAPIError as e:
-        if type(e.orig) == QueryCanceledError:
+        if type(e.orig) == QueryCanceled:
             print("Long running query was cancelled.")
             assert True
     t.cancel()
@@ -385,14 +386,15 @@ def test_sigint_cancel(db):
             str(script),
             db_url,
         ],
+        stdout=subprocess.PIPE,
     )
     time.sleep(0.5)
     p.send_signal(signal.SIGINT)
     p.wait()
-    assert p.returncode == 1
     # Make sure it didn't take too long
     dT = time.time() - start
     assert dT < 2
+    assert p.returncode != 0
 
 
 def test_check_table_exists(db):
