@@ -16,7 +16,6 @@ sqlparse = "^0.5.1"
 aiofiles = "^23.2.1"
 rich = "^13.7.1"
 psycopg = "^3.2.1"
-psycopg2 = "^2.9.10"
 
 [tool.poetry.group.dev.dependencies]
 "macrostrat.utils" = { path = "../utils", develop = true }
