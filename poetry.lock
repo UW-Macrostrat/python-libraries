@@ -779,7 +779,7 @@ i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "2.2.1"
+version = "2.2.2"
 description = "A control script framework for containerized applications."
 optional = false
 python-versions = "^3.10"
