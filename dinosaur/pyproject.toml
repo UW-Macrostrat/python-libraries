@@ -16,7 +16,6 @@ schemainspect = "^3.0.1616029793"
 # Add an explicit dependency on setuptools for Python 3.12 compatibility
 setuptools = "^78.1.0"
 
-
 [tool.poetry.group.dev.dependencies]
 "macrostrat.database" = { path = "../database", develop = true }
 "macrostrat.utils" = { path = "../utils", develop = true }
