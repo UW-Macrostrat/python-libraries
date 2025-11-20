@@ -40,7 +40,7 @@ class ControlCommand(CommandBase):
         rich_utils.STYLE_HELPTEXT = None
 
         self.registered_callback = TyperInfo(
-            callback=self._update_docstring(self.callback)
+            callback=self.callback
         )
 
         if backend == BackendType.DockerCompose:
