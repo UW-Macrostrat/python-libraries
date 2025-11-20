@@ -9,13 +9,6 @@ from pathlib import Path
 from sys import stdout
 
 from dotenv import load_dotenv
-from psycopg.errors import SyntaxError
-from psycopg.sql import SQL, Identifier, Literal, Placeholder
-from pytest import fixture, raises, warns
-from pytest import mark
-from sqlalchemy.exc import ProgrammingError
-from sqlalchemy.sql import text
-
 from macrostrat.database import Database, run_sql
 from macrostrat.database.postgresql import table_exists
 from macrostrat.database.utils import (
@@ -25,6 +18,12 @@ from macrostrat.database.utils import (
     temp_database,
 )
 from macrostrat.utils import get_logger, relative_path
+from psycopg.errors import SyntaxError
+from psycopg.sql import SQL, Identifier, Literal, Placeholder
+from pytest import fixture, raises, warns
+from pytest import mark
+from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.sql import text
 
 load_dotenv()
 

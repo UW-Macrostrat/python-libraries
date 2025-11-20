@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import CompileError
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.dml import Insert
 from sqlalchemy.sql.expression import text
 
 if TYPE_CHECKING:
@@ -24,7 +26,7 @@ def on_conflict(action="restrict"):
         _insert_mode.reset(token)
 
 
-# @compiles(Insert, "postgresql")
+@compiles(Insert, "postgresql")
 def prefix_inserts(insert, compiler, **kw):
     """Conditionally adapt insert statements to use on-conflict resolution (a PostgreSQL feature)"""
 
