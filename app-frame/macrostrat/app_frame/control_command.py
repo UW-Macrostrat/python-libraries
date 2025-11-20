@@ -3,10 +3,9 @@
 from enum import Enum
 from os import environ
 
+from macrostrat.utils import get_logger
 from typer import Context, Option, rich_utils
 from typer.models import TyperInfo
-
-from macrostrat.utils import get_logger
 
 from .compose import add_docker_compose_commands
 from .core import Application
@@ -42,19 +41,7 @@ class ControlCommand(CommandBase):
 
         verbose_envvar = self.app.envvar_prefix + "VERBOSE"
 
-        def callback(
-            ctx: Context,
-            verbose: bool = Option(False, "--verbose", envvar=verbose_envvar),
-        ):
-            """:app_name: command-line interface"""
-            ctx.obj = self.app
-            # Setting the environment variable allows nested commands to pick up
-            # the verbosity setting, if needed.
-            if verbose:
-                environ[verbose_envvar] = "1"
-            self.app.setup_logs(verbose=verbose)
-
-        self.registered_callback = TyperInfo(callback=self._update_docstring(callback))
+        self.registered_callback = TyperInfo(callback=self._update_docstring(self.callback))
 
         if backend == BackendType.DockerCompose:
             add_docker_compose_commands(self)
@@ -69,3 +56,16 @@ class ControlCommand(CommandBase):
         """Simple wrapper around command that replaces names in the docstring"""
         wrapper = super().command(*args, **kwargs)
         return lambda func: wrapper(self._update_docstring(func))
+
+    def callback(
+        self,
+        ctx: Context,
+        verbose: bool = Option(False, "--verbose", envvar=verbose_envvar),
+    ):
+        """:app_name: command-line interface"""
+        ctx.obj = self.app
+        # Setting the environment variable allows nested commands to pick up
+        # the verbosity setting, if needed.
+        if verbose:
+            environ[verbose_envvar] = "1"
+        self.app.setup_logs(verbose=verbose)
