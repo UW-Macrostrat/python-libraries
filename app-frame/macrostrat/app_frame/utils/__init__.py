@@ -1,7 +1,7 @@
 """Utilities for Typer and Click command-line interfaces."""
 
-import re
-from typing import List
+from os import environ
+from typing import List, Optional
 
 import typer
 from click import Parameter
@@ -118,3 +118,16 @@ def add_click_command(base: Typer, cmd, *args, **kwargs):
     }
 
     base.command(*args, **kwargs)(_click_command)
+
+
+def get_env_boolean(envvar: str, default: Optional[bool] = None) -> Optional[bool]:
+    """Get a boolean value from an environment variable"""
+    val = environ.get(envvar, None)
+    if val is None:
+        return default
+    val = val.lower()
+    if val in ("1", "true", "yes", "on"):
+        return True
+    elif val in ("0", "false", "no", "off"):
+        return False
+    return default

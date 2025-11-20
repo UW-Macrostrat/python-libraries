@@ -3,13 +3,13 @@
 from enum import Enum
 from os import environ
 
-from macrostrat.utils import get_logger
 from typer import Context, Option, rich_utils
 from typer.models import TyperInfo
 
+from macrostrat.utils import get_logger
 from .compose import add_docker_compose_commands
 from .core import Application
-from .utils import CommandBase, ControlCommandGroup  # noqa
+from .utils import CommandBase, ControlCommandGroup, get_env_boolean  # noqa
 
 log = get_logger(__name__)
 
@@ -39,9 +39,9 @@ class ControlCommand(CommandBase):
         # Make sure the help text is not dimmed after the first line
         rich_utils.STYLE_HELPTEXT = None
 
-        verbose_envvar = self.app.envvar_prefix + "VERBOSE"
-
-        self.registered_callback = TyperInfo(callback=self._update_docstring(self.callback))
+        self.registered_callback = TyperInfo(
+            callback=self._update_docstring(self.callback)
+        )
 
         if backend == BackendType.DockerCompose:
             add_docker_compose_commands(self)
@@ -60,12 +60,14 @@ class ControlCommand(CommandBase):
     def callback(
         self,
         ctx: Context,
-        verbose: bool = Option(False, "--verbose", envvar=verbose_envvar),
+        verbose: bool = Option(False, "--verbose"),
     ):
         """:app_name: command-line interface"""
         ctx.obj = self.app
         # Setting the environment variable allows nested commands to pick up
         # the verbosity setting, if needed.
-        if verbose:
+        verbose_envvar = self.app.envvar_prefix + "VERBOSE"
+        _env_verbose = get_env_boolean(verbose_envvar)
+        if verbose or _env_verbose:
             environ[verbose_envvar] = "1"
         self.app.setup_logs(verbose=verbose)
