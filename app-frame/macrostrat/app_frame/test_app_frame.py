@@ -4,6 +4,7 @@ from macrostrat.app_frame import Application
 
 runner = CliRunner()
 
+
 def test_app_frame_setup():
     main = _setup_app()
     assert main.app.name == "Test App"

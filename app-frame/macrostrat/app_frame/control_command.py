@@ -39,9 +39,7 @@ class ControlCommand(CommandBase):
         # Make sure the help text is not dimmed after the first line
         rich_utils.STYLE_HELPTEXT = None
 
-        self.registered_callback = TyperInfo(
-            callback=self.callback
-        )
+        self.registered_callback = TyperInfo(callback=self.callback)
 
         if backend == BackendType.DockerCompose:
             add_docker_compose_commands(self)
