@@ -19,9 +19,7 @@ log = get_logger(__name__)
 
 random_hex = lambda: "%08x" % random.randrange(16**8)
 
-from macrostrat.dinosaur.upgrade_cluster import (
-    upgrade_database_cluster,
-)
+from macrostrat.dinosaur.upgrade_cluster import upgrade_database_cluster
 from macrostrat.dinosaur.upgrade_cluster.describe import check_database_cluster_version
 from macrostrat.dinosaur.upgrade_cluster.utils import (
     database_cluster,

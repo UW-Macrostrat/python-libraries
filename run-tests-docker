@@ -24,7 +24,7 @@ while ! pg_isready -h localhost -p $port; do
   sleep 1
 done
 
-poetry run pytest -s $@
+uv run pytest -s $@
 
 if [ $teardown = true ]; then
   echo "Stopping database"

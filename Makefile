@@ -3,15 +3,15 @@
 all: install
 
 install:
-	poetry install
-	poetry run mono install
+	uv sync
+	uv run mono install
 
 publish:
-	poetry run mono publish
+	uv run mono publish
 
 format:
-	poetry run isort .
-	poetry run black .
+	uv run isort .
+	uv run black .
 
 test:
-	poetry run pytest -s -x
+	uv run pytest -s -x
