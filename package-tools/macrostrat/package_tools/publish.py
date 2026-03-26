@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from os import environ
 from pathlib import Path
 
 import requests
@@ -12,14 +13,16 @@ from .dependencies import get_local_dependencies, load_pkg_config
 
 def prepare_module(fp: Path):
     with working_directory(fp):
-        cmd("uv lock", shell=True)
+        cmd("uv lock")
         # cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
-        cmd("uv build", shell=True)
+        cmd("uv build")
 
 
 def publish_module(fp):
     with working_directory(fp):
-        res = cmd("uv publish", shell=True)
+        cmd_env = {**environ}
+        cmd_env.setdefault("UV_PUBLISH_USERNAME", "__token__")
+        res = cmd("uv publish", env=cmd_env)
         if res.returncode != 0:
             print(f"Failed to publish {module_version_string(fp)}")
             return
@@ -95,7 +98,7 @@ def publish_packages(path: Path = Path.cwd(), omit: list[str] = []):
 
     if len(module_dirs) > 0:
         msg = "Synced lock files for updated dependencies."
-        cmd(f"git add .", shell=True)
+        cmd(f"git add .")
         cmd(f"git commit -m '{msg}'", shell=True)
 
     for fp in module_dirs:
