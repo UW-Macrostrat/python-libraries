@@ -12,6 +12,8 @@ from .subsystems import ApplicationBase
 log = get_logger(__name__)
 
 EnvironmentDependency = dict[str, str] | Callable[[ApplicationBase], dict[str, str]]
+DotenvDependency = bool | Path | list[Path]
+
 
 class Application(ApplicationBase):
     console: Console
@@ -26,7 +28,7 @@ class Application(ApplicationBase):
         project_prefix: Optional[str] = None,
         log_modules: Optional[str | list[str]] = None,
         env: EnvironmentDependency = {},
-        load_dotenv: bool | Path | list[Path] = False,
+        load_dotenv: DotenvDependency = None,
         env_prefix: Optional[str] = None,
     ):
         self.name = name
@@ -55,13 +57,16 @@ class Application(ApplicationBase):
     def info(self, text, style=None):
         self.console.print(self.replace_names(text), style=style)
 
-    def load_dotenv(self):
-        if isinstance(self._dotenv_cfg, list):
-            for path in self._dotenv_cfg:
-                load_dotenv(path)
-        elif isinstance(self._dotenv_cfg, Path):
-            load_dotenv(self._dotenv_cfg)
-        elif load_dotenv is True:
+    def load_dotenv(self, dependency: DotenvDependency = None):
+        if dependency is None:
+            dependency = self._dotenv_cfg
+
+        if isinstance(dependency, list):
+            for path in dependency:
+                self.load_dotenv(path)
+        elif isinstance(dependency, Path):
+            load_dotenv(dependency)
+        elif dependency is True:
             load_dotenv()
 
     def setup_environment(self, env: EnvironmentDependency):
@@ -73,6 +78,9 @@ class Application(ApplicationBase):
             env = env(self)
         for k, v in env.items():
             environ[k] = v
+
+        # Load other environment variables
+        self.load_dotenv()
 
     def setup_logs(self, verbose: bool = False):
         if len(self._log_modules) == 0:
