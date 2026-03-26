@@ -15,7 +15,7 @@ def prepare_module(fp: Path):
     with working_directory(fp):
         cmd("uv lock")
         # cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
-        cmd("uv build")
+        cmd("uv build --clear")
 
 
 def publish_module(fp):
