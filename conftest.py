@@ -46,7 +46,7 @@ def database_url(docker_client):
     elif docker_client is not None:
         port = get_unused_port()
 
-        with database_cluster(docker_client, image, None, port=port) as container:
+        with database_cluster(docker_client, image, port=port, in_memory=True) as container:
             # Connect to cluster
             url = f"postgresql://postgres@localhost:{port}/postgres"
             yield url

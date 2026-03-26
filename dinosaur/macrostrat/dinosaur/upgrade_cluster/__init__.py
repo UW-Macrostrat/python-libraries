@@ -4,7 +4,6 @@ from docker.client import DockerClient
 from rich.console import Console
 
 from macrostrat.utils import get_logger
-
 from .describe import (
     check_database_cluster_version,
     check_database_exists,
@@ -69,11 +68,11 @@ def upgrade_database_cluster(
     target_port = get_unused_port()
 
     with database_cluster(
-        client, version_images[current_version], cluster_volume_name, port=source_port
+        client, version_images[current_version], data_volume=cluster_volume_name, port=source_port
     ) as source, database_cluster(
         client,
         version_images[target_version],
-        dest_volume.name,
+        data_volume=dest_volume.name,
         port=target_port,
     ) as target:
         # Dump the database

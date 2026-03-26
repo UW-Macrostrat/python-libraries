@@ -1,6 +1,7 @@
 import socket
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Mapping, Optional
 
 import docker
@@ -18,10 +19,14 @@ log = get_logger(__name__)
 def database_cluster(
     client: DockerClient,
     image: str,
+    *,
     data_volume: str = None,
     remove=True,
     environment: Optional[Mapping[str, str]] = None,
     port=None,
+    config: dict | Path = None,
+    in_memory: bool = False,
+    user: str = "postgres",
 ):
     """
     Start a database cluster in a Docker volume
@@ -37,19 +42,40 @@ def database_cluster(
     if port is not None:
         ports = {f"5432/tcp": port}
 
-    volumes = None
+    volumes = {}
     if data_volume is not None:
-        volumes = {data_volume: {"bind": "/var/lib/postgresql/data", "mode": "rw"}}
+        volumes[data_volume] = {"bind": "/var/lib/postgresql/data", "mode": "rw"}
+
+    extra_args = []
+    if isinstance(config, Path):
+        assert config.is_file()
+        key = str(config.resolve())
+        internal_config_file_path = "/etc/postgresql-config.conf"
+        volumes[key] = {"bind": internal_config_file_path, "mode": "rw"}
+        config = {"config_file": internal_config_file_path}
+    elif config is None:
+        config = {}
+
+    tmpfs=None
+    if in_memory:
+        tmpfs = {
+            "/var/lib/postgresql/data": "uid=999,gid=999,mode=0700",
+        }
+
+    for key, value in config.items():
+        extra_args += ["-c", f"{key}={value}"]
 
     container = client.containers.run(
         image,
+        command=extra_args,
         detach=True,
         remove=False,
         auto_remove=False,
         environment=environment,
         volumes=volumes,
-        user="postgres",
+        user=user,
         ports=ports,
+        tmpfs=tmpfs,
     )
     log.info(f"Starting container {container.name} ({image})")
 
@@ -65,7 +91,8 @@ def database_cluster(
         log.debug(container.logs().decode("utf-8"))
         log.info(f"Stopping container {container.name} ({image})...")
         container.stop()
-        container.remove()
+        if remove:
+            container.remove()
 
 
 def wait_for_ready(engine, timeout=5):

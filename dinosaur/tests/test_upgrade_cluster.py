@@ -70,7 +70,7 @@ def postgres_11_cluster_volume():
     ensure_empty_docker_volume(client, volume_name)
 
     with database_cluster(
-        client, old_postgres_image, volume_name, port=port
+        client, old_postgres_image, data_volume=volume_name, port=port
     ) as container:
         container.exec_run("createdb -U postgres " + database_name, user="postgres")
 
@@ -90,7 +90,7 @@ def postgres_11_cluster_volume():
 def postgres_11_db(postgres_11_cluster_volume):
     port = get_unused_port()
     with database_cluster(
-        client, old_postgres_image, postgres_11_cluster_volume, port=port
+        client, old_postgres_image, data_volume=postgres_11_cluster_volume, port=port
     ) as container:
         yield Database(f"postgresql://postgres@localhost:{port}/test_database")
 
