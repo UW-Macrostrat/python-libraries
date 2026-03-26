@@ -1,6 +1,6 @@
 [project]
 name = "macrostrat.app_frame"
-version = "3.0.3"
+version = "3.0.4"
 description = "A control script framework for containerized applications."
 authors = [{ name = "Daven Quinn", email = "dev@davenquinn.com" }]
 requires-python = ">=3.10,<4"
@@ -35,5 +35,5 @@ module-root = ""
 namespace = true
 
 [build-system]
-requires = ["uv_build>=0.9.21,<0.10.0"]
+requires = ["uv_build>=0.9.21,<0.12.0"]
 build-backend = "uv_build"

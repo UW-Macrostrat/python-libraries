@@ -37,7 +37,7 @@ class ControlCommand(CommandBase):
         # Set up the command callback for global options configuration...g
         cb_wrapper = lambda *args, **kwargs: self.callback(*args, **kwargs)
         cb = self._update_docstring(update_wrapper(cb_wrapper, self.callback))
-        self.registered_callback = TyperInfo(callback=cb)
+        self.registered_callback = TyperInfo(callback=cb, invoke_without_command=True)
 
     def _update_docstring(self, func):
         if func.__doc__ is not None:
@@ -64,3 +64,4 @@ class ControlCommand(CommandBase):
             environ[verbose_envvar] = "1"
         # This is kind of a weird inversion of control
         self.app.setup_logs(verbose=verbose)
+        log.info("Activated verbose mode")

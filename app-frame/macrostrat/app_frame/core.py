@@ -42,6 +42,10 @@ class Application(ApplicationBase):
 
         if isinstance(log_modules, str):
             log_modules = [log_modules]
+        if log_modules is None:
+            log_modules = []
+        # Always log this module
+        log_modules.append("macrostrat.app_frame")
         if log_modules is not None:
             self._log_modules = log_modules
 
