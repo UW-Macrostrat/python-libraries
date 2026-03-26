@@ -3,7 +3,7 @@
   <component name="Black">
     <option name="enabledOnReformat" value="true" />
     <option name="enabledOnSave" value="true" />
-    <option name="sdkName" value="Poetry (python-libraries)" />
+    <option name="sdkName" value="uv (python-libraries)" />
   </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_21" default="true" project-jdk-name="uv (python-libraries)" project-jdk-type="Python SDK">
     <output url="file://$PROJECT_DIR$/out" />

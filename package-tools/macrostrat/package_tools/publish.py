@@ -12,20 +12,23 @@ from .dependencies import get_local_dependencies, load_pkg_config
 
 def prepare_module(fp: Path):
     with working_directory(fp):
-        cmd("uv lock")
+        cmd("uv lock", shell=True)
         # cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
-        cmd("uv build")
+        cmd("uv build", shell=True)
 
 
 def publish_module(fp):
     with working_directory(fp):
-        res = cmd("uv publish")
+        res = cmd("uv publish", shell=True)
         if res.returncode != 0:
             print(f"Failed to publish {module_version_string(fp)}")
             return
         tag = module_version_string(fp)
         msg = module_version_string(fp, long=True)
         cmd(f"git tag -a {tag} -m '{msg}'", shell=True)
+
+
+publish_skip_classifier = "Private :: Do Not Upload"
 
 
 def package_exists(pyproj: dict):
@@ -36,6 +39,16 @@ def package_exists(pyproj: dict):
     uri = f"https://pypi.python.org/pypi/{name}/{version}/json"
     response = requests.get(uri)
     pkg_exists = response.status_code == 200
+
+    classifiers = pkg.get("classifiers")
+    if classifiers is None:
+        print(f"[dim]{vstr} must have classifiers to be published.")
+        print(f"[dim]Add the [/dim]{publish_skip_classifier}[dim] to mark as private.")
+        return True
+    if publish_skip_classifier in classifiers:
+        print(f"[dim]{vstr} is marked as private and will not be published.")
+        return True
+
     if pkg_exists:
         print(f"{vstr} already exists on PyPI")
     else:
@@ -82,7 +95,7 @@ def publish_packages(path: Path = Path.cwd(), omit: list[str] = []):
 
     if len(module_dirs) > 0:
         msg = "Synced lock files for updated dependencies."
-        cmd(f"git add .")
+        cmd(f"git add .", shell=True)
         cmd(f"git commit -m '{msg}'", shell=True)
 
     for fp in module_dirs:

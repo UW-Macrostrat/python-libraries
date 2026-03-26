@@ -7,7 +7,7 @@ requires-python = ">=3.10,<4"
 
 [dependency-groups]
 dev = [
-    "black>=22.10.0,<23",
+    "black>=22.10.0,<27",
     "macrostrat.app_frame",
     "macrostrat.database",
     "macrostrat.dinosaur",
