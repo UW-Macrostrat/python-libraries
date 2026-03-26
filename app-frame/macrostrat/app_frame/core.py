@@ -39,11 +39,15 @@ class Application(ApplicationBase):
         compose_files: ComposeFilesDependency = [],
         env: EnvironmentDependency = {},
         load_dotenv: bool | Path | list[Path] = False,
+        env_prefix: Optional[str] = None,
     ):
         self.name = name
         self.command_name = command_name or name.lower()
         self.project_prefix = project_prefix or name.lower().replace(" ", "_")
-        self.envvar_prefix = self.project_prefix.upper() + "_"
+
+        _env_prefix = env_prefix or self.project_prefix.upper() + "_"
+
+        self.envvar_prefix = _env_prefix
         self.console = Console()
         self.restart_commands = restart_commands
 

@@ -7,7 +7,6 @@ from typer import Context, Option, rich_utils
 from typer.models import TyperInfo
 
 from macrostrat.utils import get_logger
-
 from .compose import add_docker_compose_commands
 from .core import Application
 from .utils import CommandBase, ControlCommandGroup, get_env_boolean  # noqa
@@ -40,13 +39,17 @@ class ControlCommand(CommandBase):
         # Make sure the help text is not dimmed after the first line
         rich_utils.STYLE_HELPTEXT = None
 
-        self.registered_callback = TyperInfo(callback=self.callback)
+        cb = lambda ctx, verbose: self.callback(ctx, verbose)
+        cb.__doc__ = ":app_name: command-line interface"
+
+        self.registered_callback = TyperInfo(callback=self._update_docstring(cb))
 
         if backend == BackendType.DockerCompose:
             add_docker_compose_commands(self)
         # We don't have Kubernetes support yet, but will work to add it.
 
     def _update_docstring(self, func):
+        print("Updating docstring for function", func.__name__)
         if func.__doc__ is not None:
             func.__doc__ = self.app.replace_names(func.__doc__)
         return func
