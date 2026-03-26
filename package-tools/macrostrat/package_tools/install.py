@@ -26,7 +26,7 @@ def install_packages(
         cfg = load_pkg_config(path / _dir)
         if k in omit:
             continue
-        print(f"Locking dependencies for [bold cyan]{cfg['name']}[/]...")
+        print(f"Locking dependencies for [bold cyan]{k}[/]...")
 
         cmd(
             lock_cmd,
@@ -37,4 +37,4 @@ def install_packages(
     if not skip_root:
         print(f"Installing project...")
         cmd(lock_cmd)
-        cmd("poetry install")
+        cmd("uv sync")
