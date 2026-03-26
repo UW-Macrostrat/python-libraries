@@ -7,7 +7,6 @@ from rich import print
 
 from macrostrat.utils import cmd, working_directory
 from macrostrat.utils.shell import git_has_changes
-
 from .dependencies import get_local_dependencies, load_pkg_config
 
 
@@ -29,7 +28,8 @@ def publish_module(fp):
         cmd(f"git tag -a {tag} -m '{msg}'", shell=True)
 
 
-def package_exists(pkg):
+def package_exists(pyproj: dict):
+    pkg = pyproj["project"]
     name = pkg["name"]
     version = pkg["version"]
     vstr = f"[cyan]{name}[/cyan] ([bold]{version}[/bold])"
@@ -48,7 +48,8 @@ def modules_to_publish(modules: list[Path], omit: list[str] = []):
 
 
 def module_version_string(fp: Path, long: bool = False):
-    pkg = load_pkg_config(fp)
+    pyproj = load_pkg_config(fp)
+    pkg = pyproj["package"]
     if long:
         return f"{pkg['name']} version {pkg['version']}"
     return f"{pkg['name']}-v{pkg['version']}"

@@ -4,7 +4,7 @@ all: install
 
 install:
 	uv sync
-	uv run mono install
+	#uv run mono install
 
 publish:
 	uv run mono publish
