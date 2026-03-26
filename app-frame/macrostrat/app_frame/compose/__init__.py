@@ -1,6 +1,7 @@
 """
 Integration with docker-compose
 """
+
 import sys
 from os import environ
 from pathlib import Path
@@ -26,16 +27,25 @@ log = get_logger(__name__)
 ComposeFilesDependency = list[Path] | Callable[[ApplicationBase], list[Path]]
 RootDirectoryDependency = dict[str, str] | Callable[[Path], Path]
 
+
 class DockerComposeManager(CoreSubsystem):
     """Subsystem for managing docker-compose configuration
 
     Right now, we integrate this using a separate path than the overall subsystem
     configuration, but we will change this with time.
     """
+
     root_dir: Path
     compose_files: list[Path]
 
-    def __init__(self, app: ApplicationBase, *, root_dir: RootDirectoryDependency = lambda x: x, compose_files: ComposeFilesDependency = None, restart_commands: dict[str, str] = dict()):
+    def __init__(
+        self,
+        app: ApplicationBase,
+        *,
+        root_dir: RootDirectoryDependency = lambda x: x,
+        compose_files: ComposeFilesDependency = None,
+        restart_commands: dict[str, str] = dict(),
+    ):
         # Root dir and compose files can be specified using dependency injection.
         if callable(root_dir):
             root_dir = root_dir(Path.cwd())
@@ -70,7 +80,10 @@ class DockerComposeManager(CoreSubsystem):
     ):
         add_docker_compose_commands(command, rich_help_panel=rich_help_panel)
 
-def add_docker_compose_commands(command: Typer, *, rich_help_panel: str = "System (Docker Compose)"):
+
+def add_docker_compose_commands(
+    command: Typer, *, rich_help_panel: str = "System (Docker Compose)"
+):
     for cmd in [up, down, restart]:
         command.command(rich_help_panel=rich_help_panel)(cmd)
     add_click_command(command, _compose, "compose", rich_help_panel=rich_help_panel)
@@ -93,8 +106,8 @@ def up(
     offline: bool = False,
 ):
     """Start the :app_name: server and follow logs."""
-    app = get_compose_manager(ctx)
-    if app is None:
+    mgr = get_compose_manager(ctx)
+    if mgr is None:
         raise ValueError("Could not find application config")
 
     # Remove DOCKER_BUILDKIT=1 from the environment if we are in offline mode
@@ -103,20 +116,20 @@ def up(
         environ["DOCKER_BUILDKIT"] = "0"
         log.info("Disabling Docker BuildKit for offline mode")
 
-    start_app(app, container=container, force_recreate=force_recreate)
-    proc = follow_logs(app, container)
+    start_app(mgr, container=container, force_recreate=force_recreate)
+    proc = follow_logs(mgr.app, container)
     try:
         for res in command_stream(refresh_rate=1):
             # Stop the logs process and wait for it to exit
             if res == Result.RESTART:
-                app.info("Restarting :app_name: server...", style="bold")
-                start_app(app, container=container, force_recreate=True)
+                mgr.app.info("Restarting :app_name: server...", style="bold")
+                start_app(mgr, container=container, force_recreate=True)
             elif res == Result.EXIT:
-                app.info("Stopping :app_name: server...", style="bold")
+                mrg.app.info("Stopping :app_name: server...", style="bold")
                 ctx.invoke(down, ctx)
                 return
             elif res == Result.CONTINUE:
-                app.info(
+                mgr.app.info(
                     "[bold]Detaching from logs[/bold] [dim](:app_name: will continue to run)[/dim]",
                     style="bold",
                 )
