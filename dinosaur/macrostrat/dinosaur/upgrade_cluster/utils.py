@@ -1,9 +1,9 @@
 import socket
+import time
 from contextlib import contextmanager
 from typing import Mapping, Optional
 
 import docker
-import time
 from docker.client import DockerClient
 from docker.models.containers import Container
 from sqlalchemy.exc import OperationalError

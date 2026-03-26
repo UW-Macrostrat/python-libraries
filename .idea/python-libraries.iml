@@ -21,15 +21,7 @@
       <excludeFolder url="file://$MODULE_DIR$/dinosaur/dist" />
       <excludeFolder url="file://$MODULE_DIR$/utils/dist" />
     </content>
-    <orderEntry type="jdk" jdkName="Poetry (python-libraries)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Poetry (python-libraries) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Poetry (python-libraries) interpreter library" level="application" />
-  </component>
-  <component name="PyNamespacePackagesService">
-    <option name="namespacePackageFolders">
-      <list>
-        <option value="$MODULE_DIR$/utils/macrostrat" />
-      </list>
-    </option>
   </component>
 </module>

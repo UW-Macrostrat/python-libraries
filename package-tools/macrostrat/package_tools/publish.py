@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from os import environ
 from pathlib import Path
 
 import requests
@@ -8,19 +7,19 @@ from rich import print
 
 from macrostrat.utils import cmd, working_directory
 from macrostrat.utils.shell import git_has_changes
-from .dependencies import get_local_dependencies, load_poetry_config
+from .dependencies import get_local_dependencies, load_pkg_config
 
 
 def prepare_module(fp: Path):
     with working_directory(fp):
-        cmd("poetry lock")
+        cmd("uv lock")
         # cmd("poetry export -f requirements.txt > requirements.txt", shell=True)
-        cmd("poetry build")
+        cmd("uv build")
 
 
 def publish_module(fp):
     with working_directory(fp):
-        res = cmd("poetry publish")
+        res = cmd("uv publish")
         if res.returncode != 0:
             print(f"Failed to publish {module_version_string(fp)}")
             return
@@ -29,7 +28,8 @@ def publish_module(fp):
         cmd(f"git tag -a {tag} -m '{msg}'", shell=True)
 
 
-def package_exists(pkg):
+def package_exists(pyproj: dict):
+    pkg = pyproj["project"]
     name = pkg["name"]
     version = pkg["version"]
     vstr = f"[cyan]{name}[/cyan] ([bold]{version}[/bold])"
@@ -44,11 +44,12 @@ def package_exists(pkg):
 
 
 def modules_to_publish(modules: list[Path], omit: list[str] = []):
-    return [f for f in modules if not package_exists(load_poetry_config(f))]
+    return [f for f in modules if not package_exists(load_pkg_config(f))]
 
 
 def module_version_string(fp: Path, long: bool = False):
-    pkg = load_poetry_config(fp)
+    pyproj = load_pkg_config(fp)
+    pkg = pyproj["package"]
     if long:
         return f"{pkg['name']} version {pkg['version']}"
     return f"{pkg['name']}-v{pkg['version']}"
@@ -58,12 +59,12 @@ def module_version_string(fp: Path, long: bool = False):
 # and set the environment variable POETRY_PYPI_TOKEN to it.
 def publish_packages(path: Path = Path.cwd(), omit: list[str] = []):
     """Publish all packages that need to be published."""
-    cfg = load_poetry_config(path)
+    cfg = load_pkg_config(path)
     local_deps = get_local_dependencies(cfg)
     # Filter omitted packages
     local_deps = {k: v for k, v in local_deps.items() if k not in omit}
 
-    environ["POETRY_VIRTUALENVS_CREATE"] = "False"
+    # environ["POETRY_VIRTUALENVS_CREATE"] = "False"
 
     module_dirs = [path / v["path"] for k, v in local_deps.items() if k not in omit]
     module_dirs = modules_to_publish(module_dirs)

@@ -4,6 +4,7 @@ from enum import Enum
 from pathlib import Path
 from re import search
 from sys import stderr
+from time import sleep
 from typing import IO, Union
 from warnings import warn
 
@@ -11,8 +12,9 @@ from click import echo, secho
 from psycopg.errors import QueryCanceled
 from psycopg.sql import SQL, Composable, Composed
 from rich.console import Console
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData
 from sqlalchemy import create_engine as base_create_engine
+from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import (
@@ -28,7 +30,6 @@ from sqlalchemy.sql.elements import ClauseElement, TextClause
 from sqlalchemy_utils import create_database as _create_database
 from sqlalchemy_utils import database_exists, drop_database
 from sqlparse import format, split
-from time import sleep
 
 from macrostrat.utils import cmd, get_logger
 
