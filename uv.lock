@@ -636,7 +636,7 @@ dev = [
 
 [[package]]
 name = "macrostrat-package-tools"
-version = "1.1.2"
+version = "2.0.0"
 source = { editable = "package-tools" }
 dependencies = [
     { name = "macrostrat-utils" },

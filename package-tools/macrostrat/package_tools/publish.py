@@ -49,7 +49,7 @@ def modules_to_publish(modules: list[Path], omit: list[str] = []):
 
 def module_version_string(fp: Path, long: bool = False):
     pyproj = load_pkg_config(fp)
-    pkg = pyproj["package"]
+    pkg = pyproj["project"]
     if long:
         return f"{pkg['name']} version {pkg['version']}"
     return f"{pkg['name']}-v{pkg['version']}"
