@@ -532,7 +532,7 @@ wheels = [
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "3.0.1"
+version = "3.0.2"
 source = { editable = "app-frame" }
 dependencies = [
     { name = "macrostrat-utils" },
