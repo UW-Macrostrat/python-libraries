@@ -14,7 +14,7 @@ concurrency:
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   test:
@@ -23,32 +23,23 @@ jobs:
     steps:
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Install Python
-        uses: actions/setup-python@v4
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version-file: "pyproject.toml"
 
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v2
-
-      - name: Setup a local virtual environment (if no poetry.toml file)
-        run: |
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
-
-      - name: Cache Python dependencies
-        uses: actions/cache@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          path: ./.venv
-          key: venv-${{ hashFiles('poetry.lock') }}
+          enable-cache: true
 
       - name: Install the project dependencies
-        run: poetry install
+        run: uv sync
 
       - name: Build the static website
-        run: poetry run mkdocs build
+        run: uv run mkdocs build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
