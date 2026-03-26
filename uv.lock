@@ -511,7 +511,7 @@ wheels = [
 
 [[package]]
 name = "macrostrat-app-frame"
-version = "2.2.4"
+version = "3.0.0"
 source = { editable = "app-frame" }
 dependencies = [
     { name = "macrostrat-utils" },
@@ -527,7 +527,7 @@ requires-dist = [
     { name = "macrostrat-utils", specifier = ">=1.3.0,<2" },
     { name = "packaging", specifier = ">=24.1,<25" },
     { name = "python-dotenv", specifier = ">=1.0.0,<2" },
-    { name = "rich", specifier = ">=13,<14" },
+    { name = "rich", specifier = ">=13,<15" },
     { name = "toposort", specifier = ">=1.5,<2" },
     { name = "typer", specifier = ">=0.12.5,<0.25" },
 ]

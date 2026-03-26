@@ -3,29 +3,87 @@ Integration with docker-compose
 """
 import sys
 from os import environ
+from pathlib import Path
 from time import sleep
+from typing import Callable, Optional
 
 import click
 import typer
 from typer import Context, Typer
 
 from macrostrat.utils import get_logger
-
-from ..core import Application
-from ..utils import add_click_command
 from .base import check_status, compose
 from .follow_logs import Result, command_stream, follow_logs
+from ..core import Application
+from ..subsystems.defs import ApplicationBase, CoreSubsystem
+from ..utils import add_click_command
 
 # Typer command-line application
 
 log = get_logger(__name__)
 
 
-def add_docker_compose_commands(command: Typer):
-    rich_help_panel = "System (Docker Compose)"
+ComposeFilesDependency = list[Path] | Callable[[ApplicationBase], list[Path]]
+RootDirectoryDependency = dict[str, str] | Callable[[Path], Path]
+
+class DockerComposeManager(CoreSubsystem):
+    """Subsystem for managing docker-compose configuration
+
+    Right now, we integrate this using a separate path than the overall subsystem
+    configuration, but we will change this with time.
+    """
+    root_dir: Path
+    compose_files: list[Path]
+
+    def __init__(self, app: ApplicationBase, *, root_dir: RootDirectoryDependency = lambda x: x, compose_files: ComposeFilesDependency = None, restart_commands: dict[str, str] = dict()):
+        # Root dir and compose files can be specified using dependency injection.
+        if callable(root_dir):
+            root_dir = root_dir(Path.cwd())
+        self.root_dir = root_dir
+
+        if callable(compose_files):
+            compose_files = compose_files(self)
+        self.compose_files = compose_files or []
+
+        # Commands to run after service restart
+        self.restart_commands = restart_commands or {}
+
+        super().__init__(app)
+
+        # TODO: find a better way to do this
+        app._compose_manager = self
+        self._setup_environment()
+
+    def _setup_environment(self):
+        # Set up environment for docker-compose
+        # We may need to move this to a context where it is only
+        # applied for docker-compose commands
+        environ["COMPOSE_PROJECT_NAME"] = self.app.project_prefix
+        compose_files = ":".join([str(f) for f in self.compose_files])
+        environ["COMPOSE_FILE"] = compose_files
+
+    def add_commands(
+        self,
+        command: Typer,
+        *,
+        rich_help_panel: str = "System (Docker Compose)",
+    ):
+        add_docker_compose_commands(command, rich_help_panel=rich_help_panel)
+
+def add_docker_compose_commands(command: Typer, *, rich_help_panel: str = "System (Docker Compose)"):
     for cmd in [up, down, restart]:
         command.command(rich_help_panel=rich_help_panel)(cmd)
     add_click_command(command, _compose, "compose", rich_help_panel=rich_help_panel)
+
+
+def get_compose_manager(ctx: Context) -> Optional[DockerComposeManager]:
+    mgr = ctx.find_object(DockerComposeManager)
+    if mgr is not None:
+        return mgr
+    app = ctx.find_object(Application)
+    if app is not None:
+        return getattr(app, "_compose_manager", None)
+    return None
 
 
 def up(
@@ -35,7 +93,7 @@ def up(
     offline: bool = False,
 ):
     """Start the :app_name: server and follow logs."""
-    app = ctx.find_object(Application)
+    app = get_compose_manager(ctx)
     if app is None:
         raise ValueError("Could not find application config")
 
@@ -69,12 +127,13 @@ def up(
 
 
 def start_app(
-    app: Application,
+    manager: DockerComposeManager,
     container: str = typer.Argument(None),
     force_recreate: bool = False,
     single_stage: bool = False,
 ):
     """Start the :app_name: server and follow logs."""
+    app = manager.app
 
     if not single_stage:
         build_args = ["build"]
@@ -103,7 +162,7 @@ def start_app(
         res = compose("start")
         fail_with_message(app, res, "Start :app_name:")
 
-    run_restart_commands(app, running_containers)
+    run_restart_commands(manager, running_containers)
 
 
 def fail_with_message(app, res, stage_name):
@@ -118,20 +177,20 @@ def fail_with_message(app, res, stage_name):
         print()
 
 
-def run_restart_commands(app, running_containers):
-    for c, command in app.restart_commands.items():
+def run_restart_commands(manager: DockerComposeManager, running_containers):
+    for c, command in manager.restart_commands.items():
         if c in running_containers:
-            app.info(f"Reloading {c}...", style="bold")
+            manager.app.info(f"Reloading {c}...", style="bold")
             compose("exec", c, command)
     print()
 
 
 def down(ctx: Context):
     """Stop all :app_name: services."""
-    app = ctx.find_object(Application)
-    if app is None:
+    manager = get_compose_manager(ctx)
+    if manager is None:
         raise ValueError("Could not find application config")
-    app.info("Stopping :app_name: server...", style="bold")
+    manager.app.info("Stopping :app_name: server...", style="bold")
     compose("down", "--remove-orphans")
 
 

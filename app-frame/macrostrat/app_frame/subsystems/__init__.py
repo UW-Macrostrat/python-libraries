@@ -1,4 +1,3 @@
-import warnings
 from typing import Optional
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
@@ -6,12 +5,9 @@ from packaging.version import Version
 from toposort import toposort_flatten
 
 from macrostrat.utils.logs import get_logger
-
-from ..core import ApplicationBase
-from .defs import Subsystem, SubsystemError
+from .defs import Subsystem, CoreSubsystem, SubsystemError, ApplicationBase
 
 log = get_logger(__name__)
-
 
 class SubsystemManager:
     """

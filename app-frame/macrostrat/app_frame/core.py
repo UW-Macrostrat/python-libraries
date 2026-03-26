@@ -7,20 +7,11 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from macrostrat.utils import get_logger, setup_stderr_logs
+from .subsystems import ApplicationBase
 
 log = get_logger(__name__)
 
-
-class ApplicationBase:
-    name: str
-    command_name: str
-    app_module: Optional[str]
-    root_dir: Path
-
-
 EnvironmentDependency = dict[str, str] | Callable[[ApplicationBase], dict[str, str]]
-ComposeFilesDependency = list[Path] | Callable[[ApplicationBase], list[Path]]
-
 
 class Application(ApplicationBase):
     console: Console
@@ -33,10 +24,7 @@ class Application(ApplicationBase):
         *,
         command_name: Optional[str] = None,
         project_prefix: Optional[str] = None,
-        restart_commands: dict[str, str] = {},
         log_modules: Optional[str | list[str]] = None,
-        root_dir: Path | Callable[[Path], Path] = Path.cwd(),
-        compose_files: ComposeFilesDependency = [],
         env: EnvironmentDependency = {},
         load_dotenv: bool | Path | list[Path] = False,
         env_prefix: Optional[str] = None,
@@ -49,7 +37,6 @@ class Application(ApplicationBase):
 
         self.envvar_prefix = _env_prefix
         self.console = Console()
-        self.restart_commands = restart_commands
 
         if isinstance(log_modules, str):
             log_modules = [log_modules]
@@ -58,14 +45,6 @@ class Application(ApplicationBase):
 
         self._dotenv_cfg = load_dotenv
 
-        # Root dir and compose files can be specified using dependency injection.
-        if callable(root_dir):
-            root_dir = root_dir(Path.cwd())
-        self.root_dir = root_dir
-
-        if callable(compose_files):
-            compose_files = compose_files(self)
-        self.compose_files = compose_files
         # Environment setup should possibly be postponed until within a command context.
         self.setup_environment(env)
 
@@ -88,13 +67,6 @@ class Application(ApplicationBase):
     def setup_environment(self, env: EnvironmentDependency):
         environ["DOCKER_SCAN_SUGGEST"] = "false"
         # environ["DOCKER_BUILDKIT"] = "1"
-
-        # Set up environment for docker-compose
-        # We may need to move this to a context where it is only
-        # applied for docker-compose commands
-        environ["COMPOSE_PROJECT_NAME"] = self.project_prefix
-        compose_files = ":".join([str(f) for f in self.compose_files])
-        environ["COMPOSE_FILE"] = compose_files
 
         # Additional user-specified environment variables
         if callable(env):

@@ -1,6 +1,5 @@
-from macrostrat.app_frame.compose.base import compose
-
-from .control_command import BackendType, CommandBase, ControlCommand
-from .core import Application
-from .exc import ApplicationError
-from .subsystems import Subsystem, SubsystemError, SubsystemManager
+from .compose import DockerComposeManager, compose  # noqa
+from .control_command import CommandBase, ControlCommand  # noqa
+from .core import Application  # noqa
+from .exc import ApplicationError  # noqa
+from .subsystems import Subsystem, SubsystemError, SubsystemManager  # noqa

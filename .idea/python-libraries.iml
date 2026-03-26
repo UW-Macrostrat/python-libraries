@@ -15,6 +15,8 @@
       <sourceFolder url="file://$MODULE_DIR$/site" isTestSource="false" generated="true" />
       <sourceFolder url="file://$MODULE_DIR$/auth-system" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/utils" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/utils/macrostrat" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/app-frame/macrostrat/app_frame" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/app-frame/dist" />
       <excludeFolder url="file://$MODULE_DIR$/database/dist" />

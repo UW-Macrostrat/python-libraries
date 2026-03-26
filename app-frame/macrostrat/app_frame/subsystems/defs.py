@@ -1,5 +1,12 @@
+from typing import Optional
+
 from ..exc import ApplicationError
 
+
+class ApplicationBase:
+    name: str
+    command_name: str
+    app_module: Optional[str]
 
 class SubsystemError(ApplicationError):
     pass
@@ -20,3 +27,7 @@ class Subsystem:
 
     def should_enable(self, mgr: "SubsystemManager"):
         return True
+
+
+class CoreSubsystem(Subsystem):
+    ...
