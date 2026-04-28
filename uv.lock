@@ -626,7 +626,7 @@ dev = [{ name = "macrostrat-utils", editable = "utils" }]
 
 [[package]]
 name = "macrostrat-dinosaur"
-version = "3.3.0"
+version = "3.3.1"
 source = { editable = "dinosaur" }
 dependencies = [
     { name = "docker" },
@@ -645,7 +645,7 @@ requires-dist = [
     { name = "macrostrat-utils", editable = "utils" },
     { name = "migra", specifier = ">=3.0.1621480950,<4" },
     { name = "schemainspect", specifier = ">=3.0.1616029793,<4" },
-    { name = "setuptools", specifier = ">=78.1.0,<79" },
+    { name = "setuptools", specifier = ">=78.1.0,<83" },
     { name = "sqlalchemy", specifier = ">=2.0.0,<3" },
 ]
 

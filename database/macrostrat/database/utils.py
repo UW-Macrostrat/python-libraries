@@ -8,6 +8,7 @@ from time import sleep
 from typing import IO, Union
 from warnings import warn
 
+import psycopg2.sql as psql2
 from click import echo, secho
 from psycopg.errors import QueryCanceled
 from psycopg.sql import SQL, Composable, Composed
@@ -31,6 +32,9 @@ from sqlalchemy_utils import create_database as _create_database
 from sqlalchemy_utils import database_exists, drop_database
 from sqlparse import format, split
 
+from macrostrat.database.compat import (
+    update_legacy_identifier,
+)
 from macrostrat.utils import cmd, get_logger
 
 log = get_logger(__name__)
@@ -140,9 +144,7 @@ def _get_queries(sql, interpret_as_file=None):
         for i in sql:
             queries.extend(_get_queries(i, interpret_as_file=interpret_as_file))
         return queries
-    if isinstance(sql, TextClause):
-        return [sql]
-    if isinstance(sql, SQL):
+    if isinstance(sql, (SQL, psql2.SQL, TextClause)):
         return [sql]
 
     if sql in [None, ""]:
@@ -159,7 +161,7 @@ def _get_queries(sql, interpret_as_file=None):
 
 
 def _is_prebind_param(param):
-    return isinstance(param, Composable)
+    return isinstance(param, (Composable, psql2.Composable))
 
 
 def _split_params(params):
@@ -170,7 +172,7 @@ def _split_params(params):
     if isinstance(params, (list, tuple)):
         for i in params:
             if _is_prebind_param(i):
-                new_bind_params.append(i)
+                new_bind_params.append(update_legacy_identifier(i))
             else:
                 new_params.append(i)
     elif isinstance(params, dict):
@@ -178,7 +180,7 @@ def _split_params(params):
         new_bind_params = {}
         for k, v in params.items():
             if _is_prebind_param(v):
-                new_bind_params[k] = v
+                new_bind_params[k] = update_legacy_identifier(v)
             else:
                 new_params[k] = v
     if len(new_bind_params) == 0:
@@ -295,6 +297,8 @@ def _run_sql(connectable, sql, params=None, **kwargs):
 
     for query, _params in zip(queries, params):
         params, pre_bind_params = _split_params(_params)
+        if isinstance(query, (psql2.SQL, psql2.Composed)):
+            query = update_legacy_identifier(query)
 
         if pre_bind_params is not None:
             if not isinstance(query, SQL):

@@ -8,6 +8,7 @@ from io import StringIO, TextIOWrapper
 from pathlib import Path
 from sys import stdout
 
+import psycopg2.sql as psql2
 from dotenv import load_dotenv
 from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
@@ -16,6 +17,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
 from macrostrat.database import Database, run_sql
+from macrostrat.database.compat import update_legacy_identifier
 from macrostrat.database.postgresql import table_exists
 from macrostrat.database.utils import (
     _print_error,
@@ -224,11 +226,37 @@ def test_sql_object(db):
     assert res[0].scalar() == "Test"
 
 
+def test_legacy_parameter_translation():
+    sql = psql2.SQL("SELECT name FROM {table} WHERE name = {name}")
+    sql2 = update_legacy_identifier(sql)
+    assert isinstance(sql2, SQL)
+    assert sql2._obj == sql._wrapped
+
+
+def test_sql_object_legacy(db):
+    sql = psql2.SQL("SELECT name FROM {table} WHERE name = {name}")
+    params = dict(table=psql2.Identifier("sample"), name=psql2.Literal("Test"))
+
+    res = list(db.run_sql(sql, raise_errors=True, params=params))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
+
+
 def test_sqlalchemy_bound_parameters(db):
     """Some of the parameters should be pre-bound."""
     sql = "SELECT {column} FROM {table} WHERE {column} = :value"
     params = dict(column=Identifier("name"), table=Identifier("sample"), value="Test")
     db.run_sql(sql, params=params, raise_errors=True)
+
+
+def test_sqlalchemy_bound_parameters_legacy(db):
+    """Pre-bound parameters using psycopg2 library, for backwards compatibility."""
+    sql = "SELECT {column} FROM {table} WHERE {column} = :value"
+    params = dict(
+        column=psql2.Identifier("name"), table=psql2.Identifier("sample"), value="Test"
+    )
+    with warns(DeprecationWarning):
+        db.run_sql(sql, params=params, raise_errors=True)
 
 
 def test_server_bound_parameters(db):
@@ -243,6 +271,15 @@ def test_server_bound_parameters(db):
 def test_server_bound_parameters_mixed(db):
     sql = "SELECT name FROM {table_name} WHERE name = %(name)s"
     res = db.run_query(sql, {"name": "Test", "table_name": Identifier("sample")})
+    assert res.scalar() == "Test"
+
+
+def test_server_bound_parameters_mixed_legacy(db):
+    sql = "SELECT name FROM {table_name} WHERE name = %(name)s"
+    with warns(DeprecationWarning):
+        res = db.run_query(
+            sql, {"name": "Test", "table_name": psql2.Identifier("sample")}
+        )
     assert res.scalar() == "Test"
 
 
