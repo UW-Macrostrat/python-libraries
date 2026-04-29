@@ -21,12 +21,12 @@ from macrostrat.database import Database, run_sql, on_conflict
 from macrostrat.database.compat import update_legacy_identifier
 from macrostrat.database.postgresql import table_exists
 from macrostrat.database.postgresql import upsert
-from macrostrat.database.utils import (
+from macrostrat.database.query import (
     _print_error,
     infer_is_sql_text,
     run_fixtures,
-    temp_database,
 )
+from macrostrat.database.utils import temp_database
 from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
