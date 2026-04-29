@@ -1,12 +1,16 @@
 # Changelog
 
-## [4.0.1] - 2026-04-28
+## [4.0.1] - 2026-04-29
 
 - Change default PostgreSQL insert mode to `restrict`, making on-conflict
   behavior explicitly opt-in.
 - Added an `upsert` function
-- Add conversion of Psycopg2 SQL types to Psycopg3 types to allow for smooter
+- Add conversion of Psycopg2 SQL types to Psycopg3 types to allow for smoother
   migration of parameter binding code.
+- Moved all `run_sql` utility functions to `macrostrat.database.query`
+- Add a `transform_statement` function to `run_sql` to allow for transformation
+  of statements before execution, which can be used to add parameters or other
+  modifications to statements in a SQL file.
 
 ## [4.0.0] - Unreleased
 
