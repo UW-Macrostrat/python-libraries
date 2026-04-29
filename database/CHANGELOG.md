@@ -1,5 +1,10 @@
 # Changelog
 
+## [4.0.1] - 2026-04-28
+
+- Change default PostgreSQL insert mode to `restrict`, making on-conflict
+  behavior explicitly opt-in.
+
 ## [4.0.0] - Unreleased
 
 - Upgrade to `psycopg` version 3 instead of Psycopg2

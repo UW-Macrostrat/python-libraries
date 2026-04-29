@@ -13,12 +13,14 @@ from dotenv import load_dotenv
 from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
 from pytest import fixture, mark, raises, warns
+from sqlalchemy import insert
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
-from macrostrat.database import Database, run_sql
+from macrostrat.database import Database, run_sql, on_conflict
 from macrostrat.database.compat import update_legacy_identifier
 from macrostrat.database.postgresql import table_exists
+from macrostrat.database.postgresql import upsert
 from macrostrat.database.utils import (
     _print_error,
     infer_is_sql_text,
@@ -307,6 +309,56 @@ def test_server_bound_parameters_invalid_3(db):
         assert isinstance(e.orig, SyntaxError)
     else:
         assert False
+
+
+@fixture(scope="session")
+def upsert_test_table(db):
+    from sqlalchemy import Column, Integer, MetaData, String, Table
+
+    metadata = MetaData()
+    test_table = Table(
+        "test_upsert",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("value", String),
+    )
+    metadata.create_all(db.engine)
+    return test_table
+
+
+def test_postgresql_upsert(db, upsert_test_table):
+
+    # Insert a row
+    stmt = upsert(upsert_test_table, {"id": 1, "value": "A"}, index_elements=["id"])
+    db.session.execute(stmt)
+    db.session.commit()
+
+    # Upsert the same row with a different value
+    stmt = upsert(upsert_test_table, {"id": 1, "value": "B"}, index_elements=["id"])
+    db.session.execute(stmt)
+    db.session.commit()
+
+    # Check that the value was updated
+    res = db.session.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "B"
+
+
+def test_postgresql_upsert_modal(db, upsert_test_table):
+    with on_conflict("do-update"):
+        stmt = insert(upsert_test_table).values(id=1, value="A")
+        db.session.execute(stmt)
+        db.session.commit()
+
+    res = db.session.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "A"
+
+    with on_conflict("do-nothing"):
+        stmt = insert(upsert_test_table).values(id=1, value="B")
+        db.session.execute(stmt)
+        db.session.commit()
+
+    res = db.session.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "A"
 
 
 @mark.skip(reason="This is based on older, psycopg2-style parameter binding.")
