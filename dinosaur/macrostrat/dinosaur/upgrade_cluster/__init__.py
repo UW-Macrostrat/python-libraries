@@ -11,10 +11,10 @@ from .describe import (
 )
 from .restore import pg_restore
 from .utils import (
-    database_cluster,
     ensure_empty_docker_volume,
     get_unused_port,
     replace_docker_volume,
+    database_cluster_legacy,
 )
 
 log = get_logger(__name__)
@@ -67,14 +67,20 @@ def upgrade_database_cluster(
     source_port = get_unused_port()
     target_port = get_unused_port()
 
-    with database_cluster(
-        client, version_images[current_version], data_volume=cluster_volume_name, port=source_port
-    ) as source, database_cluster(
-        client,
-        version_images[target_version],
-        data_volume=dest_volume.name,
-        port=target_port,
-    ) as target:
+    with (
+        database_cluster_legacy(
+            client,
+            version_images[current_version],
+            data_volume=cluster_volume_name,
+            port=source_port,
+        ) as source,
+        database_cluster_legacy(
+            client,
+            version_images[target_version],
+            data_volume=dest_volume.name,
+            port=target_port,
+        ) as target,
+    ):
         # Dump the database
         log.info("Dumping database...")
 

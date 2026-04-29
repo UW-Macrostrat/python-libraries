@@ -626,7 +626,7 @@ def create_engine(db_conn, **kwargs):
         return base_create_engine(url, **kwargs)
 
 
-def connection_args(engine):
+def connection_args(engine, with_password=False):
     """Get PostgreSQL connection arguments for an engine"""
     _psql_flags = {"-U": "username", "-h": "host", "-p": "port", "-P": "password"}
 
@@ -636,6 +636,8 @@ def connection_args(engine):
     flags = ""
     for flag, _attr in _psql_flags.items():
         val = getattr(engine.url, _attr)
+        if flag == "-P" and not with_password:
+            continue
         if val is not None:
             flags += f" {flag} {val}"
     return flags, engine.url.database
@@ -643,7 +645,7 @@ def connection_args(engine):
 
 def db_isready(engine_or_url, use_shell_command=False):
     if use_shell_command:
-        args, _ = connection_args(engine_or_url)
+        args, _ = connection_args(engine_or_url, with_password=True)
         c = cmd("pg_isready", args, capture_output=True)
         return c.returncode == 0
     # Use a more typical sqlalchemy connection approach

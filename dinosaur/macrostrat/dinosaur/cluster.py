@@ -1,0 +1,120 @@
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Optional
+
+import docker
+from docker import DockerClient
+from testcontainers.postgres import PostgresContainer
+
+from macrostrat.database import Database
+from macrostrat.utils import get_logger
+
+log = get_logger(__name__)
+
+
+@contextmanager
+def database_cluster(
+    image_tag: str,
+    *,
+    build: bool = False,
+    context: Path = None,
+    optimize_for_testing: bool = False,
+    data_volume: str = None,
+    user: str = None,
+    database: str = None,
+    driver: str = None,
+    environment: Optional[dict[str, str]] = None,
+    config: dict | Path = None,
+    in_memory: bool = True,
+    docker_client: Optional[DockerClient] = None,
+    **kwargs,
+):
+    """
+    Start a database cluster in a Docker volume
+    Context manager to create a temporary database cluster
+    """
+
+    print("Starting database cluster using image %s" % image_tag)
+
+    should_build = build and (context is not None)
+
+    # Check if image exists locally to avoid build
+    client = docker_client or docker.from_env()
+    if not should_build:
+        try:
+            client.images.get(image_tag)
+            log.info(f"Using existing image {image_tag}")
+        except docker.errors.ImageNotFound:
+            should_build = True
+
+    if should_build:
+        client.images.build(path=str(context), tag=image_tag)
+
+    # Begin run configurations
+
+    if user is not None:
+        kwargs.setdefault("username", user)
+    if database is not None:
+        kwargs.setdefault("dbname", database)
+
+    container = PostgresContainer(image_tag, **kwargs)
+
+    _config = {}
+
+    _environment = {}
+    if environment is not None:
+        _environment.update(environment)
+    _environment.setdefault("POSTGRES_HOST_AUTH_METHOD", "trust")
+    container.with_envs(**_environment)
+
+    if isinstance(config, Path):
+        assert config.is_file()
+        key = str(config.resolve())
+        internal_config_file_path = "/etc/postgresql-config.conf"
+        container.with_volume_mapping(key, internal_config_file_path, mode="ro")
+        config["config_file"] = internal_config_file_path
+    elif config is not None:
+        _config.update(config)
+
+    if data_volume is not None:
+        # We can't optimize for testing if we're using a data volume
+        in_memory = False
+        optimize_for_testing = False
+        container.with_volume_mapping(
+            data_volume, "/var/lib/postgresql/data", mode="rw"
+        )
+
+    if optimize_for_testing:
+        _config = {
+            **_config,
+            "synchronous_commit": "off",
+            "fsync": "off",
+            "wal_level": "minimal",
+            "max_wal_senders": "0",
+            "full_page_writes": "off",
+            "checkpoint_completion_target": "0.9",
+        }
+        in_memory = True
+
+    if in_memory:
+        container.with_kwargs(
+            tmpfs={
+                "/var/lib/postgresql/data": "uid=999,gid=999,mode=0700",
+            }
+        )
+
+    container.with_command(build_postgres_command(_config))
+    container.start()
+    try:
+        _url = container.get_connection_url(driver=driver)
+        yield Database(_url)
+    finally:
+        log.info(f"Stopping container {image_tag}...")
+        container.stop()
+
+
+def build_postgres_command(pg_config):
+    cmd = "postgres"
+    for k, v in pg_config.items():
+        cmd += f" -c {k}={v}"
+    return cmd

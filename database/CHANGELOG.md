@@ -4,6 +4,9 @@
 
 - Change default PostgreSQL insert mode to `restrict`, making on-conflict
   behavior explicitly opt-in.
+- Added an `upsert` function
+- Add conversion of Psycopg2 SQL types to Psycopg3 types to allow for smooter
+  migration of parameter binding code.
 
 ## [4.0.0] - Unreleased
 
