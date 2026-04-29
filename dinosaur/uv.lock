@@ -236,7 +236,7 @@ wheels = [
 
 [[package]]
 name = "macrostrat-database"
-version = "4.0.0"
+version = "4.0.1"
 source = { editable = "../database" }
 dependencies = [
     { name = "aiofiles" },
@@ -270,7 +270,7 @@ dev = [{ name = "macrostrat-utils", editable = "../utils" }]
 
 [[package]]
 name = "macrostrat-dinosaur"
-version = "3.3.1"
+version = "4.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "docker" },
@@ -309,7 +309,7 @@ dev = [
 
 [[package]]
 name = "macrostrat-utils"
-version = "1.3.2"
+version = "1.3.3"
 source = { editable = "../utils" }
 dependencies = [
     { name = "colorlog" },
