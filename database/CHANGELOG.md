@@ -1,5 +1,10 @@
 # Changelog
 
+## [4.0.2] - 2026-05-03
+
+- Change the `upsert` function to infer primary key columns from the table
+  metadata, and to not error if there is a empty update clause.
+
 ## [4.0.1] - 2026-04-29
 
 - Change default PostgreSQL insert mode to `restrict`, making on-conflict
