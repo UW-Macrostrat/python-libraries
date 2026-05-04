@@ -8,13 +8,11 @@ from migra import Migration
 from migra.statements import check_for_drop
 from rich import print
 from schemainspect import get_inspector
-from sqlalchemy import text
-from sqlalchemy.exc import DataError, IntegrityError, ProgrammingError
 
 from macrostrat.database import Database
 from macrostrat.database.utils import connection_args, run_sql, temp_database
 from macrostrat.utils import cmd, get_logger
-
+from .cluster import database_cluster
 from .upgrade_cluster.utils import wait_for_cluster, wait_for_ready
 
 log = get_logger(__name__)
@@ -119,9 +117,10 @@ def create_migration(
     redirect=sys.stderr,
     **kwargs,
 ):
-    with _target_db(
-        target_url, initializer, redirect=redirect
-    ) as target, redirect_stdout(redirect):
+    with (
+        _target_db(target_url, initializer, redirect=redirect) as target,
+        redirect_stdout(redirect),
+    ):
         return _create_migration(database.engine, target, safe=safe, **kwargs)
 
 
@@ -154,13 +153,16 @@ def dump_schema(engine, image_name=None) -> str:
     flags, dbname = connection_args(engine)
     flags_array = [f for f in flags.split(" ") if len(f) > 0]
     args = ("pg_dump", "--schema-only", *flags_array, dbname)
+    env_vars = dict(PGPASSWORD=engine.url.password)
     if image_name is None:
         # Run pg_dump locally
-        res = cmd(*args, capture_output=True)
+        res = cmd(*args, capture_output=True, env=env_vars)
         return res.stdout.decode("utf-8")
     else:
         client = docker.from_env()
-        res = client.containers.run(image_name, args, network_mode="host", remove=True)
+        res = client.containers.run(
+            image_name, args, network_mode="host", remove=True, environment=env_vars
+        )
         return res.decode("utf-8")
 
 

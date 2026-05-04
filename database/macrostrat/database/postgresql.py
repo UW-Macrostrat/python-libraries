@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import Any, Sequence, TYPE_CHECKING
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import CompileError
@@ -13,7 +14,14 @@ from sqlalchemy.sql.expression import text
 if TYPE_CHECKING:
     from ..database import Database
 
-_insert_mode = ContextVar("insert-mode", default="do-nothing")
+
+class OnConflictAction(str, Enum):
+    DO_NOTHING = "do-nothing"
+    DO_UPDATE = "do-update"
+    RESTRICT = "restrict"
+
+
+_insert_mode = ContextVar("insert-mode", default="restrict")
 
 
 # https://stackoverflow.com/questions/33307250/postgresql-on-conflict-in-sqlalchemy/62305344#62305344
@@ -59,6 +67,32 @@ def prefix_inserts(insert, compiler, **kw):
             index_elements=insert.table.primary_key
         )
     return compiler.visit_insert(insert, **kw)
+
+
+def upsert(
+    table,
+    values: dict[str, Any],
+    index_elements: Sequence[str],
+    *,
+    on_conflict: OnConflictAction = "do-update",
+):
+    stmt = postgresql.insert(table).values(values)
+    if on_conflict == "restrict":
+        return stmt
+
+    if on_conflict == "do-nothing":
+        return stmt.on_conflict_do_nothing(index_elements=list(index_elements))
+
+    update_values = {
+        column.name: getattr(stmt.excluded, column.name)
+        for column in table.columns
+        if column.name in values and column.name not in index_elements
+    }
+
+    return stmt.on_conflict_do_update(
+        index_elements=list(index_elements),
+        set_=update_values,
+    )
 
 
 def table_exists(db: Database, table_name: str, schema: str = "public") -> bool:

@@ -8,21 +8,25 @@ from io import StringIO, TextIOWrapper
 from pathlib import Path
 from sys import stdout
 
+import psycopg2.sql as psql2
 from dotenv import load_dotenv
 from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
 from pytest import fixture, mark, raises, warns
+from sqlalchemy import insert
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.sql import text
 
-from macrostrat.database import Database, run_sql
+from macrostrat.database import Database, run_sql, on_conflict
+from macrostrat.database.compat import update_legacy_identifier
 from macrostrat.database.postgresql import table_exists
-from macrostrat.database.utils import (
+from macrostrat.database.postgresql import upsert
+from macrostrat.database.query import (
     _print_error,
     infer_is_sql_text,
     run_fixtures,
-    temp_database,
 )
+from macrostrat.database.utils import temp_database
 from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
@@ -224,11 +228,37 @@ def test_sql_object(db):
     assert res[0].scalar() == "Test"
 
 
+def test_legacy_parameter_translation():
+    sql = psql2.SQL("SELECT name FROM {table} WHERE name = {name}")
+    sql2 = update_legacy_identifier(sql)
+    assert isinstance(sql2, SQL)
+    assert sql2._obj == sql._wrapped
+
+
+def test_sql_object_legacy(db):
+    sql = psql2.SQL("SELECT name FROM {table} WHERE name = {name}")
+    params = dict(table=psql2.Identifier("sample"), name=psql2.Literal("Test"))
+
+    res = list(db.run_sql(sql, raise_errors=True, params=params))
+    assert len(res) == 1
+    assert res[0].scalar() == "Test"
+
+
 def test_sqlalchemy_bound_parameters(db):
     """Some of the parameters should be pre-bound."""
     sql = "SELECT {column} FROM {table} WHERE {column} = :value"
     params = dict(column=Identifier("name"), table=Identifier("sample"), value="Test")
     db.run_sql(sql, params=params, raise_errors=True)
+
+
+def test_sqlalchemy_bound_parameters_legacy(db):
+    """Pre-bound parameters using psycopg2 library, for backwards compatibility."""
+    sql = "SELECT {column} FROM {table} WHERE {column} = :value"
+    params = dict(
+        column=psql2.Identifier("name"), table=psql2.Identifier("sample"), value="Test"
+    )
+    with warns(DeprecationWarning):
+        db.run_sql(sql, params=params, raise_errors=True)
 
 
 def test_server_bound_parameters(db):
@@ -243,6 +273,15 @@ def test_server_bound_parameters(db):
 def test_server_bound_parameters_mixed(db):
     sql = "SELECT name FROM {table_name} WHERE name = %(name)s"
     res = db.run_query(sql, {"name": "Test", "table_name": Identifier("sample")})
+    assert res.scalar() == "Test"
+
+
+def test_server_bound_parameters_mixed_legacy(db):
+    sql = "SELECT name FROM {table_name} WHERE name = %(name)s"
+    with warns(DeprecationWarning):
+        res = db.run_query(
+            sql, {"name": "Test", "table_name": psql2.Identifier("sample")}
+        )
     assert res.scalar() == "Test"
 
 
@@ -270,6 +309,56 @@ def test_server_bound_parameters_invalid_3(db):
         assert isinstance(e.orig, SyntaxError)
     else:
         assert False
+
+
+@fixture(scope="session")
+def upsert_test_table(db):
+    from sqlalchemy import Column, Integer, MetaData, String, Table
+
+    metadata = MetaData()
+    test_table = Table(
+        "test_upsert",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("value", String),
+    )
+    metadata.create_all(db.engine)
+    return test_table
+
+
+def test_postgresql_upsert(db, upsert_test_table):
+
+    # Insert a row
+    stmt = upsert(upsert_test_table, {"id": 1, "value": "A"}, index_elements=["id"])
+    db.session.execute(stmt)
+    db.session.commit()
+
+    # Upsert the same row with a different value
+    stmt = upsert(upsert_test_table, {"id": 1, "value": "B"}, index_elements=["id"])
+    db.session.execute(stmt)
+    db.session.commit()
+
+    # Check that the value was updated
+    res = db.session.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "B"
+
+
+def test_postgresql_upsert_modal(db, upsert_test_table):
+    with on_conflict("do-update"):
+        stmt = insert(upsert_test_table).values(id=1, value="A")
+        db.session.execute(stmt)
+        db.session.commit()
+
+    res = db.session.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "A"
+
+    with on_conflict("do-nothing"):
+        stmt = insert(upsert_test_table).values(id=1, value="B")
+        db.session.execute(stmt)
+        db.session.commit()
+
+    res = db.session.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "A"
 
 
 @mark.skip(reason="This is based on older, psycopg2-style parameter binding.")

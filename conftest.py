@@ -6,7 +6,7 @@ from pytest import fixture
 from sqlalchemy.exc import OperationalError
 
 from macrostrat.database.utils import create_engine
-from macrostrat.dinosaur.upgrade_cluster.utils import database_cluster, get_unused_port
+from macrostrat.dinosaur.cluster import database_cluster
 
 load_dotenv()
 
@@ -44,12 +44,9 @@ def database_url(docker_client):
     if testing_db is not None:
         yield testing_db
     elif docker_client is not None:
-        port = get_unused_port()
+        with database_cluster(image, in_memory=True, docker_client=docker_client) as db:
+            yield db.engine.url
 
-        with database_cluster(docker_client, image, port=port, in_memory=True) as container:
-            # Connect to cluster
-            url = f"postgresql://postgres@localhost:{port}/postgres"
-            yield url
     else:
         raise ValueError(
             "Please set TESTING_DATABASE to a PostgreSQL connection string in .env file or environment or ensure Docker is running."

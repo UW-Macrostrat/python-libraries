@@ -16,7 +16,7 @@ log = get_logger(__name__)
 
 
 @contextmanager
-def database_cluster(
+def database_cluster_legacy(
     client: DockerClient,
     image: str,
     *,
@@ -56,7 +56,7 @@ def database_cluster(
     elif config is None:
         config = {}
 
-    tmpfs=None
+    tmpfs = None
     if in_memory:
         tmpfs = {
             "/var/lib/postgresql/data": "uid=999,gid=999,mode=0700",

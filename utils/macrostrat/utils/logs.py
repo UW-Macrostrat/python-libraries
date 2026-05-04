@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 from sys import stderr
 
 from colorlog import ColoredFormatter, StreamHandler
@@ -50,3 +51,19 @@ def setup_stderr_logs(*args, level=logging.DEBUG):
         if logger.hasHandlers():
             logger.handlers.clear()
         logger.addHandler(handler)
+
+
+@contextmanager
+def suppress_loggers(*loggers, level=logging.ERROR):
+    """Temporarily suppresses logs for a specific logger or the root logger."""
+    orig_level_map = {}
+    for logger_name in loggers:
+        logger = logging.getLogger(logger_name)
+        orig_level_map[logger_name] = logger.getEffectiveLevel()
+        logger.setLevel(level)
+    try:
+        yield
+    finally:
+        for logger_name, original_level in orig_level_map.items():
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(original_level)
