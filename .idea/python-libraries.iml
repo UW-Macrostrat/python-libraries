@@ -23,6 +23,7 @@
       <excludeFolder url="file://$MODULE_DIR$/dinosaur/dist" />
       <excludeFolder url="file://$MODULE_DIR$/utils/dist" />
       <excludeFolder url="file://$MODULE_DIR$/package-tools/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/dinosaur/.venv" />
     </content>
     <orderEntry type="jdk" jdkName="uv (python-libraries)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
