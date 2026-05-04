@@ -72,25 +72,33 @@ def prefix_inserts(insert, compiler, **kw):
 def upsert(
     table,
     values: dict[str, Any],
-    index_elements: Sequence[str],
     *,
-    on_conflict: OnConflictAction = "do-update",
+    index_elements: Sequence[str] | None = None,
+    on_conflict: OnConflictAction = OnConflictAction.DO_UPDATE,
 ):
+    _index = index_elements
     stmt = postgresql.insert(table).values(values)
     if on_conflict == "restrict":
         return stmt
 
     if on_conflict == "do-nothing":
-        return stmt.on_conflict_do_nothing(index_elements=list(index_elements))
+        return stmt.on_conflict_do_nothing(index_elements=_index)
+
+    if _index is None:
+        _index = table.primary_key.columns.keys()
+    _index = list(_index)
 
     update_values = {
         column.name: getattr(stmt.excluded, column.name)
         for column in table.columns
-        if column.name in values and column.name not in index_elements
+        if column.name not in _index
     }
 
+    if len(update_values) == 0:
+        return stmt
+
     return stmt.on_conflict_do_update(
-        index_elements=list(index_elements),
+        index_elements=_index,
         set_=update_values,
     )
 

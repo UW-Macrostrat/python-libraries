@@ -19,7 +19,7 @@ from sqlalchemy.sql import text
 
 from macrostrat.database import Database, run_sql, on_conflict
 from macrostrat.database.compat import update_legacy_identifier
-from macrostrat.database.postgresql import table_exists
+from macrostrat.database.postgresql import table_exists, OnConflictAction
 from macrostrat.database.postgresql import upsert
 from macrostrat.database.query import (
     _print_error,
@@ -343,21 +343,41 @@ def test_postgresql_upsert(db, upsert_test_table):
     assert res.value == "B"
 
 
-def test_postgresql_upsert_modal(db, upsert_test_table):
+def test_postgresql_upsert_infer_primary_key(conn, upsert_test_table):
+    # Insert a row
+    stmt = upsert(upsert_test_table, {"id": 3, "value": "A"})
+    conn.execute(stmt)
+
+    # Update a row
+    stmt = upsert(upsert_test_table, {"id": 3, "value": "B"})
+    conn.execute(stmt)
+
+    stmt = upsert(
+        upsert_test_table,
+        {"id": 3, "value": "C"},
+        on_conflict=OnConflictAction.DO_NOTHING,
+    )
+    conn.execute(stmt)
+
+    res = conn.execute(upsert_test_table.select()).fetchone()
+    assert res.value == "B"
+
+
+def test_postgresql_upsert_modal(conn, upsert_test_table):
     with on_conflict("do-update"):
         stmt = insert(upsert_test_table).values(id=1, value="A")
-        db.session.execute(stmt)
-        db.session.commit()
+        conn.execute(stmt)
+        conn.commit()
 
-    res = db.session.execute(upsert_test_table.select()).fetchone()
+    res = conn.execute(upsert_test_table.select()).fetchone()
     assert res.value == "A"
 
     with on_conflict("do-nothing"):
         stmt = insert(upsert_test_table).values(id=1, value="B")
-        db.session.execute(stmt)
-        db.session.commit()
+        conn.execute(stmt)
+        conn.commit()
 
-    res = db.session.execute(upsert_test_table.select()).fetchone()
+    res = conn.execute(upsert_test_table.select()).fetchone()
     assert res.value == "A"
 
 
