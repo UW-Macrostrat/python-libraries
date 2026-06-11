@@ -407,6 +407,19 @@ def test_server_parameters_function_def(db):
     db.run_sql(sql, raise_errors=True, has_server_binds=False)
 
 
+def test_function_def_with_literal_parameter(db):
+    sql = """
+    CREATE OR REPLACE FUNCTION get_text()
+    RETURNS text AS $$
+    SELECT :text;
+    $$ LANGUAGE SQL IMMUTABLE;
+    """
+    text = "Birds are government surveillance machines"
+    db.run_sql(sql, dict(text=text), raise_errors=True, has_server_binds=False)
+    res = db.run_query("SELECT get_text()").scalar()
+    assert res == text
+
+
 def test_long_running_sql(db):
     sql = "SELECT pg_sleep(0.5)"
     res = list(db.run_sql(sql, raise_errors=True))
