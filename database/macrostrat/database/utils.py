@@ -84,8 +84,64 @@ def temporary_database(
         yield engine
         engine.dispose()
     finally:
-        if drop:
-            drop_database(conn_string)
+        drop_database(engine, force=force_drop)
+
+
+def drop_database(engine_or_url, force=None, allow_missing=False):
+    """Drop a database.
+
+    Parameters
+    ----------
+    engine : Database, Engine or str
+        A SQLAlchemy engine or database URL.
+    force: bool
+        If true, use the `force` parameter
+    """
+    from . import Database
+
+    db = engine_or_url
+    if (
+        isinstance(engine_or_url, str)
+        or isinstance(engine_or_url, URL)
+        or isinstance(engine_or_url, Engine)
+    ):
+        db = Database(engine_or_url)
+    url = db.engine.url
+    # Check that the database exists
+    if not database_exists(url):
+        if not allow_missing:
+            raise ValueError(f"Database {url} does not exist")
+        else:
+            return
+
+    if "postgres" in url.drivername and force is not False:
+        # Check if we can force-drop and do so if we can
+        database_name = url.database
+        user_url = url._replace(database=None)
+        user_db = Database(user_url, isolation_level="AUTOCOMMIT")
+
+        version = user_db.run_query("SHOW server_version").scalar()
+        major_version = int(version.split(".")[0])
+        can_use_modern_force = major_version >= 13
+        user_db.session.close()
+
+        sql = f"DROP DATABASE {database_name}"
+
+        with user_db.engine.connect() as conn:
+            if can_use_modern_force:
+                sql += " WITH (FORCE)"
+            else:
+                run_sql(
+                    conn,
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :database",
+                    dict(database=database_name),
+                )
+            conn.execute(text("COMMIT"))
+            conn.execute(text(sql))
+        return
+    else:
+        # Drop the database without force
+        _drop_database(url)
 
 
 @contextmanager
