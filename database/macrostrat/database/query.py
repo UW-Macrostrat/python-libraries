@@ -10,6 +10,10 @@ from warnings import warn
 
 import psycopg2.sql as psql2
 from click import secho
+from macrostrat.database.compat import (
+    update_legacy_identifier,
+)
+from macrostrat.utils import get_logger
 from psycopg.errors import QueryCanceled
 from psycopg.sql import SQL, Composable, Composed
 from rich.console import Console
@@ -24,11 +28,6 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.sql.elements import TextClause
 from sqlparse import format, split
-
-from macrostrat.database.compat import (
-    update_legacy_identifier,
-)
-from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
 
@@ -376,7 +375,7 @@ def escape_postgresql_cast_parameters(sql_text):
     for res in re.findall(regex, sql_text):
         param, cast_type = res
         sql_text = sql_text.replace(
-            f":{param}::{cast_type}", f":{param}\:\:{cast_type}"
+            f":{param}::{cast_type}", ":" + param + r"\:\:" + cast_type
         )
     return sql_text
 

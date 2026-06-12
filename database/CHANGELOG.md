@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.1.1] - 2026-06-12
+
+- Fix a bug in with escape sequences.
+
 ## [4.1.0] - 2026-06-11
 
 - Add new tests of client cursor for binding parameters in a Psycopg2-compatible
