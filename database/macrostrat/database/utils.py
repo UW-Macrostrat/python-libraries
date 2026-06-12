@@ -101,7 +101,9 @@ def temp_database(conn_string, drop=True, ensure_empty=False):
     """Create a temporary database and tear it down after tests."""
     create_database(conn_string, exists_ok=True, replace=ensure_empty)
     try:
-        yield create_engine(conn_string)
+        engine = create_engine(conn_string)
+        yield engine
+        engine.dispose()
     finally:
         if drop:
             drop_database(conn_string)

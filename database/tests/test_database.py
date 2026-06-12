@@ -240,7 +240,8 @@ def test_sql_object_legacy(db):
     sql = psql2.SQL("SELECT name FROM {table} WHERE name = {name}")
     params = dict(table=psql2.Identifier("sample"), name=psql2.Literal("Test"))
 
-    res = list(db.run_sql(sql, raise_errors=True, params=params))
+    with warns(DeprecationWarning):
+        res = list(db.run_sql(sql, raise_errors=True, params=params))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
 

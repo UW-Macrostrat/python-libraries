@@ -103,7 +103,7 @@ def _target_db(
 
     log.debug("Creating migration target")
     with temp_database(url) as engine:
-        database = Database(url)
+        database = Database(engine)
         with redirect_stdout(redirect):
             initializer(database)
         yield engine
