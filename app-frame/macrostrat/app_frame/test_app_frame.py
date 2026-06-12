@@ -12,14 +12,22 @@ def test_app_frame_setup():
 
 def test_app_frame_cli_invocation():
     main = _setup_app()
-    result = runner.invoke(main)
-    assert result.exit_code == 0
+    result = runner.invoke(main, ["print-name"])
     assert "Test App" in result.output
+    assert result.exit_code == 0
 
 
 def _setup_app():
     app = Application(
         "Test App",
+        command_name="test-app",
         log_modules=["test_app"],
     )
-    return app.control_command()
+
+    cmd = app.control_command()
+
+    @cmd.command(name="print-name", help="Print the name of the app")
+    def main():
+        print("Test App")
+
+    return cmd

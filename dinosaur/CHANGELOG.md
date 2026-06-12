@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.1.0] - 2026-06-11
+
+- Switch to `results` and deprecate `migra` and `schemainspect`
+
 ## [4.0.0] - 2026-04-29
 
 - Upgrade to `macrostrat.database` v4.0.0

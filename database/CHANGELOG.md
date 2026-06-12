@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.1.0] - 2026-06-11
+
+- Add new tests of client cursor for binding parameters in a Psycopg2-compatible
+  way
+- Add new parameter escaping of `:variable::text`-style SQLAlchemy+Postgres type
+  casts, for more flexibility in query construction
+- Updated dependency versions
+
 ## [4.0.2] - 2026-05-03
 
 - Change the `upsert` function to infer primary key columns from the table

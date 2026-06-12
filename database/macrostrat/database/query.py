@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -319,7 +320,7 @@ def _run_sql(connectable, sql, params=None, *, print_skipped=True, **kwargs):
         params = [params] * len(queries)
 
     for index, (query, _params) in enumerate(zip(queries, params)):
-        _query, sql_text = _render_query_text(connectable, query, _params)
+        _query, sql_text, rest_params = _render_query_text(connectable, query, _params)
         if sql_text == "":
             continue
 
@@ -349,6 +350,11 @@ def _render_query_text(connectable, query, params):
     if isinstance(query, (psql2.SQL, psql2.Composed)):
         query = update_legacy_identifier(query)
 
+    if isinstance(query, str):
+        # Escape postgresql cast parameters after SQLAlchemy binds
+        # (e.g., :param::text)
+        query = escape_postgresql_cast_parameters(query)
+
     if pre_bind_params is not None:
         if not isinstance(query, SQL):
             query = SQL(query)
@@ -360,9 +366,19 @@ def _render_query_text(connectable, query, params):
 
     sql_text = str(query)
     if isinstance(query, str):
-        sql_text = format(query, strip_comments=True).strip()
+        sql_text = format(sql_text, strip_comments=True).strip()
 
-    return query, sql_text
+    return query, sql_text, params
+
+
+def escape_postgresql_cast_parameters(sql_text):
+    regex = r":([\w]+)::([a-zA-Z]+)"
+    for res in re.findall(regex, sql_text):
+        param, cast_type = res
+        sql_text = sql_text.replace(
+            f":{param}::{cast_type}", f":{param}\:\:{cast_type}"
+        )
+    return sql_text
 
 
 def _execute_one(
@@ -377,7 +393,7 @@ def _execute_one(
 ):
     params = result.params
 
-    query, sql_text = _render_query_text(connectable, result.query, params)
+    query, sql_text, _params = _render_query_text(connectable, result.query, params)
     if has_server_binds is None:
         has_server_binds = infer_has_server_binds(sql_text)
 
@@ -402,11 +418,11 @@ def _execute_one(
         log.debug("Executing SQL: \n %s", query)
         if has_server_binds:
             conn = _get_connection(connectable)
-            res = conn.exec_driver_sql(query, params)
+            res = conn.exec_driver_sql(query, _params)
         else:
             if not isinstance(query, TextClause):
                 query = text(query)
-            res = connectable.execute(query, params)
+            res = connectable.execute(query, _params)
 
         yield res
 

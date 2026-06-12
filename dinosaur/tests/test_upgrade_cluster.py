@@ -111,12 +111,12 @@ def test_schema_clone(postgres_11_db):
         url_clone,
         image_name=version_images[old_postgres_major_version],
     ) as clone:
-        conn = clone.connect()
-        assert conn.execute(text("SELECT 1")).fetchone()[0] == 1
-        insp = inspect(clone)
-        # TODO: this doesn't work with schema=None
-        assert insp.has_table("sample", schema="public")
-        assert insp.has_table("spatial_ref_sys", schema="public")
+        with clone.connect() as conn:
+            assert conn.execute(text("SELECT 1")).fetchone()[0] == 1
+            insp = inspect(clone)
+            # TODO: this doesn't work with schema=None
+            assert insp.has_table("sample", schema="public")
+            assert insp.has_table("spatial_ref_sys", schema="public")
 
 
 def test_upgrade_cluster(postgres_11_cluster_volume):

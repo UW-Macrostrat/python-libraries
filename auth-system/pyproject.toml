@@ -1,6 +1,6 @@
 [project]
 name = "macrostrat.auth_system"
-version = "1.0.3"
+version = "1.1.0"
 description = "Authentication system for Macrostrat and related apps"
 authors = [{ name = "Daven Quinn", email = "code@davenquinn.com" }]
 requires-python = ">=3.10,<4"
@@ -18,17 +18,17 @@ dependencies = [
     "macrostrat.utils>=1.2.0,<2",
     "PyJWT>=1.7.1,<3.0",
     "werkzeug>=2.3.7,<4.0",
-    "starlette>=0.27.0,<0.28",
     "webargs-starlette>=2.0.0,<3",
-    "fastapi>=0.104.0,<0.105",
+    "fastapi>=0.104.0,<0.137.0",
+    "starlette>=1.0.0,<2",
     "python-jose[cryptography]>=3.3.0,<4",
-    "bcrypt>=4.1.1,<5",
-    "httpx>=0.25.0,<0.26",
+    "bcrypt>=4.1.1,<6",
+    "httpx2>=2.4.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.2,<9",
+    "pytest>=8.3.2,<10",
     "pytest-asyncio>=0.21.1,<0.22",
 ]
 

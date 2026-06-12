@@ -10,6 +10,7 @@ from sys import stdout
 
 import psycopg2.sql as psql2
 from dotenv import load_dotenv
+from psycopg import ClientCursor
 from psycopg.errors import SyntaxError
 from psycopg.sql import SQL, Identifier, Literal, Placeholder
 from pytest import fixture, mark, raises, warns
@@ -239,7 +240,8 @@ def test_sql_object_legacy(db):
     sql = psql2.SQL("SELECT name FROM {table} WHERE name = {name}")
     params = dict(table=psql2.Identifier("sample"), name=psql2.Literal("Test"))
 
-    res = list(db.run_sql(sql, raise_errors=True, params=params))
+    with warns(DeprecationWarning):
+        res = list(db.run_sql(sql, raise_errors=True, params=params))
     assert len(res) == 1
     assert res[0].scalar() == "Test"
 
@@ -407,6 +409,19 @@ def test_server_parameters_function_def(db):
     db.run_sql(sql, raise_errors=True, has_server_binds=False)
 
 
+def test_function_def_with_literal_parameter(db):
+    sql = """
+    CREATE OR REPLACE FUNCTION get_text()
+    RETURNS text AS $$
+    SELECT {text}::text; -- use a pre-bound parameter
+    $$ LANGUAGE SQL IMMUTABLE;
+    """
+    _text = "Birds are government surveillance machines"
+    db.run_sql(sql, dict(text=Literal(_text)), raise_errors=True)
+    res = db.run_query("SELECT get_text()").scalar()
+    assert res == _text
+
+
 def test_long_running_sql(db):
     sql = "SELECT pg_sleep(0.5)"
     res = list(db.run_sql(sql, raise_errors=True))
@@ -560,3 +575,55 @@ def test_no_printing_fixtures(db, capsys):
     with StringIO() as _stdout:
         run_fixtures(db.session, fd, output_mode="none", output_file=_stdout)
         _check_text(_stdout, "")
+
+
+# PsycoPG2 compatibility
+
+
+def _apply_client_cursor(db):
+    return Database(db.engine.url, connect_args=dict(cursor_factory=ClientCursor))
+
+
+def test_bound_params_with_casting(db):
+    sql = "SELECT :text::text"
+    res = db.run_query(
+        sql, dict(text="Birds are government surveillance machines")
+    ).scalar()
+
+
+def test_bound_params_with_casting_escaped(db):
+    sql = "SELECT :text\:\:text"
+    res = db.run_query(
+        sql, dict(text="Birds are government surveillance machines")
+    ).scalar()
+
+
+def test_function_def_with_literal_parameter_sqlalchemy_bind(db):
+    """Test that we can recover former PsycoPG2 behavior, such as binding
+    parameters within a function definition, using the client cursor factory.
+
+    We may make this a bit easier in the future if it proves helpful."""
+    sql = """
+          CREATE OR REPLACE FUNCTION get_text()
+              RETURNS text AS $$
+          SELECT :text\:\:text; -- use a sqlalchemy bind parameter
+          $$ LANGUAGE SQL IMMUTABLE;
+          """
+    _text = "Birds are government surveillance machines"
+    db = _apply_client_cursor(db)
+    db.run_sql(text(sql).bindparams(text=_text), raise_errors=True)
+    res = db.run_query("SELECT get_text()").scalar()
+    assert res == _text
+
+
+def test_binding_within_view_definition(db):
+    """Test that we can recover former PsycoPG2 behavior, such as binding
+    parameters within a view definition, using the client cursor factory."""
+    db = _apply_client_cursor(db)
+
+    sql = "CREATE VIEW test_view AS SELECT :text\:\:text"
+    _text = "Birds are government surveillance machines"
+    db.run_sql(sql, dict(text=_text), raise_errors=True)
+    # Run the view
+    res = db.run_query("SELECT * FROM test_view").scalar()
+    assert res == _text
