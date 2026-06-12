@@ -149,7 +149,7 @@ def create_engine(db_conn, **kwargs):
         if isinstance(url, str):
             url = make_url(url)
         # Set the driver to psycopg if not already set
-        if url.drivername != "postgresql+psycopg":
+        if "postgres" in url.drivername:
             url = url.set(drivername="postgresql+psycopg")
 
         return base_create_engine(url, **kwargs)
