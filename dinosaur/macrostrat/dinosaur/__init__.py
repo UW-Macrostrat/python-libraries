@@ -4,10 +4,10 @@ from contextlib import contextmanager, redirect_stdout
 from typing import Callable
 
 import docker
-from migra import Migration
-from migra.statements import check_for_drop
+from results.dbdiff import Migration
+from results.dbdiff.statements import check_for_drop
+from results.schemainspect import get_inspector
 from rich import print
-from schemainspect import get_inspector
 
 from macrostrat.database import Database
 from macrostrat.database.utils import connection_args, run_sql, temp_database
