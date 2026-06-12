@@ -10,14 +10,6 @@ from sys import stdout
 
 import psycopg2.sql as psql2
 from dotenv import load_dotenv
-from psycopg import ClientCursor
-from psycopg.errors import SyntaxError
-from psycopg.sql import SQL, Identifier, Literal, Placeholder
-from pytest import fixture, mark, raises, warns
-from sqlalchemy import insert
-from sqlalchemy.exc import ProgrammingError
-from sqlalchemy.sql import text
-
 from macrostrat.database import Database, run_sql, on_conflict
 from macrostrat.database.compat import update_legacy_identifier
 from macrostrat.database.postgresql import table_exists, OnConflictAction
@@ -29,6 +21,13 @@ from macrostrat.database.query import (
 )
 from macrostrat.database.utils import temp_database
 from macrostrat.utils import get_logger, relative_path
+from psycopg import ClientCursor
+from psycopg.errors import SyntaxError
+from psycopg.sql import SQL, Identifier, Literal, Placeholder
+from pytest import fixture, mark, raises, warns
+from sqlalchemy import insert
+from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.sql import text
 
 load_dotenv()
 
@@ -37,7 +36,9 @@ log = get_logger(__name__)
 
 @fixture(scope="session")
 def engine(database_url, pytestconfig):
-    with temp_database(database_url, drop=pytestconfig.option.teardown) as engine:
+    with temp_database(
+        database_url, drop=pytestconfig.option.teardown, force_drop=True
+    ) as engine:
         yield engine
 
 
