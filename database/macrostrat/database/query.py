@@ -595,3 +595,27 @@ def run_sql(*args, **kwargs):
     if kwargs.pop("yield_results", False):
         return res
     return list(res)
+
+
+def execute(connectable, sql, params=None, stop_on_error=False, **kwargs):
+    output_file = kwargs.pop("output_file", None)
+    output_mode = kwargs.pop("output_mode", None)
+    sql = format(sql, strip_comments=True).strip()
+    if sql == "":
+        return
+    try:
+        connectable.begin()
+        res = connectable.execute(text(sql), params=params)
+        if hasattr(connectable, "commit"):
+            connectable.commit()
+        pretty_print(sql, dim=True, file=output_file, mode=output_mode)
+        return res
+    except (ProgrammingError, IntegrityError) as err:
+        if hasattr(connectable, "rollback"):
+            connectable.rollback()
+        _print_error(sql, dim=True, file=output_file, mode=output_mode)
+        if stop_on_error:
+            return
+    finally:
+        if hasattr(connectable, "close"):
+            connectable.close()

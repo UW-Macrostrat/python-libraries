@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.2.0] - 2026-06-17
+
+- Add `template_database` context manager to create a database with an existing
+  template.
+- Rename `temp_database` -> `temporary_database` to align names with
+  `template_database`.
+- Reorganize imports for database query utilities
+
 ## [4.1.1] - 2026-06-12
 
 - Fix a bug in with escape sequences.

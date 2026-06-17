@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import Insert
 
 from macrostrat.utils import get_logger
-
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
+from .query import run_fixtures, run_query, run_sql, execute  # noqa
 from .utils import (  # noqa
     create_database,
     create_engine,
@@ -23,9 +23,6 @@ from .utils import (  # noqa
     get_dataframe,
     get_or_create,
     reflect_table,
-    run_fixtures,
-    run_query,
-    run_sql,
 )
 
 metadata = MetaData()
