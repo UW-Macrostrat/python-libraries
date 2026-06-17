@@ -27,7 +27,7 @@ from macrostrat.database.query import (
     infer_is_sql_text,
     run_fixtures,
 )
-from macrostrat.database.utils import temp_database
+from macrostrat.database.utils import temp_database, template_database
 from macrostrat.utils import get_logger, relative_path
 
 load_dotenv()
@@ -74,6 +74,15 @@ def test_database(db):
     # Test that tables exist
     assert "sample" in db.model
     assert "geology_formation" in db.model
+
+
+def test_template_database(db):
+    with template_database(db.engine) as engine:
+        assert engine.url.database != db.engine.url.database
+        db1 = Database(engine)
+        db.automap(schemas=["public", "geology"])
+        assert "sample" in db.model
+        assert "geology_formation" in db.model
 
 
 def test_database_mapper(db):

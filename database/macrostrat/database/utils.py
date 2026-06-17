@@ -1,5 +1,7 @@
+import warnings
 from contextlib import contextmanager
 from time import sleep
+from uuid import uuid4
 
 from click import echo
 from sqlalchemy import MetaData
@@ -8,19 +10,16 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import (
-    IntegrityError,
     OperationalError,
-    ProgrammingError,
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.elements import ClauseElement
 from sqlalchemy_utils import create_database as _create_database
 from sqlalchemy_utils import database_exists, drop_database
-from sqlparse import format
 
 from macrostrat.utils import cmd, get_logger
-from .query import get_sql_text
+from .query import get_sql_text, execute  # noqa
 
 log = get_logger(__name__)
 
@@ -44,30 +43,6 @@ def get_dataframe(connectable, filename_or_query, **kwargs):
 def db_session(engine):
     factory = sessionmaker(bind=engine)
     return factory()
-
-
-def execute(connectable, sql, params=None, stop_on_error=False, **kwargs):
-    output_file = kwargs.pop("output_file", None)
-    output_mode = kwargs.pop("output_mode", None)
-    sql = format(sql, strip_comments=True).strip()
-    if sql == "":
-        return
-    try:
-        connectable.begin()
-        res = connectable.execute(text(sql), params=params)
-        if hasattr(connectable, "commit"):
-            connectable.commit()
-        pretty_print(sql, dim=True, file=output_file, mode=output_mode)
-        return res
-    except (ProgrammingError, IntegrityError) as err:
-        if hasattr(connectable, "rollback"):
-            connectable.rollback()
-        _print_error(sql, dim=True, file=output_file, mode=output_mode)
-        if stop_on_error:
-            return
-    finally:
-        if hasattr(connectable, "close"):
-            connectable.close()
 
 
 def get_or_create(session, model, defaults=None, **kwargs):
@@ -97,9 +72,13 @@ def get_db_model(db, model_name: str):
 
 
 @contextmanager
-def temp_database(conn_string, drop=True, ensure_empty=False):
+def temporary_database(
+    conn_string, *, drop=True, ensure_empty=False, exists_ok=True, template=None
+):
     """Create a temporary database and tear it down after tests."""
-    create_database(conn_string, exists_ok=True, replace=ensure_empty)
+    create_database(
+        conn_string, exists_ok=exists_ok, replace=ensure_empty, template=template
+    )
     try:
         engine = create_engine(conn_string)
         yield engine
@@ -107,6 +86,33 @@ def temp_database(conn_string, drop=True, ensure_empty=False):
     finally:
         if drop:
             drop_database(conn_string)
+
+
+@contextmanager
+def temp_database(*args, **kwargs):
+    warnings.warn(
+        "temp_database is deprecated, use temporary_database instead",
+        DeprecationWarning,
+    )
+    with temporary_database(*args, **kwargs) as engine:
+        yield engine
+
+
+@contextmanager
+def template_database(engine: Engine, *, name: str = None):
+    """Create a temporary template database using an existing database as a template."""
+    db_name = engine.url.database
+    template_db_name = name
+    if name is None:
+        uid = str(uuid4())[:8]
+        template_db_name = db_name + "_template_" + uid
+    # Close connection to the database so we can create a new one based on the template
+    new_db_url = engine.url.set(database=template_db_name)
+    engine.dispose()
+    with temporary_database(
+        new_db_url, drop=True, exists_ok=False, template=db_name
+    ) as engine:
+        yield engine
 
 
 def create_database(url, **kwargs):
