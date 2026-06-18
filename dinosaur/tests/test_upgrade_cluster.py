@@ -75,7 +75,7 @@ def postgres_11_cluster_volume():
         fn = fixtures / "test-cluster-1.sql"
         run_sql_file(db.session, fn)
 
-    yield volume_name
+        yield volume_name
 
     client.volumes.get(volume_name).remove(force=True)
 

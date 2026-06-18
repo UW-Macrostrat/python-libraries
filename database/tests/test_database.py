@@ -10,6 +10,14 @@ from sys import stdout
 
 import psycopg2.sql as psql2
 from dotenv import load_dotenv
+from psycopg import ClientCursor
+from psycopg.errors import SyntaxError
+from psycopg.sql import SQL, Identifier, Literal, Placeholder
+from pytest import fixture, mark, raises, warns
+from sqlalchemy import insert
+from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.sql import text
+
 from macrostrat.database import Database, run_sql, on_conflict
 from macrostrat.database.compat import update_legacy_identifier
 from macrostrat.database.postgresql import table_exists, OnConflictAction
@@ -19,15 +27,8 @@ from macrostrat.database.query import (
     infer_is_sql_text,
     run_fixtures,
 )
-from macrostrat.database.utils import temp_database, template_database
+from macrostrat.database.utils import temporary_database, template_database
 from macrostrat.utils import get_logger, relative_path
-from psycopg import ClientCursor
-from psycopg.errors import SyntaxError
-from psycopg.sql import SQL, Identifier, Literal, Placeholder
-from pytest import fixture, mark, raises, warns
-from sqlalchemy import insert
-from sqlalchemy.exc import ProgrammingError
-from sqlalchemy.sql import text
 
 load_dotenv()
 
@@ -36,7 +37,7 @@ log = get_logger(__name__)
 
 @fixture(scope="session")
 def engine(database_url, pytestconfig):
-    with temp_database(
+    with temporary_database(
         database_url, drop=pytestconfig.option.teardown, force_drop=True
     ) as engine:
         yield engine
@@ -44,7 +45,9 @@ def engine(database_url, pytestconfig):
 
 @fixture(scope="session")
 def empty_db(engine):
-    return Database(engine.url)
+    db = Database(engine.url)
+    yield db
+    db.cleanup()
 
 
 @fixture(scope="session")
@@ -59,15 +62,15 @@ def db(empty_db):
     for sqlfile in file_list:
         res = run_sql(empty_db.engine, sqlfile)
         assert len(res) == 3
-    return empty_db
+    yield empty_db
 
 
 @fixture(scope="function")
 def conn(db):
     """A connection managed by the database session."""
-    connection = db.session.connection()
-    yield connection
-    db.session.rollback()
+    with db.session.connection() as conn:
+        yield conn
+        db.session.rollback()
 
 
 def test_database(db):
@@ -78,12 +81,14 @@ def test_database(db):
 
 
 def test_template_database(db):
-    with template_database(db.engine) as engine:
+    db.engine.dispose()
+    with template_database(db.engine.url) as engine:
         assert engine.url.database != db.engine.url.database
         db1 = Database(engine)
-        db.automap(schemas=["public", "geology"])
+        db1.automap(schemas=["public", "geology"])
         assert "sample" in db.model
         assert "geology_formation" in db.model
+        db1.engine.dispose()
 
 
 def test_database_mapper(db):

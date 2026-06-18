@@ -1,22 +1,28 @@
-import warnings
 from contextlib import contextmanager
 from time import sleep
+from typing import Union
 from uuid import uuid4
+from warnings import warn
 
 from click import echo
+from psycopg.errors import AdminShutdown
+from psycopg.sql import Identifier
 from sqlalchemy import MetaData
 from sqlalchemy import create_engine as base_create_engine
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from sqlalchemy.engine.url import make_url
+from sqlalchemy.engine.url import make_url, URL
 from sqlalchemy.exc import (
     OperationalError,
 )
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.elements import ClauseElement
-from sqlalchemy_utils import create_database as _create_database
-from sqlalchemy_utils import database_exists, drop_database
+from sqlalchemy_utils import (
+    create_database as _create_database,
+    database_exists,
+    drop_database as _drop_database,
+)
 
 from macrostrat.utils import cmd, get_logger
 from .query import get_sql_text, execute  # noqa
@@ -25,6 +31,8 @@ log = get_logger(__name__)
 
 # Ensure that old import structure still works
 from .query import run_sql, run_query, run_sql_file, run_fixtures  # noqa: F401
+
+DatabaseInput = Union["Database", Engine, str, URL]
 
 
 def get_dataframe(connectable, filename_or_query, **kwargs):
@@ -72,22 +80,38 @@ def get_db_model(db, model_name: str):
 
 
 @contextmanager
+def temp_database(*args, **kwargs):
+    warn(
+        "temp_database is deprecated, use temporary_database instead",
+        DeprecationWarning,
+    )
+    with temporary_database(*args, **kwargs) as engine:
+        yield engine
+
+
+@contextmanager
 def temporary_database(
-    conn_string, *, drop=True, ensure_empty=False, exists_ok=True, template=None
+    _input: DatabaseInput,
+    *,
+    drop=True,
+    ensure_empty=False,
+    exists_ok=True,
+    template=None,
+    force_drop=False,
 ):
     """Create a temporary database and tear it down after tests."""
-    create_database(
-        conn_string, exists_ok=exists_ok, replace=ensure_empty, template=template
-    )
+    url = get_database_url(_input)
+    create_database(url, exists_ok=exists_ok, replace=ensure_empty, template=template)
+    engine = create_engine(url)
     try:
-        engine = create_engine(conn_string)
         yield engine
         engine.dispose()
     finally:
-        drop_database(engine, force=force_drop)
+        if drop:
+            drop_database(engine, force=force_drop)
 
 
-def drop_database(engine_or_url, force=None, allow_missing=False):
+def drop_database(_input: DatabaseInput, force=None, allow_missing=False):
     """Drop a database.
 
     Parameters
@@ -97,81 +121,110 @@ def drop_database(engine_or_url, force=None, allow_missing=False):
     force: bool
         If true, use the `force` parameter
     """
-    from . import Database
-
-    db = engine_or_url
-    if (
-        isinstance(engine_or_url, str)
-        or isinstance(engine_or_url, URL)
-        or isinstance(engine_or_url, Engine)
-    ):
-        db = Database(engine_or_url)
-    url = db.engine.url
-    # Check that the database exists
+    url = get_database_url(_input)
     if not database_exists(url):
         if not allow_missing:
             raise ValueError(f"Database {url} does not exist")
-        else:
-            return
-
-    if "postgres" in url.drivername and force is not False:
+    elif "postgres" in url.drivername and force is not False:
         # Check if we can force-drop and do so if we can
-        database_name = url.database
-        user_url = url._replace(database=None)
-        user_db = Database(user_url, isolation_level="AUTOCOMMIT")
-
-        version = user_db.run_query("SHOW server_version").scalar()
-        major_version = int(version.split(".")[0])
-        can_use_modern_force = major_version >= 13
-        user_db.session.close()
-
-        sql = f"DROP DATABASE {database_name}"
-
-        with user_db.engine.connect() as conn:
-            if can_use_modern_force:
-                sql += " WITH (FORCE)"
-            else:
-                run_sql(
-                    conn,
-                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :database",
-                    dict(database=database_name),
-                )
-            conn.execute(text("COMMIT"))
-            conn.execute(text(sql))
-        return
+        _force_drop_postgresql_database(url)
     else:
         # Drop the database without force
         _drop_database(url)
 
 
-@contextmanager
-def temp_database(*args, **kwargs):
-    warnings.warn(
-        "temp_database is deprecated, use temporary_database instead",
-        DeprecationWarning,
+def _force_drop_postgresql_database(url):
+    # Check if we can force-drop and do so if we can
+    database_name = url.database
+    user_url = url._replace(database=None)
+    user_engine = create_engine(
+        user_url, execution_options={"isolation_level": "AUTOCOMMIT"}
     )
-    with temporary_database(*args, **kwargs) as engine:
-        yield engine
+    # Get postgresql version from engine
+    major_version = 0
+    with allow_shutdown(user_engine) as conn:
+        conn.autocommit = True
+        pg_version = user_engine.dialect.server_version_info
+        major_version = pg_version[0]
+        can_use_modern_force = major_version >= 13
+        sql = "DROP DATABASE {database_name}"
+        params = dict(database_name=Identifier(database_name))
+        if can_use_modern_force:
+            sql += " WITH (FORCE)"
+        else:
+            close_all_connections(user_engine, database=database_name)
+        run_sql(conn, sql, params=params, raise_errors=True, use_transaction=False)
+    user_engine.dispose()
 
 
 @contextmanager
-def template_database(engine: Engine, *, name: str = None):
+def allow_shutdown(engine):
+    with engine.connect() as conn:
+        conn.autocommit = True
+        try:
+            yield conn
+        except AdminShutdown:
+            pass
+        except OperationalError as exc:
+            if isinstance(exc.orig, AdminShutdown):
+                pass
+            else:
+                raise exc
+
+
+def close_all_connections(engine: Engine, database: str = None):
+    """Close all connections to the database."""
+    if database is None:
+        database = engine.url.database
+    sql = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :database"
+    params = dict(database=database)
+    with allow_shutdown(engine) as conn:
+        run_sql(conn, sql, params=params, raise_errors=True, use_transaction=False)
+
+
+def get_database_url(_input: DatabaseInput) -> URL:
+    from .core import Database
+
+    if isinstance(_input, Database):
+        return _input.engine.url
+    elif isinstance(_input, Engine):
+        return _input.url
+    elif isinstance(_input, str) or isinstance(_input, URL):
+        return make_url(_input)
+    else:
+        raise ValueError(f"Invalid input type: {_input}")
+
+
+@contextmanager
+def template_database(
+    _input: DatabaseInput,
+    *,
+    name: str = None,
+    force_drop=True,
+    close_source_connections=False,
+):
     """Create a temporary template database using an existing database as a template."""
-    db_name = engine.url.database
+
+    url = get_database_url(_input)
+    if close_source_connections:
+        engine = create_engine(_input)
+        close_all_connections(engine)
+        engine.dispose()
+
+    db_name = url.database
     template_db_name = name
     if name is None:
         uid = str(uuid4())[:8]
         template_db_name = db_name + "_template_" + uid
     # Close connection to the database so we can create a new one based on the template
-    new_db_url = engine.url.set(database=template_db_name)
-    engine.dispose()
+    new_db_url = url.set(database=template_db_name)
     with temporary_database(
-        new_db_url, drop=True, exists_ok=False, template=db_name
+        new_db_url, drop=True, exists_ok=False, template=db_name, force_drop=force_drop
     ) as engine:
         yield engine
 
 
-def create_database(url, **kwargs):
+def create_database(_input: DatabaseInput, **kwargs):
     """Create a database if it doesn't exist.
 
     Parameters
@@ -185,6 +238,7 @@ def create_database(url, **kwargs):
     kwargs : dict
         Additional keyword arguments to pass to `sqlalchemy_utils.create_database`.
     """
+    url = get_database_url(_input)
     db_exists = database_exists(url)
 
     should_replace = kwargs.pop("replace", False)
@@ -199,50 +253,67 @@ def create_database(url, **kwargs):
     _create_database(url, **kwargs)
 
 
-def create_engine(db_conn, **kwargs):
+def create_engine(_input: DatabaseInput, **kwargs):
+    from .core import Database
+
+    recreate = False
+    # If we specify engine options, we should recreate the engine
+    if len(kwargs) > 0:
+        recreate = True
+    db_conn = _input
+    if isinstance(_input, Database):
+        db_conn = _input.engine
+    elif isinstance(_input, str):
+        db_conn = make_url(_input)
+    elif isinstance(_input, URL):
+        db_conn = _input
+
     if isinstance(db_conn, Engine):
-        log.info(f"Set up database connection with engine {db_conn.url}")
-        if db_conn.driver == "psycopg2":
-            log.warning(
-                "The psycopg2 driver is deprecated. Please use psycopg3 instead."
-            )
-        return db_conn
-    else:
-        log.info(f"Setting up database connection with URL '{db_conn}'")
-        url = db_conn
-        if isinstance(url, str):
-            url = make_url(url)
-        # Set the driver to psycopg if not already set
-        if "postgres" in url.drivername:
-            url = url.set(drivername="postgresql+psycopg")
+        if recreate:
+            # Reuse the existing engine
+            log.info(f"Set up database connection with engine {db_conn.url}")
+            if db_conn.driver == "psycopg2":
+                log.warning(
+                    "The psycopg2 driver is deprecated. Please use psycopg3 instead."
+                )
+            return db_conn
+        else:
+            db_conn = db_conn.url
 
-        return base_create_engine(url, **kwargs)
+    if not isinstance(db_conn, URL):
+        raise ValueError(f"Invalid input type: {_input}")
+    url = db_conn
+
+    log.info(f"Setting up database connection with URL '{url}'")
+    # Set the driver to psycopg if not already set
+    if "postgres" in url.drivername:
+        url = url.set(drivername="postgresql+psycopg")
+
+    return base_create_engine(url, **kwargs)
 
 
-def connection_args(engine, with_password=False):
+def connection_args(_input: DatabaseInput, with_password=False):
     """Get PostgreSQL connection arguments for an engine"""
     _psql_flags = {"-U": "username", "-h": "host", "-p": "port", "-P": "password"}
+    url = get_database_url(_input)
 
-    if isinstance(engine, str):
-        # We passed a connection url!
-        engine = create_engine(engine)
     flags = ""
     for flag, _attr in _psql_flags.items():
-        val = getattr(engine.url, _attr)
+        val = getattr(url, _attr)
         if flag == "-P" and not with_password:
             continue
         if val is not None:
             flags += f" {flag} {val}"
-    return flags, engine.url.database
+    return flags, url.database
 
 
-def db_isready(engine_or_url, use_shell_command=False):
+def db_isready(_input: DatabaseInput, use_shell_command=False):
     if use_shell_command:
-        args, _ = connection_args(engine_or_url, with_password=True)
+        args, _ = connection_args(_input, with_password=True)
         c = cmd("pg_isready", args, capture_output=True)
         return c.returncode == 0
     # Use a more typical sqlalchemy connection approach
-    engine = create_engine(engine_or_url)
+    engine = create_engine(_input)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -251,9 +322,9 @@ def db_isready(engine_or_url, use_shell_command=False):
         return False
 
 
-def wait_for_database(engine_or_url, *, quiet=False, use_shell_command=False):
+def wait_for_database(_input: DatabaseInput, *, quiet=False, use_shell_command=False):
     msg = "Waiting for database..."
-    while not db_isready(engine_or_url, use_shell_command=use_shell_command):
+    while not db_isready(_input, use_shell_command=use_shell_command):
         if not quiet:
             echo(msg, err=True)
         log.info(msg)

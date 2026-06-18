@@ -107,7 +107,9 @@ def database_cluster(
     container.start()
     try:
         _url = container.get_connection_url(driver=driver)
-        yield Database(_url)
+        db = Database(_url)
+        yield db
+        db.cleanup()
     finally:
         log.info(f"Stopping container {image_tag}...")
         container.stop()
