@@ -10,10 +10,6 @@ from warnings import warn
 
 import psycopg2.sql as psql2
 from click import secho
-from macrostrat.database.compat import (
-    update_legacy_identifier,
-)
-from macrostrat.utils import get_logger
 from psycopg.errors import QueryCanceled
 from psycopg.sql import SQL, Composable, Composed
 from rich.console import Console
@@ -28,6 +24,11 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.sql.elements import TextClause
 from sqlparse import format, split
+
+from macrostrat.database.compat import (
+    update_legacy_identifier,
+)
+from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
 
@@ -398,13 +399,15 @@ def _execute_one(
 
     if result.label is not None:
         display_text = result.label
+    elif output_mode == OutputMode.NONE:
+        display_text = None
     elif output_mode != OutputMode.ALL:
         display_text = summarize_statement(str(query))
     else:
         display_text = str(query)
 
     if result.skip:
-        if print_skipped:
+        if print_skipped and display_text is not None:
             secho(display_text, dim=True, strikethrough=True, file=output_file)
         return
 
@@ -430,7 +433,8 @@ def _execute_one(
         elif hasattr(connectable, "commit"):
             connectable.commit()
 
-        secho(display_text, dim=True, file=output_file)
+        if display_text is not None:
+            secho(display_text, dim=True, file=output_file)
 
     except Exception as err:
         if trans is not None:
@@ -439,7 +443,8 @@ def _execute_one(
             connectable.rollback()
         if raise_errors or _should_raise_query_error(err):
             raise err
-        _print_error(display_text, err, file=output_file)
+        if display_text is not None:
+            _print_error(display_text, err, file=output_file)
 
 
 def _should_raise_query_error(err):

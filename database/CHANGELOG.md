@@ -1,5 +1,10 @@
 # Changelog
 
+## [4.2.1] - 2026-06-18
+
+Fix logic for `OutputMode.NONE` in `run_sql` function, which was not properly
+suppressing output.
+
 ## [4.2.0] - 2026-06-17
 
 - Add `template_database` context manager to create a database with an existing
