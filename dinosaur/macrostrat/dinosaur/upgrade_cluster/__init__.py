@@ -1,7 +1,8 @@
+import asyncio
 from typing import List
 
 from docker.client import DockerClient
-from results.database import Database
+from macrostrat.database import Database
 from rich.console import Console
 
 from macrostrat.database.transfer import move_tables
@@ -70,19 +71,21 @@ def upgrade_database_cluster(
     print(f"Docker containers - from: {from_image}, to: {to_image}")
 
     # Create the volume for the new cluster
-    dest_volume = ensure_empty_docker_volume(client, cluster_new_name)
+    ensure_empty_docker_volume(client, cluster_new_name)
 
-    with database_cluster(
-        from_image,
-        data_volume=cluster_volume_name,
-        docker_client=client,
-    ) as source:
-        with database_cluster(
+    with (
+        database_cluster(
+            from_image,
+            data_volume=cluster_volume_name,
+            docker_client=client,
+        ) as source,
+        database_cluster(
             to_image,
             data_volume=cluster_new_name,
             docker_client=client,
-        ) as target:
-            _upgrade_cluster(source, target, databases)
+        ) as target,
+    ):
+        _upgrade_cluster(source, target, databases)
 
     # Remove the old volume
     backup_volume_name = cluster_volume_name + "_backup"
@@ -111,48 +114,41 @@ def upgrade_database_cluster(
 
 
 def _upgrade_cluster(source, target, databases):
-    # Dump the database
     log.info("Dumping database...")
 
-    # Run PG_Restore asynchronously
     for dbname in databases:
         source_url = get_database_url(source).set(database=dbname)
         target_url = get_database_url(target).set(database=dbname)
 
-        if database_exists(source_db.engine.url):
-            log.info(f"Database {dbname} exists in source cluster")
-        else:
-            log.info(f"Database {dbname} does not exist in source, skipping dump.")
-            return
+        if not database_exists(source_url):
+            log.info(f"Database {dbname} does not exist in source, skipping.")
+            continue
 
+        log.info(f"Database {dbname} exists in source cluster")
         source_db = Database(source_url)
         n_tables = count_database_tables(source_db)
 
         log.info("Creating database")
-
         create_database(target_url)
 
         if not database_exists(target_url):
             raise DatabaseUpgradeError("Database not created")
 
         target_db = Database(target_url)
+        asyncio.run(move_tables(source_db.engine, target_db.engine))
 
-        move_tables(source_db.engine, target_db.engine)
+        if not database_exists(target_url):
+            raise DatabaseUpgradeError(
+                f"Database {dbname} does not exist in target after migration"
+            )
 
-        db_exists = database_exists(target_url)
         new_n_tables = count_database_tables(target_db)
-
-    if db_exists:
-        log.info(f"Database {dbname} exists in target cluster.")
-    else:
-        log.info(f"Database {dbname} does not exist in target, dump failed.")
-        dest_volume.remove()
-        return
-
-    if new_n_tables >= n_tables:
-        log.info(f"{new_n_tables} tables were restored.")
-    else:
-        raise DatabaseUpgradeError(f"Expected {n_tables} tables, got {new_n_tables}")
+        if new_n_tables >= n_tables:
+            log.info(f"{new_n_tables} tables were restored.")
+        else:
+            raise DatabaseUpgradeError(
+                f"Expected {n_tables} tables, got {new_n_tables}"
+            )
 
 
 # In-place upgrade
