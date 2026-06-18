@@ -81,6 +81,10 @@ class Database(object):
         self.mapper = DatabaseMapper(self)
         self.mapper.reflect_database(**kwargs)
 
+    def get_server_version(self):
+        with self.engine.connect():
+            return self.engine.dialect.server_version_info
+
     @contextmanager
     def session_scope(self, commit=True):
         """Provide a transactional scope around a series of operations."""

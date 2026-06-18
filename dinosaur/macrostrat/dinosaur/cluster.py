@@ -105,8 +105,10 @@ def database_cluster(
 
     container.with_command(build_postgres_command(_config))
     container.start()
+    log.info(f"Container started!")
     try:
         _url = container.get_connection_url(driver=driver)
+        print("Database cluster started at %s" % _url)
         db = Database(_url)
         yield db
         db.cleanup()

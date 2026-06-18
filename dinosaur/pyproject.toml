@@ -26,6 +26,7 @@ dependencies = [
 dev = [
     "macrostrat.database",
     "macrostrat.utils",
+    "pytest>=9.1.0",
 ]
 
 [tool.uv]

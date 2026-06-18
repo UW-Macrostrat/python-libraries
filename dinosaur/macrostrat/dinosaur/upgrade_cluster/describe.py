@@ -5,6 +5,7 @@ from docker.client import DockerClient
 from docker.errors import ContainerError
 from docker.models.containers import Container
 
+from macrostrat.database import Database
 from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
@@ -42,12 +43,6 @@ def check_database_exists(container: Container, db_name: str) -> bool:
     return False
 
 
-def count_database_tables(container: Container, db_name: str) -> int:
-    res = container.exec_run(
-        f"psql -U postgres -d {db_name} -c 'SELECT COUNT(*) FROM information_schema.tables;'",
-        stdout=True,
-        demux=True,
-        user="postgres",
-    )
-    stdout = res.output[0].decode("utf-8")
-    return int(stdout.splitlines()[2].strip())
+def count_database_tables(db: Database) -> int:
+    res = db.run_query("SELECT COUNT(*) FROM information_schema.tables").scalar()
+    return res
