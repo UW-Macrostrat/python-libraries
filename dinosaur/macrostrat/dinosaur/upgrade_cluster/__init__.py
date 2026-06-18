@@ -5,8 +5,9 @@ from docker.client import DockerClient
 from macrostrat.database import Database
 from rich.console import Console
 
-from macrostrat.database.transfer import move_tables
-from macrostrat.database.utils import get_database_url, database_exists, create_database
+from macrostrat.database.transfer import pg_dump, pg_restore
+from macrostrat.database.transfer.stream_utils import print_stdout, print_stream_progress
+from macrostrat.database.utils import get_database_url, database_exists
 from macrostrat.utils import get_logger
 from .describe import (
     check_database_cluster_version,
@@ -85,7 +86,9 @@ def upgrade_database_cluster(
             docker_client=client,
         ) as target,
     ):
-        _upgrade_cluster(source, target, databases)
+        asyncio.run(
+            _upgrade_cluster(source, target, databases, from_image=from_image, to_image=to_image)
+        )
 
     # Remove the old volume
     backup_volume_name = cluster_volume_name + "_backup"
@@ -113,8 +116,9 @@ def upgrade_database_cluster(
     console.print("Done!", style="bold green")
 
 
-def _upgrade_cluster(source, target, databases):
-    log.info("Dumping database...")
+async def _upgrade_cluster(source, target, databases, *, from_image, to_image):
+    """Dump each database from source and restore into target via pg_dump | pg_restore."""
+    log.info("Upgrading databases...")
 
     for dbname in databases:
         source_url = get_database_url(source).set(database=dbname)
@@ -124,30 +128,26 @@ def _upgrade_cluster(source, target, databases):
             log.info(f"Database {dbname} does not exist in source, skipping.")
             continue
 
-        log.info(f"Database {dbname} exists in source cluster")
         source_db = Database(source_url)
         n_tables = count_database_tables(source_db)
-
-        log.info("Creating database")
-        create_database(target_url)
-
-        if not database_exists(target_url):
-            raise DatabaseUpgradeError("Database not created")
+        log.info(f"Dumping {dbname} ({n_tables} tables) from source cluster...")
 
         target_db = Database(target_url)
-        asyncio.run(move_tables(source_db.engine, target_db.engine))
+        dump_proc = await pg_dump(source_db.engine, postgres_container=from_image)
+        restore_proc = await pg_restore(target_db.engine, create=True, postgres_container=to_image)
 
-        if not database_exists(target_url):
-            raise DatabaseUpgradeError(
-                f"Database {dbname} does not exist in target after migration"
-            )
+        await asyncio.gather(
+            asyncio.create_task(print_stream_progress(dump_proc.stdout, restore_proc.stdin)),
+            asyncio.create_task(print_stdout(dump_proc.stderr)),
+            asyncio.create_task(print_stdout(restore_proc.stderr)),
+        )
 
         new_n_tables = count_database_tables(target_db)
         if new_n_tables >= n_tables:
-            log.info(f"{new_n_tables} tables were restored.")
+            log.info(f"{new_n_tables} tables restored to target cluster.")
         else:
             raise DatabaseUpgradeError(
-                f"Expected {n_tables} tables, got {new_n_tables}"
+                f"Expected {n_tables} tables, got {new_n_tables} after restoring {dbname}"
             )
 
 
