@@ -2,11 +2,14 @@ import asyncio
 from typing import List
 
 from docker.client import DockerClient
-from macrostrat.database import Database
 from rich.console import Console
 
+from macrostrat.database import Database
 from macrostrat.database.transfer import pg_dump, pg_restore
-from macrostrat.database.transfer.stream_utils import print_stdout, print_stream_progress
+from macrostrat.database.transfer.stream_utils import (
+    print_stdout,
+    print_stream_progress,
+)
 from macrostrat.database.utils import get_database_url, database_exists
 from macrostrat.utils import get_logger
 from .describe import (
@@ -18,7 +21,6 @@ from .utils import (
     ensure_empty_docker_volume,
     get_unused_port,
     replace_docker_volume,
-    database_cluster_legacy,
 )
 from ..cluster import database_cluster
 
@@ -87,7 +89,9 @@ def upgrade_database_cluster(
         ) as target,
     ):
         asyncio.run(
-            _upgrade_cluster(source, target, databases, from_image=from_image, to_image=to_image)
+            _upgrade_cluster(
+                source, target, databases, from_image=from_image, to_image=to_image
+            )
         )
 
     # Remove the old volume
@@ -134,10 +138,14 @@ async def _upgrade_cluster(source, target, databases, *, from_image, to_image):
 
         target_db = Database(target_url)
         dump_proc = await pg_dump(source_db.engine, postgres_container=from_image)
-        restore_proc = await pg_restore(target_db.engine, create=True, postgres_container=to_image)
+        restore_proc = await pg_restore(
+            target_db.engine, create=True, postgres_container=to_image
+        )
 
         await asyncio.gather(
-            asyncio.create_task(print_stream_progress(dump_proc.stdout, restore_proc.stdin)),
+            asyncio.create_task(
+                print_stream_progress(dump_proc.stdout, restore_proc.stdin)
+            ),
             asyncio.create_task(print_stdout(dump_proc.stderr)),
             asyncio.create_task(print_stdout(restore_proc.stderr)),
         )
