@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.3.0] - 2026-06-19
+
+- Add `Database.get_table` and `Database.get_model` methods for easier access to
+  object mappings.
+- Improve tests
+- Improve and fix bugs with `temporary_database` and `template_database` context
+  managers, which are useful for testing.
+- Use more consistent and open-ended approaches to passing database instances,
+  urls, or connection strings.
+
 ## [4.2.1] - 2026-06-18
 
 Fix logic for `OutputMode.NONE` in `run_sql` function, which was not properly
