@@ -1,5 +1,10 @@
 # Changelog
 
+## [4.3.1] - 2026-06-19
+
+Add sequence management utilities to the database module (for database sequence
+updates and value resets).
+
 ## [4.3.0] - 2026-06-19
 
 - Add `Database.get_table` and `Database.get_model` methods for easier access to
