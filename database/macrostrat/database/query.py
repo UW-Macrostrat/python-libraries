@@ -271,7 +271,15 @@ def _statement_filter_to_transform(statement_filter) -> TransformFn:
     return transform
 
 
-def _run_sql(connectable, sql, params=None, *, print_skipped=True, **kwargs):
+def _run_sql(
+    connectable,
+    sql,
+    params=None,
+    *,
+    print_skipped=True,
+    use_transaction=True,
+    **kwargs,
+):
     """
     Internal function for running a query on a SQLAlchemy connectable,
     which always returns an iterator. The wrapper function adds the option
@@ -342,6 +350,7 @@ def _run_sql(connectable, sql, params=None, *, print_skipped=True, **kwargs):
                 output_mode=output_mode,
                 print_skipped=print_skipped,
                 has_server_binds=has_server_binds,
+                use_transaction=use_transaction,
             )
 
 
@@ -390,6 +399,7 @@ def _execute_one(
     output_mode: OutputMode = OutputMode.SUMMARY,
     has_server_binds: bool | None = None,
     print_skipped: bool = True,
+    use_transaction: bool = True,
 ):
     params = result.params
 
@@ -411,10 +421,12 @@ def _execute_one(
             secho(display_text, dim=True, strikethrough=True, file=output_file)
         return
 
-    try:
-        trans = connectable.begin()
-    except InvalidRequestError:
-        trans = None
+    trans = None
+    if use_transaction:
+        try:
+            trans = connectable.begin()
+        except InvalidRequestError:
+            pass
 
     try:
         log.debug("Executing SQL: \n %s", query)
@@ -595,6 +607,8 @@ def run_sql(*args, **kwargs):
         objects, which can modify the query, parameters, and whether the statement
         should be skipped or not. This allows for more complex logic than a simple
         statement filter.
+    use_transaction: bool
+        Whether to run the query in a transaction block
     """
     res = _run_sql(*args, **kwargs)
     if kwargs.pop("yield_results", False):

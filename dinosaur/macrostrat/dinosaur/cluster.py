@@ -45,17 +45,19 @@ def database_cluster(
             client.images.get(image_tag)
             log.info(f"Using existing image {image_tag}")
         except docker.errors.ImageNotFound:
-            should_build = True
+            if context is not None:
+                should_build = True
+            # else: testcontainers will pull the image automatically
 
     if should_build:
         client.images.build(path=str(context), tag=image_tag)
 
     # Begin run configurations
-
-    if user is not None:
-        kwargs.setdefault("username", user)
-    if database is not None:
-        kwargs.setdefault("dbname", database)
+    # Default to the postgres superuser/database so testcontainers' readiness
+    # check (psql --username ... --dbname ...) can always connect, even when
+    # attaching to an existing volume with no separate user/db configured.
+    kwargs.setdefault("username", user or "postgres")
+    kwargs.setdefault("dbname", database or "postgres")
 
     container = PostgresContainer(image_tag, **kwargs)
 
@@ -103,18 +105,26 @@ def database_cluster(
             }
         )
 
-    container.with_command(build_postgres_command(_config))
+    cmd = build_postgres_command(_config)
+    if cmd is not None:
+        container.with_command(cmd)
     container.start()
+    log.info(f"Container started!")
     try:
         _url = container.get_connection_url(driver=driver)
-        yield Database(_url)
+        print("Database cluster started at %s" % _url)
+        db = Database(_url)
+        yield db
+        db.cleanup()
     finally:
         log.info(f"Stopping container {image_tag}...")
         container.stop()
 
 
 def build_postgres_command(pg_config):
-    cmd = "postgres"
+    if not pg_config:
+        return None
+    cmd = ["postgres"]
     for k, v in pg_config.items():
-        cmd += f" -c {k}={v}"
+        cmd += ["-c", f"{k}={v}"]
     return cmd

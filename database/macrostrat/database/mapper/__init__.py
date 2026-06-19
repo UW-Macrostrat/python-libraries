@@ -33,6 +33,7 @@ class DatabaseMapper:
     automap_error = None
     _models = None
     _tables = None
+    _reflected_schemas: set
 
     def __init__(self, db, **kwargs):
         # https://docs.sqlalchemy.org/en/13/orm/extensions/automap.html#sqlalchemy.ext.automap.AutomapBase.prepare
@@ -56,6 +57,7 @@ class DatabaseMapper:
 
         self._models = ModelCollection(self.automap_base.classes)
         self._tables = TableCollection(self._models)
+        self._reflected_schemas = set()
 
     def reflect_database(self, schemas=["public"], use_cache=True):
         # This stuff should be placed outside of core (one likely extension point).
@@ -74,6 +76,7 @@ class DatabaseMapper:
         self.automap_base.builder._cache_database_map(self.automap_base.metadata)
 
     def reflect_schema(self, schema, use_cache=True):
+        self._reflected_schemas.add(schema or "public")
         if use_cache and self.automap_base.loaded_from_cache:
             log.info("Database models for %s have been loaded from cache", schema)
             self.automap_base.prepare(schema=schema, **self.reflection_kwargs)

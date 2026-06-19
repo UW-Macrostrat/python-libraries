@@ -38,6 +38,7 @@ def database_url(docker_client):
         try:
             engine = create_engine(testing_db)
             engine.connect()
+            engine.dispose()
         except OperationalError:
             testing_db = None
 

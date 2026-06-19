@@ -12,7 +12,7 @@ from sqlalchemy.sql.dml import Insert
 from sqlalchemy.sql.expression import text
 
 if TYPE_CHECKING:
-    from ..database import Database
+    from .core import Database
 
 
 class OnConflictAction(str, Enum):

@@ -11,8 +11,8 @@ from docker.client import DockerClient
 from pytest import fixture
 from sqlalchemy import inspect, text
 
-from macrostrat.database.utils import run_sql_file
-from macrostrat.dinosaur import create_schema_clone, dump_schema
+from macrostrat.database.utils import run_sql_file, template_database
+from macrostrat.dinosaur import dump_schema
 from macrostrat.utils import get_logger
 
 log = get_logger(__name__)
@@ -80,7 +80,7 @@ def postgres_11_cluster_volume():
     client.volumes.get(volume_name).remove(force=True)
 
 
-@fixture(scope="module")
+@fixture(scope="function")
 def postgres_11_db(postgres_11_cluster_volume):
     with database_cluster(
         old_postgres_image,
@@ -104,13 +104,7 @@ def test_schema_clone(postgres_11_db):
     """Test dumping of a PostgreSQL schema."""
 
     url = postgres_11_db.engine.url
-    url_clone = url.set(database="test_schema_clone")
-
-    with create_schema_clone(
-        postgres_11_db.engine,
-        url_clone,
-        image_name=version_images[old_postgres_major_version],
-    ) as clone:
+    with template_database(postgres_11_db.engine) as clone:
         with clone.connect() as conn:
             assert conn.execute(text("SELECT 1")).fetchone()[0] == 1
             insp = inspect(clone)
