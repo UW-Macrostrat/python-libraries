@@ -2,6 +2,7 @@ from .core import Database
 from .mapper import DatabaseMapper
 from .postgresql import on_conflict, prefix_inserts  # noqa
 from .query import run_fixtures, run_query, run_sql, execute  # noqa
+from .sequences import reset_sequence, serial_to_identity
 from .utils import (  # noqa
     create_database,
     create_engine,
