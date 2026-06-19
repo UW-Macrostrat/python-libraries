@@ -72,20 +72,14 @@ def _create_command(
         args = []
 
     command_prefix = prefix or _docker_local_run_args(container)
-    _cmd = [*command_prefix, *command, str(engine.url), *args]
 
+    # Strip the SQLAlchemy dialect suffix (e.g. +psycopg) — pg_dump/pg_restore
+    # only understand plain postgresql:// URLs.  Also expand any *** password
+    # masking so the subprocess receives the real credentials.
+    pg_url = raw_database_url(engine.url.set(drivername="postgresql"))
+
+    _cmd = [*command_prefix, *command, pg_url, *args]
     log.info(" ".join(_cmd))
-
-    # Replace asterisks with the real password (if any). This is kind of backwards
-    # but it works.
-    if "***" in str(engine.url) and engine.url.password is not None:
-        _cmd = [
-            *command_prefix,
-            *command,
-            raw_database_url(engine.url),
-            *args,
-        ]
-
     return _cmd
 
 

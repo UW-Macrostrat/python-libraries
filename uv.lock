@@ -708,6 +708,7 @@ requires-dist = [
 dev = [
     { name = "macrostrat-database", editable = "database" },
     { name = "macrostrat-utils", editable = "utils" },
+    { name = "pytest", specifier = ">=9.1.0" },
 ]
 
 [[package]]

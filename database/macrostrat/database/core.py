@@ -28,6 +28,28 @@ metadata = MetaData()
 log = get_logger(__name__)
 
 
+def _parse_table_name(name, schema=None):
+    """Parse a table name into (schema, table_name).
+
+    Accepts "table", "schema.table", or ("schema", "table").
+    An explicit schema kwarg takes precedence. Defaults to "public".
+    """
+    if isinstance(name, tuple):
+        parsed_schema, table_name = name[0], name[1]
+    elif "." in str(name):
+        parsed_schema, table_name = str(name).split(".", 1)
+    else:
+        parsed_schema, table_name = None, str(name)
+    return (schema or parsed_schema or "public"), table_name
+
+
+def _model_key(schema, table_name):
+    """Return the ModelCollection key used by automap for a given table."""
+    if schema == "public":
+        return table_name
+    return f"{schema}_{table_name}"
+
+
 class Database(object):
     mapper: Optional[DatabaseMapper] = None
     metadata: MetaData
@@ -69,6 +91,7 @@ class Database(object):
         self._session_factory = sessionmaker(bind=self.engine)
         self.session = scoped_session(self._session_factory)
         # Use the self.session_scope function to more explicitly manage sessions.
+        self._table_cache: dict = {}
 
     def create_tables(self):
         """
@@ -80,6 +103,10 @@ class Database(object):
         log.info("Automapping the database")
         self.mapper = DatabaseMapper(self)
         self.mapper.reflect_database(**kwargs)
+
+    def get_server_version(self):
+        with self.engine.connect():
+            return self.engine.dialect.server_version_info
 
     @contextmanager
     def session_scope(self, commit=True):
@@ -344,9 +371,90 @@ class Database(object):
             self.session.close()
             self.session = _prev_session
 
+    def get_table(self, name, *, schema=None):
+        """Return a reflected SQLAlchemy Table object, with per-instance caching.
+
+        After the first call the result is cached; subsequent calls for the
+        same table are instant.  If automap has already been run the mapper's
+        existing Table is reused, avoiding a second round-trip.
+
+        Args:
+            name: Table name as ``"table"``, ``"schema.table"``, or
+                  ``("schema", "table")``.
+            schema: Explicit schema override (default ``"public"``).
+        """
+        schema_, table_name = _parse_table_name(name, schema)
+        cache_key = (schema_, table_name)
+        if cache_key in self._table_cache:
+            return self._table_cache[cache_key]
+
+        # Reuse the already-reflected Table from automap when available
+        if self.mapper is not None:
+            model_key = _model_key(schema_, table_name)
+            if model_key in self.mapper._models:
+                tbl = self.mapper._models[model_key].__table__
+                self._table_cache[cache_key] = tbl
+                return tbl
+
+        # Per-table reflection; "public" → None matches how automap stores it
+        reflect_schema = None if schema_ == "public" else schema_
+        tbl = reflect_table(self.engine, table_name, schema=reflect_schema)
+        self._table_cache[cache_key] = tbl
+        return tbl
+
+    def get_model(self, name, *, schema=None, automap=True):
+        """Return the ORM model class for a table.
+
+        If the target schema has not yet been reflected and ``automap=True``
+        (the default), it is reflected lazily before the lookup.  Set
+        ``automap=False`` to raise ``LookupError`` instead, which is useful
+        when you want strict control over when reflection happens.
+
+        Args:
+            name: Table name as ``"table"``, ``"schema.table"``, or
+                  ``("schema", "table")``.
+            schema: Explicit schema override (default ``"public"``).
+            automap: Lazily reflect the schema if not yet mapped.
+
+        Raises:
+            LookupError: When the model is not found.
+        """
+        schema_, table_name = _parse_table_name(name, schema)
+        model_key = _model_key(schema_, table_name)
+
+        if self.mapper is not None and model_key in self.mapper._models:
+            return self.mapper._models[model_key]
+
+        if not automap:
+            raise LookupError(
+                f"No ORM model found for {schema_}.{table_name}. "
+                "Call db.automap() first, or use get_table() for a Table object."
+            )
+
+        # Lazy automap: reflect only the needed schema
+        if self.mapper is None:
+            self.automap(schemas=[schema_])
+        elif schema_ not in self.mapper._reflected_schemas:
+            self.mapper.reflect_schema(schema_)
+
+        if model_key in self.mapper._models:
+            return self.mapper._models[model_key]
+
+        raise LookupError(
+            f"No ORM model found for {schema_}.{table_name} after reflecting "
+            f"schema '{schema_}'. Verify the table exists, or use get_table()."
+        )
+
+    def __getitem__(self, name):
+        """Subscript shorthand for get_table()."""
+        return self.get_table(name)
+
     # Destroy engine on cleanup
     def cleanup(self):
-        self.session.close()
+        try:
+            self.session.close()
+        except OperationalError:
+            pass
         self.engine.dispose()
 
     def __del__(self):
