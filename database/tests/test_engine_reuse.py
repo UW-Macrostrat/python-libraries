@@ -1,8 +1,9 @@
 """
 Tests for the engine-reuse behaviour of Database and create_engine.
 
-These tests use SQLite in-memory databases and do not require Docker / PostgreSQL,
-so they can run without the session-level ``database_url`` fixture.
+SQLite-based tests do not require Docker/PostgreSQL and run in isolation.
+PostgreSQL-based tests use the session-level ``database_url`` fixture from
+the root conftest and require Docker (or a ``TESTING_DATABASE`` env var).
 """
 
 import sqlalchemy as sa
@@ -14,7 +15,7 @@ from macrostrat.database.utils import create_engine
 
 
 # ---------------------------------------------------------------------------
-# create_engine helpers
+# create_engine helpers (SQLite, no Docker)
 # ---------------------------------------------------------------------------
 
 
@@ -57,7 +58,7 @@ def test_create_engine_kwargs_ignored_for_prebuilt_engine():
 
 
 # ---------------------------------------------------------------------------
-# Database class
+# Database class – SQLite (no Docker)
 # ---------------------------------------------------------------------------
 
 
@@ -94,3 +95,34 @@ def test_database_sqlite_in_memory_query():
 
     result = db.run_query("SELECT val FROM t WHERE id = 1").scalar()
     assert result == "hello"
+
+
+# ---------------------------------------------------------------------------
+# Database class – PostgreSQL (requires Docker / TESTING_DATABASE)
+# ---------------------------------------------------------------------------
+
+
+def test_database_engine_identity_postgresql(database_url):
+    """Database(engine).engine is engine for a real PostgreSQL engine."""
+    eng = create_engine(database_url)
+    try:
+        db = Database(eng)
+        assert db.engine is eng
+    finally:
+        eng.dispose()
+
+
+def test_database_connect_listener_fires_postgresql(database_url):
+    """A 'connect' listener on a PostgreSQL engine survives Database wrapping."""
+    eng = create_engine(database_url)
+    fired = []
+    sa.event.listen(eng, "connect", lambda dbapi_conn, rec: fired.append(1))
+
+    try:
+        db = Database(eng)
+        result = db.run_query("SELECT 1").scalar()
+        assert result == 1
+        assert fired, "connect listener was not called -- engine was rebuilt"
+    finally:
+        eng.dispose()
+
