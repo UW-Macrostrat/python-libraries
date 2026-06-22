@@ -70,17 +70,17 @@ def test_database_engine_identity():
 
 def test_database_connect_listener_fires():
     """A 'connect' event listener attached before passing the engine to Database
-    must still fire when Database opens a connection."""
+    must still fire when a connection is opened through the resulting Database."""
     eng = sa.create_engine("sqlite+pysqlite:///:memory:")
     fired = []
     sa.event.listen(eng, "connect", lambda dbapi_conn, rec: fired.append(1))
 
     db = Database(eng)
-    # Execute a query to force a connection
+    # Execute a query via db.engine to force a connection checkout
     with db.engine.connect() as conn:
         conn.execute(sa.text("SELECT 1"))
 
-    assert fired, "connect listener was not called – engine was rebuilt"
+    assert fired, "connect listener was not called -- engine was rebuilt"
 
 
 def test_database_sqlite_in_memory_query():
