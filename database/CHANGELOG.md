@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Rework `Database` class creation to preserve initialized engines if passed.
+  Remove `recreate` parameter.
+
 ## [4.3.1] - 2026-06-19
 
 Add sequence management utilities to the database module (for database sequence
