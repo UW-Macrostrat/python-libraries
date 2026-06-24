@@ -9,6 +9,7 @@ from typing import Callable, Any, IO, Union
 from warnings import warn
 
 import psycopg2.sql as psql2
+import sqlparse
 from click import secho
 from psycopg.errors import QueryCanceled
 from psycopg.sql import SQL, Composable, Composed
@@ -23,7 +24,6 @@ from sqlalchemy.exc import (
     ProgrammingError,
 )
 from sqlalchemy.sql.elements import TextClause
-from sqlparse import format, split
 
 from macrostrat.database.compat import (
     update_legacy_identifier,
@@ -45,11 +45,7 @@ def infer_is_sql_text(_string: str) -> bool:
     lines = _string.split("\n")
     if len(lines) > 1:
         return True
-    _string = _string.lower()
-    for i in _sql_keywords:
-        if _string.strip().startswith(i.lower() + " "):
-            return True
-    return False
+    return _starts_with_keyword(_string)
 
 
 def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
@@ -65,6 +61,14 @@ def canonicalize_query(file_or_text: Union[str, Path, IO]) -> Union[str, Path]:
     if pth.exists() and pth.is_file():
         return pth
     return file_or_text
+
+
+def _starts_with_keyword(text: str) -> bool:
+    t1 = text.strip().lower()
+    for i in _sql_keywords:
+        if t1.startswith(i.lower() + " "):
+            return True
+    return False
 
 
 def pretty_print(sql, **kwargs):
@@ -93,9 +97,7 @@ _sql_keywords = [
 
 def summarize_statement(sql):
     for line in sql.split("\n"):
-        for i in _sql_keywords:
-            if not line.startswith(i):
-                continue
+        if _starts_with_keyword(line):
             return line.split("(")[0].strip().rstrip(";").replace(" AS", "")
     return sql.strip().split("\n")[0].strip().rstrip(";")
 
@@ -114,7 +116,7 @@ def get_sql_text(sql, interpret_as_file=None, echo_file_name=True):
     return sql
 
 
-def _get_queries(sql, interpret_as_file=None):
+def _get_queries(sql, *, interpret_as_file=None, format=False):
     if isinstance(sql, (list, tuple)):
         queries = []
         for i in sql:
@@ -133,11 +135,37 @@ def _get_queries(sql, interpret_as_file=None):
     if isinstance(sql, Path):
         sql = sql.read_text()
 
-    return split(format(sql, strip_comments=True))
+    # We're now dealing with a single string
+
+    # Quickly check for comments to see if we must strip them
+    if _has_comments(sql) or format:
+        sql = sqlparse.format(sql, strip_comments=True)
+
+    sql = sql.strip()
+    # If the last character is a semicolon, remove it
+    if sql.endswith(";"):
+        sql = sql[:-1]
+
+    if ";" not in sql:
+        # Fast path, only semicolons can be used to separate queries
+        return [sql]
+
+    # Do the expensive SQL split operation
+    return sqlparse.split(sql)
 
 
 def _is_prebind_param(param):
     return isinstance(param, (Composable, psql2.Composable))
+
+
+def _has_comments(sql):
+    """Fast pre-check to see if a query has comments.
+    This saves us from formatting the query and doing a regex search"""
+    for line in sql.split("\n"):
+        line = line.strip()
+        if line.startswith("--") or line.startswith("/*"):
+            return True
+    return False
 
 
 def _split_params(params):
@@ -374,8 +402,6 @@ def _render_query_text(connectable, query, params):
         query = _render_query(query, connectable)
 
     sql_text = str(query)
-    if isinstance(query, str):
-        sql_text = format(sql_text, strip_comments=True).strip()
 
     return query, sql_text, params
 
