@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## [4.4.0] - 2026-06-24
 
 - Rework `Database` class creation to preserve initialized engines if passed.
   Remove `recreate` parameter.
+- Remove SQL formatting to speed up query execution.
 
 ## [4.3.1] - 2026-06-19
 

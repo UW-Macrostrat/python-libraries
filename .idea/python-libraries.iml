@@ -27,6 +27,7 @@
       <excludeFolder url="file://$MODULE_DIR$/package-tools/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/dinosaur/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/app-frame/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/database/.venv" />
     </content>
     <orderEntry type="jdk" jdkName="uv (python-libraries)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
