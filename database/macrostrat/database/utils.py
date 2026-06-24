@@ -256,10 +256,6 @@ def create_database(_input: DatabaseInput, **kwargs):
 def create_engine(_input: DatabaseInput, **kwargs):
     from .core import Database
 
-    recreate = False
-    # If we specify engine options, we should recreate the engine
-    if len(kwargs) > 0:
-        recreate = True
     db_conn = _input
     if isinstance(_input, Database):
         db_conn = _input.engine
@@ -269,16 +265,16 @@ def create_engine(_input: DatabaseInput, **kwargs):
         db_conn = _input
 
     if isinstance(db_conn, Engine):
-        if recreate:
-            # Reuse the existing engine
-            log.info(f"Set up database connection with engine {db_conn.url}")
-            if db_conn.driver == "psycopg2":
-                log.warning(
-                    "The psycopg2 driver is deprecated. Please use psycopg3 instead."
-                )
-            return db_conn
-        else:
-            db_conn = db_conn.url
+        if kwargs:
+            log.warning(
+                "create_engine: ignoring kwargs %s for a pre-built Engine",
+                sorted(kwargs),
+            )
+        if db_conn.driver == "psycopg2":
+            log.warning(
+                "The psycopg2 driver is deprecated. Please use psycopg3 instead."
+            )
+        return db_conn
 
     if not isinstance(db_conn, URL):
         raise ValueError(f"Invalid input type: {_input}")
