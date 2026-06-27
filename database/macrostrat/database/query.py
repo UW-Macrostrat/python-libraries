@@ -536,8 +536,8 @@ def run_query(connectable, query, params=None, **kwargs):
                 query,
                 params,
                 ensure_single_query=True,
-                yield_results=False,
-                raise_errors=True,
+                yield_results=kwargs.pop("yield_results", False),
+                raise_errors=kwargs.pop("raise_errors", True),
                 **kwargs,
             )
         )
