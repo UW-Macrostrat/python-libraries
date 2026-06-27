@@ -186,7 +186,16 @@ class Database(object):
         if params is None:
             params = {}
         if use_instance_params:
-            params.update(self.instance_params)
+            if isinstance(params, dict):
+                params.update(self.instance_params)
+                return params
+            if isinstance(params, list):
+                if all(isinstance(p, dict) for p in params):
+                    params = [dict(p, **self.instance_params) for p in params]
+                    return params
+            warnings.warn(
+                "Could not apply shared instance params to %", params, stacklevel=2
+            )
         return params
 
     def exec_sql(self, sql, params=None, **kwargs):
