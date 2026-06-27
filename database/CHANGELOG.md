@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.4.1] - 2026-06-26
+
+- Fix executemany functionality in `Database.run_query`.
+
 ## [4.4.0] - 2026-06-24
 
 - Rework `Database` class creation to preserve initialized engines if passed.

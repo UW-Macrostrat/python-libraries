@@ -131,6 +131,21 @@ def test_sql_text_inference_6():
     assert infer_is_sql_text(insert_sample_query)
 
 
+def test_insert_sample_executemany(db):
+    db.run_query(
+        insert_sample_query,
+        [
+            dict(name="Test1"),
+            dict(name="Test2"),
+            dict(name="Test3"),
+        ],
+        raise_errors=True,
+    )
+
+    # Check that the sample table has the right number of rows
+    assert _get_sample_count(db) == 3
+
+
 def test_sql_statement_filtering(db):
     sql = """
     INSERT INTO sample (name) VALUES (:name);
