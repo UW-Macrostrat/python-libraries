@@ -142,6 +142,9 @@ def test_insert_sample_executemany(db):
         raise_errors=True,
     )
 
+    # Check that the sample table has the right number of rows
+    assert _get_sample_count(db) == 3
+
 
 def test_sql_statement_filtering(db):
     sql = """
