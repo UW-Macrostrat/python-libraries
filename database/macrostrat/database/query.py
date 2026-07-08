@@ -267,33 +267,53 @@ def _normalize_output_args(kwargs):
 
 
 @dataclass
-class StatementResult:
+class StatementDirective:
+    """What a hook asks the loop to *do*: run ``query`` (or ``skip`` it).
+
+    Returned by ``transform_statement``/``on_error`` *before* the statement runs,
+    so it is an instruction, not an outcome.
+    """
+
     query: Any
     params: Any = None
     skip: bool = False
     label: str | None = None
 
     @classmethod
-    def skipped(cls, query=None, params=None) -> "StatementResult":
+    def skipped(cls, query=None, params=None) -> "StatementDirective":
         return cls(query=query, params=params, skip=True)
+
+
+# Deprecated alias — renamed from the misleading "Result" (it is returned before
+# the statement runs). Kept for backwards compatibility.
+StatementResult = StatementDirective
 
 
 @dataclass
 class StatementContext:
+    """What a hook is told: the statement currently being processed."""
+
     index: int
     query: Any
     params: Any
     sql_text: str
 
 
-TransformFn = Callable[[StatementContext], list[StatementResult] | None]
+TransformFn = Callable[[StatementContext], list[StatementDirective] | None]
 Connectable = Union[Engine, Connection]
+
+# Called when a statement raises. It may return a list of StatementDirectives to
+# execute as recovery (e.g. drop-and-recreate, then re-run) — in which case the
+# original error is suppressed — or None to let normal error handling proceed.
+RecoveryFn = Callable[
+    [StatementContext, Exception, Connectable], "list[StatementDirective] | None"
+]
 
 
 def _statement_filter_to_transform(statement_filter) -> TransformFn:
-    def transform(ctx: StatementContext) -> list[StatementResult] | None:
+    def transform(ctx: StatementContext) -> list[StatementDirective] | None:
         if not statement_filter(ctx.sql_text, ctx.params):
-            return [StatementResult.skipped(query=ctx.query, params=ctx.params)]
+            return [StatementDirective.skipped(query=ctx.query, params=ctx.params)]
         return None
 
     return transform
@@ -326,6 +346,7 @@ def _run_sql(
 
     statement_filter = kwargs.pop("statement_filter", None)
     transform_statement: TransformFn | None = kwargs.pop("transform_statement", None)
+    on_error: RecoveryFn | None = kwargs.pop("on_error", None)
 
     if stop_on_error:
         raise_errors = True
@@ -367,7 +388,7 @@ def _run_sql(
         results = transform_statement(ctx) if transform_statement is not None else None
 
         if results is None:
-            results = [StatementResult(query=query, params=_params)]
+            results = [StatementDirective(query=query, params=_params)]
 
         for result in results:
             yield from _execute_one(
@@ -379,6 +400,8 @@ def _run_sql(
                 print_skipped=print_skipped,
                 has_server_binds=has_server_binds,
                 use_transaction=use_transaction,
+                on_error=on_error,
+                context=ctx,
             )
 
 
@@ -418,7 +441,7 @@ def escape_postgresql_cast_parameters(sql_text):
 
 def _execute_one(
     connectable,
-    result: StatementResult,
+    result: StatementDirective,
     output_file: IO,
     *,
     raise_errors: bool = True,
@@ -426,6 +449,9 @@ def _execute_one(
     has_server_binds: bool | None = None,
     print_skipped: bool = True,
     use_transaction: bool = True,
+    on_error: "RecoveryFn | None" = None,
+    context: "StatementContext | None" = None,
+    _recovering: bool = False,
 ):
     params = result.params
 
@@ -479,6 +505,25 @@ def _execute_one(
             trans.rollback()
         elif hasattr(connectable, "rollback"):
             connectable.rollback()
+
+        # Give an error handler a chance to recover (e.g. drop-and-recreate).
+        # Recovery statements run with on_error disabled to prevent loops.
+        if on_error is not None and not _recovering and context is not None:
+            recovery = on_error(context, err, connectable)
+            if recovery is not None:
+                for _stmt in recovery:
+                    yield from _execute_one(
+                        connectable,
+                        _stmt,
+                        output_file,
+                        raise_errors=raise_errors,
+                        output_mode=output_mode,
+                        print_skipped=print_skipped,
+                        use_transaction=use_transaction,
+                        _recovering=True,
+                    )
+                return
+
         if raise_errors or _should_raise_query_error(err):
             raise err
         if display_text is not None:
@@ -629,7 +674,7 @@ def run_sql(*args, **kwargs):
         A function that takes a SQL statement and parameters and returns True if the statement
         should be run, and False if it should be skipped.
     transform_statement: TransformFn | None
-        A function that takes a StatementContext and returns a list of StatementResult
+        A function that takes a StatementContext and returns a list of StatementDirective
         objects, which can modify the query, parameters, and whether the statement
         should be skipped or not. This allows for more complex logic than a simple
         statement filter.

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased] - 2026-07-05
+
+- Add `on_error` hook to `Database.run_query` to allow for custom error handling
+  and recovery. This can support retrying queries and adjusting their behavior
+  as needed.
+
 ## [4.4.1] - 2026-06-26
 
 - Fix executemany functionality in `Database.run_query`.
@@ -23,7 +29,7 @@ updates and value resets).
 - Improve and fix bugs with `temporary_database` and `template_database` context
   managers, which are useful for testing.
 - Use more consistent and open-ended approaches to passing database instances,
-  urls, or connection strings.
+  urls, and connection strings.
 
 ## [4.2.1] - 2026-06-18
 
