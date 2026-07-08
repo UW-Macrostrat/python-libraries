@@ -647,7 +647,7 @@ dev = [
 
 [[package]]
 name = "macrostrat-database"
-version = "4.4.1"
+version = "4.5.0"
 source = { editable = "database" }
 dependencies = [
     { name = "aiofiles" },

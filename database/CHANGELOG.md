@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - 2026-07-05
+## [4.5.0] - 2026-07-05
 
 - Add `on_error` hook to `Database.run_query` to allow for custom error handling
   and recovery. This can support retrying queries and adjusting their behavior
