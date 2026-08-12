@@ -9,17 +9,24 @@ raster layers in a list, the way the tileserver already declares vector layers.
 from dataclasses import dataclass, field
 from typing import Optional
 
-from fastapi import APIRouter, FastAPI, Query
+from fastapi import APIRouter, FastAPI, Query, Request
+from starlette.responses import Response
 from rio_tiler.types import RIOResampling
 from titiler.core.dependencies import DatasetParams
+from titiler.core.errors import add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
+from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 from typing_extensions import Annotated
 
 from macrostrat.raster_index import RasterIndex
 
 from .factory import RasterMosaicFactory, fixed_layers
 
-__all__ = ["RasterLayerConfig", "register_raster_layers"]
+__all__ = [
+    "RasterLayerConfig",
+    "register_raster_layers",
+    "install_exception_handlers",
+]
 
 
 @dataclass
@@ -40,6 +47,8 @@ class RasterLayerConfig:
     colormap: Optional[dict] = None
     # Look the colormap up from the index when the request doesn't supply one.
     use_index_colormap: bool = True
+    # Forwarded to the backend — notably `allow_overscaled` and `zoom_tolerance`.
+    backend_options: dict = field(default_factory=dict)
     optional_headers: list[OptionalHeader] = field(
         default_factory=lambda: [OptionalHeader.x_assets]
     )
@@ -55,9 +64,41 @@ class RasterLayerConfig:
             dataset_dependency=_dataset_params(self.resampling),
             default_colormap=self.colormap,
             use_index_colormap=self.use_index_colormap,
+            backend_options=self.backend_options,
             optional_headers=self.optional_headers,
         )
         return factory.router
+
+
+async def _empty_tile(request: Request, exc: Exception) -> Response:
+    """An empty, explicitly zero-length 204.
+
+    Two things have to be right here, because running off the edge of coverage
+    is routine and must never reach the client as an error:
+
+    - **No body.** titiler's own handler renders a JSON payload at this status,
+      and a 204 carrying a body is malformed.
+    - **An explicit `Content-Length: 0`.** Starlette omits the header entirely
+      for a 204, which leaves the response close-delimited; Varnish then tries
+      to read a body it will never get and fails the fetch with a 503.
+    """
+    return Response(status_code=204, headers={"content-length": "0"})
+
+
+def install_exception_handlers(app: FastAPI) -> None:
+    """Map "no coverage" onto an empty tile rather than a server error.
+
+    A tile request outside a layer's rasters is *normal operation* — panning to
+    the edge of coverage does it constantly — so it must not surface as a 5xx or
+    a logged traceback. Registering these with the routes means a host
+    application gets the behavior by mounting the layers, without having to know
+    these exceptions exist.
+    """
+    for exc, status in MOSAIC_STATUS_CODES.items():
+        if status == 204:
+            app.add_exception_handler(exc, _empty_tile)
+        else:
+            add_exception_handlers(app, {exc: status})
 
 
 def register_raster_layers(
@@ -69,6 +110,7 @@ def register_raster_layers(
     tags: Optional[list[str]] = None,
 ) -> None:
     """Mount each layer at `<prefix>/<slug>`."""
+    install_exception_handlers(app)
     for config in configs:
         app.include_router(
             config.router(index),

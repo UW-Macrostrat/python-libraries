@@ -47,7 +47,7 @@ def get_raster_info(href: str, **reader_options) -> RasterInfo:
     bounding box wraps the wrong way around the globe.
     """
     with Reader(href, **reader_options) as src:
-        bounds = tuple(_geographic_bounds(src))
+        bounds = tuple(src.get_geographic_bounds(WGS84_CRS))
         info = src.info()
         dataset = src.dataset
 
@@ -70,20 +70,6 @@ def get_raster_info(href: str, **reader_options) -> RasterInfo:
             colormap=colormap,
             metadata=info.model_dump(mode="json", exclude={"colormap"}),
         )
-
-
-def _geographic_bounds(src: Reader) -> tuple[float, float, float, float]:
-    """The reader's bounds in WGS84, across rio-tiler versions.
-
-    rio-tiler 6.4 introduced `get_geographic_bounds(crs)` and deprecated the
-    `geographic_bounds` property, which is gone in 7.x. Macrostrat's tile server
-    and its API run different major versions of the stack, so this package has
-    to work with both.
-    """
-    getter = getattr(src, "get_geographic_bounds", None)
-    if getter is not None:
-        return getter(WGS84_CRS)
-    return src.geographic_bounds
 
 
 def _crs_string(crs: Optional[rasterio.crs.CRS]) -> Optional[str]:

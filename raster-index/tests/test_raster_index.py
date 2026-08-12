@@ -129,3 +129,46 @@ class TestAssetSelection:
         feature = result["features"][0]
         assert feature["geometry"]["type"] == "Polygon"
         assert feature["properties"]["layer"] == "minerals"
+
+
+class TestUnifiedSelection:
+    """All lookups run through `raster_layers.select_rasters`.
+
+    The point of collapsing them is that the ordering and zoom rules can't drift
+    apart between entry points, so that agreement is what's asserted here.
+    """
+
+    def test_bbox_and_tile_agree_over_the_same_area(self, populated_index):
+        tile = _tile_for(OVERLAP, 12)
+        west, south, east, north = web_mercator.bounds(tile)
+
+        by_tile = populated_index.assets_for_tile(
+            tile.x, tile.y, tile.z, ["minerals"]
+        )
+        by_bbox = populated_index.assets_for_bbox(
+            west, south, east, north, ["minerals"]
+        )
+        assert [a.slug for a in by_bbox] == [a.slug for a in by_tile]
+
+    def test_bbox_never_flags_overscaled(self, populated_index):
+        """A bbox query has no zoom, so nothing can be 'past its resolution'."""
+        assets = populated_index.assets_for_bbox(
+            -105.0, 40.0, -104.9, 40.1, ["minerals"]
+        )
+        assert assets
+        assert not any(a.overscaled for a in assets)
+
+    def test_footprints_are_unfiltered_by_zoom(self, populated_index):
+        """Coverage stays visible even where the rasters would be overscaled."""
+        result = populated_index.footprints(["minerals"])
+        assert len(result["features"]) == 2
+
+    def test_selection_order_is_stable(self, populated_index):
+        tile = _tile_for(OVERLAP, 12)
+        runs = [
+            [a.slug for a in populated_index.assets_for_tile(
+                tile.x, tile.y, tile.z, ["minerals"]
+            )]
+            for _ in range(3)
+        ]
+        assert runs[0] == runs[1] == runs[2] == ["fine", "coarse"]

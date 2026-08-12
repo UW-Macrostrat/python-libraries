@@ -71,9 +71,9 @@ class RasterIndex:
         extension needs privileges the role that owns an application schema
         generally doesn't have.
         """
-        # Imported lazily: `macrostrat.database` is only needed to apply
-        # multi-statement SQL files, and this package has to stay installable
-        # next to both the 3.x and 4.x lines of it.
+        # Imported lazily: applying multi-statement SQL files is the only thing
+        # `macrostrat.database` is needed for, and nothing on the serving path
+        # should pay for importing it.
         from macrostrat.database import Database
 
         with self.engine.begin() as conn:
@@ -279,7 +279,31 @@ class RasterIndex:
             )
         return res.rowcount
 
-    # -- Asset selection ---------------------------------------------------
+    # -- Raster selection --------------------------------------------------
+    #
+    # Every lookup here goes through `raster_layers.select_rasters`, so the
+    # ordering and zoom rules live in exactly one place. These methods differ
+    # only in the geometry they ask about.
+
+    # Columns needed to build a `RasterAsset`.
+    _ASSET_COLUMNS = "href, layer, slug, minzoom, maxzoom, rescale_range, overscaled"
+
+    def _select_assets(self, geometry_sql: str, params: dict) -> list[RasterAsset]:
+        """Run `select_rasters` over an area and return assets in read order."""
+        sql = text(
+            f"""
+            SELECT {self._ASSET_COLUMNS}
+            FROM raster_layers.select_rasters(
+              {geometry_sql}, CAST(:layers AS text[]), :zoom, :tolerance
+            )
+            """
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(sql, params).mappings().all()
+        return [
+            RasterAsset(**{**dict(row), "rescale_range": _floats(row["rescale_range"])})
+            for row in rows
+        ]
 
     def assets_for_tile(
         self,
@@ -291,17 +315,35 @@ class RasterIndex:
         zoom_tolerance: int = 3,
     ) -> list[RasterAsset]:
         """The rasters to composite for a tile, in compositing order."""
-        sql = text("""
-            SELECT href, layer, slug, minzoom, maxzoom, rescale_range, overscaled
-            FROM raster_layers.get_rasters(:x, :y, :z, CAST(:layers AS text[]), :tolerance)
-            """)
-        params = dict(x=x, y=y, z=z, layers=layers, tolerance=zoom_tolerance)
-        with self.engine.connect() as conn:
-            rows = conn.execute(sql, params).mappings().all()
-        return [
-            RasterAsset(**{**dict(row), "rescale_range": _floats(row["rescale_range"])})
-            for row in rows
-        ]
+        return self._select_assets(
+            "raster_layers.tile_envelope(:x, :y, :z)",
+            dict(x=x, y=y, z=z, layers=layers, zoom=z, tolerance=zoom_tolerance),
+        )
+
+    def assets_for_bbox(
+        self,
+        west: float,
+        south: float,
+        east: float,
+        north: float,
+        layers: list[str],
+    ) -> list[RasterAsset]:
+        """The rasters intersecting a WGS84 bounding box, in compositing order.
+
+        No zoom is involved, so nothing is filtered or flagged as overscaled.
+        """
+        return self._select_assets(
+            "ST_MakeEnvelope(:west, :south, :east, :north, 4326)",
+            dict(
+                west=west,
+                south=south,
+                east=east,
+                north=north,
+                layers=layers,
+                zoom=None,
+                tolerance=None,
+            ),
+        )
 
     def should_generate_tile(self, x: int, y: int, z: int, layers: list[str]) -> bool:
         sql = text(
@@ -318,16 +360,17 @@ class RasterIndex:
         `None` when no rasters are indexed for them — the caller decides whether
         that is an empty layer or a typo.
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT ST_XMin(e) west, ST_YMin(e) south,
                    ST_XMax(e) east, ST_YMax(e) north
             FROM (
               SELECT ST_Extent(footprint) e
-              FROM raster_layers.raster
-              WHERE layer = ANY(CAST(:layers AS text[]))
+              FROM raster_layers.select_rasters(NULL, CAST(:layers AS text[]))
             ) a
             WHERE e IS NOT NULL
-            """)
+            """
+        )
         with self.engine.connect() as conn:
             row = conn.execute(sql, dict(layers=layers)).first()
         if row is None:
@@ -337,11 +380,37 @@ class RasterIndex:
     def footprints(self, layers: list[str]) -> dict[str, Any]:
         """The footprints of a set of layers, as a GeoJSON FeatureCollection."""
         sql = text(
-            "SELECT feature FROM raster_layers.layer_footprints(CAST(:layers AS text[]))"
+            """
+            SELECT jsonb_build_object(
+              'type', 'Feature',
+              'geometry', ST_AsGeoJSON(footprint)::jsonb,
+              'properties', jsonb_build_object(
+                'id', id, 'layer', layer, 'slug', slug, 'href', href,
+                'minzoom', minzoom, 'maxzoom', maxzoom, 'dtype', dtype
+              )
+            )
+            FROM raster_layers.select_rasters(NULL, CAST(:layers AS text[]))
+            """
         )
         with self.engine.connect() as conn:
             features = [r[0] for r in conn.execute(sql, dict(layers=layers))]
         return {"type": "FeatureCollection", "features": features}
+
+    def footprint_tile(
+        self, x: int, y: int, z: int, layers: Optional[list[str]] = None
+    ) -> bytes:
+        """Raster footprints for a tile, as Mapbox Vector Tile bytes.
+
+        Empty (zero-length) where nothing intersects, which is a valid empty
+        tile as far as a client is concerned.
+        """
+        sql = text(
+            "SELECT raster_layers.footprint_tile("
+            ":x, :y, :z, CAST(:layers AS text[]))"
+        )
+        with self.engine.connect() as conn:
+            data = conn.execute(sql, dict(x=x, y=y, z=z, layers=layers)).scalar()
+        return bytes(data) if data is not None else b""
 
     # -- Internals ---------------------------------------------------------
 

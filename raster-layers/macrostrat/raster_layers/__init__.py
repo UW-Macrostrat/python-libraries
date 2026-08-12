@@ -4,17 +4,26 @@ Reads assets from a `macrostrat.raster_index` database and composites them into
 tiles, as FastAPI routes that can be mounted into any application.
 """
 
-from .backend import NoAssetFoundError, OverscaledAssetsError, PGRasterMosaic
-from .factory import LayerListParams, RasterMosaicFactory, fixed_layers
-from .layers import RasterLayerConfig, register_raster_layers
+from .backend import PGRasterMosaic
+from .factory import (
+    MVT_MEDIA_TYPE,
+    LayerListParams,
+    RasterMosaicFactory,
+    fixed_layers,
+)
+from .layers import (
+    RasterLayerConfig,
+    install_exception_handlers,
+    register_raster_layers,
+)
 
 __all__ = [
     "PGRasterMosaic",
     "RasterMosaicFactory",
     "RasterLayerConfig",
     "register_raster_layers",
+    "install_exception_handlers",
     "fixed_layers",
     "LayerListParams",
-    "NoAssetFoundError",
-    "OverscaledAssetsError",
+    "MVT_MEDIA_TYPE",
 ]

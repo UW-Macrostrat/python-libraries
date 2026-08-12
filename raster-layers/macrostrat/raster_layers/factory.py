@@ -1,19 +1,20 @@
 """FastAPI routes for serving indexed raster layers.
 
-`RasterMosaicFactory` is titiler's `MosaicTilerFactory` with the mosaic-document
-routes removed and the index bound in. Everything about tiling, rendering,
-rescaling and colormaps is inherited — the only thing this adds is where assets
-come from and how a layer supplies its own default colormap.
+`RasterMosaicFactory` is titiler's `MosaicTilerFactory` with the index bound in
+as its backend. Since rio-tiler 8 moved the mosaic backend contract into
+rio-tiler itself, every route titiler registers — tiles, tilejson, info, point,
+assets — works against an index-backed mosaic unchanged. What's added here is
+the layer's own default colormap and a footprints layer.
 """
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
 from functools import partial
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
+from attrs import define, field
 from fastapi import Depends, Path, Query
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from titiler.core.dependencies import ColorMapParams
-from titiler.core.resources.enums import OptionalHeader
 from titiler.mosaic.factory import MosaicTilerFactory
 from typing_extensions import Annotated
 
@@ -24,7 +25,9 @@ from .backend import PGRasterMosaic
 
 log = get_logger(__name__)
 
-__all__ = ["RasterMosaicFactory", "fixed_layers", "LayerListParams"]
+__all__ = ["RasterMosaicFactory", "fixed_layers", "LayerListParams", "MVT_MEDIA_TYPE"]
+
+MVT_MEDIA_TYPE = "application/vnd.mapbox-vector-tile"
 
 
 def fixed_layers(*slugs: str) -> Callable[[], list[str]]:
@@ -49,78 +52,77 @@ def LayerListParams(
     return [slug for slug in layers.split(",") if slug]
 
 
-@dataclass
+@define(kw_only=True)
 class RasterMosaicFactory(MosaicTilerFactory):
     """Tile routes for one or more layers in a raster index."""
 
-    index: Optional[RasterIndex] = None
+    index: Optional[RasterIndex] = field(default=None)
+
+    # Required by the parent, but we always supply it ourselves in
+    # `__attrs_post_init__` — the backend has to carry the index.
+    backend: Any = field(default=None)
 
     # Colormap used when the request doesn't specify one. Falls back to the
     # layer's own colormap in the index (categorical rasters are unreadable
     # without it, and clients shouldn't have to know a 40-entry palette).
-    default_colormap: Optional[dict] = None
-    use_index_colormap: bool = True
+    default_colormap: Optional[dict] = field(default=None)
+    use_index_colormap: bool = field(default=True)
 
-    # Reader options forwarded to rio-tiler (e.g. `{"options": {...}}`).
-    backend_options: dict = field(default_factory=dict)
+    # Forwarded to `PGRasterMosaic` (e.g. `allow_overscaled`, `zoom_tolerance`).
+    backend_options: dict = field(factory=dict)
 
-    def __post_init__(self):
+    # The viewer template pulls in remote assets; not useful for these layers.
+    add_viewer: bool = field(default=False)
+
+    _colormap_cache: dict = field(factory=dict, init=False)
+
+    def __attrs_post_init__(self):
         if self.index is None:
             raise ValueError("RasterMosaicFactory requires a RasterIndex")
-        # Bind the index into the backend: titiler constructs the reader itself,
-        # and `backend_dependency` can't carry a non-request-scoped object.
-        self.reader = partial(PGRasterMosaic, index=self.index, **self.backend_options)
+        # titiler constructs the backend itself, and `backend_dependency` can't
+        # carry a non-request-scoped object, so bind the index with a partial.
+        self.backend = partial(PGRasterMosaic, index=self.index, **self.backend_options)
         self.colormap_dependency = self._colormap_dependency()
-        super().__post_init__()
+        super().__attrs_post_init__()
 
     def register_routes(self):
-        """Register only the routes that make sense without a mosaic document.
+        super().register_routes()
+        self.footprints()
 
-        Dropped: `/`, `/info`, `/validate`, `/map` — all of which describe or
-        validate a MosaicJSON. `/assets` is replaced with index-backed versions.
-        """
-        self.tile()
-        self.tilejson()
-        self.bounds()
-        self.point()
-        self.assets()
-
-    def assets(self):
-        """Register asset-listing routes, answered from the index."""
+    def footprints(self):
+        """Coverage of these layers, without reading any pixels."""
 
         @self.router.get(
-            "/{z}/{x}/{y}/assets",
-            responses={200: {"description": "Rasters overlapping a tile"}},
+            "/footprints/{z}/{x}/{y}",
+            responses={
+                200: {
+                    "content": {MVT_MEDIA_TYPE: {}},
+                    "description": "Raster footprints as a vector tile",
+                }
+            },
+            response_class=Response,
         )
-        def assets_for_tile(
+        def footprint_tile(
             z: Annotated[int, Path(description="Tile zoom level")],
             x: Annotated[int, Path(description="Tile column")],
             y: Annotated[int, Path(description="Tile row")],
             src_path=Depends(self.path_dependency),
         ):
-            """The rasters that would be read for a tile, in compositing order."""
-            assets = self.index.assets_for_tile(x, y, z, src_path)
-            return JSONResponse(
-                {
-                    "layers": src_path,
-                    "should_generate": self.index.should_generate_tile(
-                        x, y, z, src_path
-                    ),
-                    "assets": [a.model_dump() for a in assets],
-                }
-            )
+            """Raster footprints as a vector tile (layer `raster_footprints`)."""
+            data = self.index.footprint_tile(x, y, z, src_path)
+            return Response(data, media_type=MVT_MEDIA_TYPE)
 
         @self.router.get(
-            "/assets",
-            responses={200: {"description": "Footprints of every indexed raster"}},
+            "/footprints",
+            responses={200: {"description": "Raster footprints as GeoJSON"}},
         )
-        def assets(src_path=Depends(self.path_dependency)):
-            """Every footprint in these layers, as GeoJSON."""
+        def footprints(src_path=Depends(self.path_dependency)):
+            """Every footprint in these layers, as a GeoJSON FeatureCollection."""
             return JSONResponse(self.index.footprints(src_path))
 
     # -- Colormap resolution -----------------------------------------------
 
-    def _colormap_dependency(self) -> Callable[..., Optional[dict]]:
+    def _colormap_dependency(self) -> Callable[..., Optional[Any]]:
         """Wrap titiler's colormap params with a per-layer default."""
 
         def dependency(
@@ -155,15 +157,6 @@ class RasterMosaicFactory(MosaicTilerFactory):
 
         self._colormap_cache[layers] = colormap
         return colormap
-
-    @property
-    def _colormap_cache(self) -> dict:
-        # Lazily attached so the dataclass doesn't need a mutable default.
-        cache = getattr(self, "_cmap_cache", None)
-        if cache is None:
-            cache = {}
-            self._cmap_cache = cache
-        return cache
 
 
 def normalize_colormap(colormap: dict) -> dict:

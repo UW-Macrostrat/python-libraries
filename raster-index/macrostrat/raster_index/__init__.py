@@ -10,7 +10,7 @@ Serving is a separate concern, handled by `macrostrat.raster_layers`.
 from .defs import LayerDefinition, RasterAsset, RasterInfo
 from .footprints import get_raster_info
 from .index import RasterIndex, schema_files
-from .scan import RasterObject, scan_prefix
+from .scan import BucketPrefix, RasterObject, parse_bucket_url, scan_prefix
 
 __all__ = [
     "RasterIndex",
@@ -18,6 +18,8 @@ __all__ = [
     "get_raster_info",
     "scan_prefix",
     "RasterObject",
+    "BucketPrefix",
+    "parse_bucket_url",
     "RasterAsset",
     "RasterInfo",
     "LayerDefinition",

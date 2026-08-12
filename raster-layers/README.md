@@ -1,6 +1,6 @@
 # `macrostrat.raster_layers`
 
-Serve the layers in a [`macrostrat.raster_index`](../raster-index) database as
+Serve the layers in a [`macrostrat.raster_index`](https://github.com/UW-Macrostrat/python-libraries/tree/main/raster-index) database as
 mosaicked map tiles, as FastAPI routes mountable in any application.
 
 Given a tile, the index says which COGs cover it and in what order; this package
@@ -35,20 +35,33 @@ register_raster_layers(
 )
 ```
 
-Each layer gets `/tiles/{z}/{x}/{y}[@{scale}x][.{format}]`, `/tilejson.json`,
-`/bounds`, `/point/{lon},{lat}`, `/{z}/{x}/{y}/assets`, and `/assets` (footprints
-as GeoJSON).
+Each layer gets titiler's full mosaic route set — `/tiles/{tileMatrixSetId}/{z}/{x}/{y}`,
+`/{tileMatrixSetId}/tilejson.json`, `/info`, `/point/{lon},{lat}`, the
+`/assets` lookups — plus two of its own:
 
-Install titiler's exception handlers (`MOSAIC_STATUS_CODES`) so a tile with no
-coverage comes back as `204 No Content` — `NoAssetFoundError` is cogeo-mosaic's,
-re-exported for exactly that reason.
+- `/footprints/{z}/{x}/{y}` — coverage as a **vector tile**, MVT layer
+  `raster_footprints`. The raster counterpart to a map-footprints layer: where
+  the data is, without reading a pixel.
+- `/footprints` — the same thing as GeoJSON, for small layers and diagnostics.
+
+`register_raster_layers` installs its own exception handlers, so a host
+application needs no extra setup. Don't register titiler's `MOSAIC_STATUS_CODES`
+*after* mounting — it would replace the no-coverage handler with one that
+returns a body-carrying 204 (see below).
 
 ## Behavior worth knowing
 
-- **Overscaled tiles are empty by default.** When every covering raster is
-  coarser than the requested zoom, the response is "nothing to serve" (204)
-  rather than a magnified blur. Set `allow_overscaled=True` in `backend_options`
-  to serve them anyway.
+- **Overscaled tiles keep rendering.** Zooming past a raster's native
+  resolution magnifies it rather than making the layer vanish, which is what
+  every other raster service does. Set `allow_overscaled=False` in
+  `backend_options` for the opposite; `raster_layers.should_generate_tile` in
+  the index is the right tool for deciding what to *cache*.
+- **No coverage is a bodyless `204`, with an explicit `Content-Length: 0`.**
+  Both details matter: titiler's stock handler returns a 204 carrying a JSON
+  body, and Starlette omits the length header entirely — either one makes
+  Varnish fail the fetch and turn ordinary panning into 503s. Watch out for
+  compression middleware too: gzipping an empty body re-attaches a
+  `content-length` and reintroduces the same failure.
 - **Colormaps default per layer.** Categorical rasters are unreadable without
   their palette, so when a request doesn't send one, the layer's `colormap` from
   the index is used. An explicit `colormap` / `colormap_name` query parameter

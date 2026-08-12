@@ -9,7 +9,7 @@ worthwhile for a given tile: its footprint, its native zoom range, and its data
 type. The schema name is `raster_layers` rather than `raster`/`rasters` to stay
 clear of PostGIS Raster's vocabulary.
 
-Serving these layers is [`macrostrat.raster_layers`](../raster-layers).
+Serving these layers is [`macrostrat.raster_layers`](https://github.com/UW-Macrostrat/python-libraries/tree/main/raster-layers).
 
 ## Usage
 
@@ -51,10 +51,8 @@ host application can fold it into its own schema management rather than calling
 
 ```sh
 raster-index define-layer emit-minerals --name "EMIT mineral maps"
-raster-index scan s3://remote-sensing-data/emit-mineral-maps/ \
-  --layer emit-minerals --anonymous \
-  --endpoint-url https://storage.example.org \
-  --public-url https://storage.example.org
+raster-index scan https://storage.example.org/remote-sensing-data/emit-mineral-maps/ \
+  --layer emit-minerals
 raster-index set-colormap emit-minerals --from https://storage.example.org/.../nevada.tif
 raster-index assets 10 180 411 --layer emit-minerals
 ```
@@ -64,7 +62,9 @@ environment variables. A host application that already knows its own connection
 (Macrostrat mounts these as `macrostrat raster`) calls
 `set_default_connection(url_or_callable)` once, and its users never pass
 `--database` — though it still works, and still wins. Scanning object stores
-needs the `s3` extra.
+needs the `s3` extra (boto3), whichever URL form you use — an `https://` bucket
+URL is *rewritten* into an endpoint/bucket/prefix and listed through the same
+S3 API, rather than being a second code path.
 
 ## Known limitations
 

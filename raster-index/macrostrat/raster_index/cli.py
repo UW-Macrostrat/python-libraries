@@ -228,24 +228,34 @@ def add(
 @cli.command(name="scan")
 def scan(
     ctx: Context,
-    url: str = Argument(..., help="Prefix to scan, e.g. s3://bucket/prefix/"),
+    url: str = Argument(
+        ...,
+        help="Bucket prefix, e.g. https://storage.example.org/bucket/prefix/",
+    ),
     layer: str = Option(..., "--layer", "-l", help="Layer to add rasters to"),
+    dry_run: bool = Option(False, help="Show what would be registered"),
+    credentials: bool = Option(False, help="Sign requests with AWS credentials"),
     endpoint_url: Optional[str] = Option(
-        None, help="S3-compatible endpoint to list against"
+        None, help="S3-compatible endpoint to list against (inferred from https URLs)"
     ),
     public_url: Optional[str] = Option(
-        None, help="Rewrite hrefs onto this HTTPS origin"
+        None, help="Rewrite hrefs onto this origin (inferred from https URLs)"
     ),
-    anonymous: bool = Option(False, help="List without credentials"),
-    dry_run: bool = Option(False, help="Show what would be registered"),
 ):
-    """Register every raster under an object-store prefix."""
+    """Register every raster under a bucket prefix.
+
+    An `https://` URL — the one you'd paste into a browser — needs nothing else:
+    its origin is the endpoint, its first path segment the bucket, and the
+    rasters are indexed at that same origin. Use `s3://` (with `--endpoint-url`)
+    for buckets whose location isn't implied by a public URL. Listing is
+    unsigned unless `--credentials` is given.
+    """
     objects = list(
         scan_prefix(
             url,
             endpoint_url=endpoint_url,
             public_url=public_url,
-            anonymous=anonymous,
+            credentials=credentials,
         )
     )
     if not objects:

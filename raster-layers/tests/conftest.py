@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 from pytest import fixture
 from sqlalchemy.engine import make_url
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
-from titiler.mosaic.errors import MOSAIC_STATUS_CODES
 
 from macrostrat.database.utils import temporary_database
 from macrostrat.raster_index import RasterIndex
@@ -49,8 +48,10 @@ def app(index) -> FastAPI:
         [RasterLayerConfig(slug="minerals", title="Test mineral maps")],
         prefix="/rasters",
     )
+    # Deliberately *not* registering MOSAIC_STATUS_CODES: `register_raster_layers`
+    # installs its own no-coverage handler, and re-registering titiler's after
+    # mounting would clobber it (a real hazard for host applications too).
     add_exception_handlers(app, DEFAULT_STATUS_CODES)
-    add_exception_handlers(app, MOSAIC_STATUS_CODES)
     return app
 
 
