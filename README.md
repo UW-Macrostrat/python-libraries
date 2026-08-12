@@ -18,6 +18,10 @@ A monorepo containing Python-based tools and libraries for Earth data projects.
 - `macrostrat.dinosaur`: Utilities for on-the-fly database migration and
   conformance testing
 - `macrostrat.package_tools`: Monorepo versioning and PyPI publishing utilities
+- `macrostrat.raster_index`: An index of cloud-optimized rasters (COGs), grouped
+  into named layers, with the `raster_layers` schema and a registration CLI
+- `macrostrat.raster_layers`: Serves those layers as mosaicked map tiles, as
+  FastAPI routes mountable in any application
 - `macrostrat.utils`: Helpers for logging and command-line apps
 
 ## Development

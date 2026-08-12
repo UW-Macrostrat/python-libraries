@@ -3,7 +3,7 @@ name = "macrostrat.python_libraries"
 version = "1.4.0"
 description = "Macrostrat Python libraries"
 authors = [{ name = "Daven Quinn", email = "dev@davenquinn.com" }]
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "setuptools>=82.0.1",
 ]
@@ -17,7 +17,11 @@ dev = [
     "macrostrat.package_tools",
     "macrostrat.utils",
     "macrostrat.auth_system",
+    "macrostrat.raster_index",
+    "macrostrat.raster_layers",
     "pytest>=7.2.2,<10",
+    "pillow>=10.0",
+    "mapbox-vector-tile>=2.1.0,<3",
     "python-dotenv>=1.0.0,<2",
     "requests>=2.27.1,<3",
     "rich>=13,<16",
@@ -40,6 +44,8 @@ default-groups = "all"
 "macrostrat.package_tools" = { path = "./package-tools", editable = true }
 "macrostrat.utils" = { path = "./utils", editable = true }
 "macrostrat.auth_system" = { path = "./auth-system", editable = true }
+"macrostrat.raster_index" = { path = "./raster-index", editable = true }
+"macrostrat.raster_layers" = { path = "./raster-layers", editable = true }
 
 
 [tool.pytest.ini_options]
