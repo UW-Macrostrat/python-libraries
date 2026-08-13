@@ -99,11 +99,16 @@ def database_cluster(
         in_memory = True
 
     if in_memory:
-        container.with_kwargs(
-            tmpfs={
-                "/var/lib/postgresql/data": "uid=999,gid=999,mode=0700",
-            }
-        )
+        # testcontainers >= 4.x owns `tmpfs` itself and passes it to Docker
+        # explicitly, so smuggling it through `with_kwargs` collides with that
+        # argument ("got multiple values for keyword argument 'tmpfs'"). Use the
+        # dedicated mount API where it exists, and fall back for older versions.
+        data_dir = "/var/lib/postgresql/data"
+        options = "uid=999,gid=999,mode=0700"
+        if hasattr(container, "with_tmpfs_mount"):
+            container.with_tmpfs_mount(data_dir, options)
+        else:
+            container.with_kwargs(tmpfs={data_dir: options})
 
     cmd = build_postgres_command(_config)
     if cmd is not None:
