@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1] - 2026-08-12
+
+- Resolve colormaps from the assets a tile read already fetched, rather than
+  caching them or querying separately: `set-colormap` and later edits take effect
+  on the next tile, with one database query per tile instead of two
+- Requires `macrostrat.raster_index` 0.1.1, whose selection moved out of stored
+  functions into the package
+
 ## [0.1.0] - 2026-08-12
 
 - Initial release: `PGRasterMosaic` (a rio-tiler mosaic backend reading assets

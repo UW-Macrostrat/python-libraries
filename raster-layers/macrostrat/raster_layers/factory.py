@@ -14,7 +14,7 @@ from typing import Any, Optional
 from attrs import define, field
 from fastapi import Depends, Path, Query
 from starlette.responses import JSONResponse, Response
-from titiler.core.dependencies import ColorMapParams
+from titiler.core.utils import render_image
 from titiler.mosaic.factory import MosaicTilerFactory
 from typing_extensions import Annotated
 
@@ -74,15 +74,13 @@ class RasterMosaicFactory(MosaicTilerFactory):
     # The viewer template pulls in remote assets; not useful for these layers.
     add_viewer: bool = field(default=False)
 
-    _colormap_cache: dict = field(factory=dict, init=False)
-
     def __attrs_post_init__(self):
         if self.index is None:
             raise ValueError("RasterMosaicFactory requires a RasterIndex")
         # titiler constructs the backend itself, and `backend_dependency` can't
         # carry a non-request-scoped object, so bind the index with a partial.
         self.backend = partial(PGRasterMosaic, index=self.index, **self.backend_options)
-        self.colormap_dependency = self._colormap_dependency()
+        self.render_func = self._render_func()
         super().__attrs_post_init__()
 
     def register_routes(self):
@@ -122,41 +120,28 @@ class RasterMosaicFactory(MosaicTilerFactory):
 
     # -- Colormap resolution -----------------------------------------------
 
-    def _colormap_dependency(self) -> Callable[..., Optional[Any]]:
-        """Wrap titiler's colormap params with a per-layer default."""
+    def _render_func(self) -> Callable[..., tuple[bytes, str]]:
+        """Render, defaulting the colormap to the one the assets carried.
 
-        def dependency(
-            colormap=Depends(ColorMapParams),
-            src_path=Depends(self.path_dependency),
-        ) -> Optional[Any]:
-            if colormap:
-                return colormap
-            return self._layer_colormap(tuple(src_path))
+        The colormap arrives on the image itself (see `PGRasterMosaic.tile`),
+        which is what lets a tile cost a single database query: the same lookup
+        that decides *which* rasters to read also says how to draw them. A
+        request that sends its own `colormap`/`colormap_name` still wins, since
+        this only fills in when titiler resolved none.
+        """
+        default = self.default_colormap
+        use_index = self.use_index_colormap
 
-        return dependency
+        def render(image, colormap=None, **kwargs):
+            if colormap is None and default is not None:
+                colormap = default
+            elif colormap is None and use_index:
+                carried = (image.metadata or {}).get("colormap")
+                if carried:
+                    colormap = normalize_colormap(carried)
+            return render_image(image, colormap=colormap, **kwargs)
 
-    def _layer_colormap(self, layers: tuple[str, ...]) -> Optional[dict]:
-        if self.default_colormap is not None:
-            return self.default_colormap
-        if not self.use_index_colormap:
-            return None
-        if layers in self._colormap_cache:
-            return self._colormap_cache[layers]
-
-        colormap = None
-        try:
-            # First layer that defines one wins, matching compositing priority.
-            by_slug = {l.slug: l.colormap for l in self.index.layers()}
-            for slug in layers:
-                if by_slug.get(slug):
-                    colormap = normalize_colormap(by_slug[slug])
-                    break
-        except Exception as err:  # pragma: no cover - degraded, not fatal
-            log.warning("Could not resolve colormap for %s: %s", layers, err)
-            return None
-
-        self._colormap_cache[layers] = colormap
-        return colormap
+        return render
 
 
 def normalize_colormap(colormap: dict) -> dict:

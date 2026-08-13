@@ -62,10 +62,14 @@ returns a body-carrying 204 (see below).
   Varnish fail the fetch and turn ordinary panning into 503s. Watch out for
   compression middleware too: gzipping an empty body re-attaches a
   `content-length` and reintroduces the same failure.
-- **Colormaps default per layer.** Categorical rasters are unreadable without
-  their palette, so when a request doesn't send one, the layer's `colormap` from
-  the index is used. An explicit `colormap` / `colormap_name` query parameter
-  always wins.
+- **Colormaps default per layer, and ride along with the assets.** Categorical
+  rasters are unreadable without their palette, so when a request doesn't send
+  one, the layer's `colormap` from the index is used. It comes back on the same
+  query that decides which rasters to read — one database round trip per tile,
+  no cache to invalidate — so `set-colormap` and later edits take effect
+  immediately. An explicit `colormap` / `colormap_name` query parameter always
+  wins. Because the colormap travels per asset, per-raster rendering (leveling
+  from `rescale_range`) has somewhere to live later.
 - **Whole-mosaic operations are unsupported.** `/info`, `/statistics`, `/preview`
   and friends would mean reading every raster in a layer; layer-wide metadata
   belongs to the index.

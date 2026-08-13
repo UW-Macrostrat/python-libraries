@@ -56,6 +56,11 @@ class PGRasterMosaic(BaseBackend):
     # the index is the right tool for deciding what to *cache*.
     allow_overscaled: bool = attr.ib(default=True)
 
+    # Assets resolved for this request, kept so the colormap that came back with
+    # them can reach rendering. The backend is constructed per request by the
+    # route, so this is request-scoped state, not shared.
+    resolved_assets: list = attr.ib(init=False, factory=list)
+
     bounds: BBox = attr.ib(init=False, default=(-180, -90, 180, 90))
     crs: CRS = attr.ib(init=False, default=WGS84_CRS)
     minzoom: int = attr.ib(init=False, default=None)
@@ -87,7 +92,32 @@ class PGRasterMosaic(BaseBackend):
         )
         if not self.allow_overscaled:
             assets = [a for a in assets if not a.overscaled]
+        self.resolved_assets = assets
         return [a.href for a in assets]
+
+    @property
+    def colormap(self) -> Optional[dict]:
+        """The colormap for the assets resolved on this request, if any.
+
+        First asset that declares one wins, which is the same precedence
+        compositing uses.
+        """
+        for asset in self.resolved_assets:
+            if asset.colormap:
+                return asset.colormap
+        return None
+
+    def tile(self, *args: Any, **kwargs: Any):
+        """Read a tile, tagging it with the colormap its assets carried.
+
+        Rendering happens back in the route, after the reader is closed, so the
+        colormap rides along on the image rather than being looked up again.
+        """
+        image, assets = super().tile(*args, **kwargs)
+        colormap = self.colormap
+        if colormap is not None:
+            image.metadata = {**(image.metadata or {}), "colormap": colormap}
+        return image, assets
 
     def assets_for_point(
         self,

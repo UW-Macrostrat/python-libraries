@@ -18,6 +18,7 @@ from macrostrat.utils import get_logger
 
 from .defs import LayerDefinition, RasterAsset, RasterInfo
 from .footprints import get_raster_info
+from .queries import TILE_ENVELOPE, bbox_envelope, selection
 
 log = get_logger(__name__)
 
@@ -187,7 +188,10 @@ class RasterIndex:
         """Register a raster, reading its metadata if not supplied.
 
         Keyed on `href`, so this is an upsert: pointing the CLI at the same
-        bucket twice refreshes the index rather than duplicating it.
+        bucket twice refreshes the index rather than duplicating it. One
+        consequence worth knowing — a raster belongs to exactly one layer, so
+        registering the same href under a different layer *moves* it rather than
+        adding a second copy.
         """
         href = str(href)
         if info is None:
@@ -281,22 +285,19 @@ class RasterIndex:
 
     # -- Raster selection --------------------------------------------------
     #
-    # Every lookup here goes through `raster_layers.select_rasters`, so the
-    # ordering and zoom rules live in exactly one place. These methods differ
-    # only in the geometry they ask about.
+    # Every lookup composes `queries.selection`, so the ordering and zoom rules
+    # live in exactly one place. These methods differ only in the area they ask
+    # about and what they do with the rows.
 
     # Columns needed to build a `RasterAsset`.
-    _ASSET_COLUMNS = "href, layer, slug, minzoom, maxzoom, rescale_range, overscaled"
+    _ASSET_COLUMNS = (
+        "href, layer, slug, minzoom, maxzoom, rescale_range, colormap, overscaled"
+    )
 
-    def _select_assets(self, geometry_sql: str, params: dict) -> list[RasterAsset]:
-        """Run `select_rasters` over an area and return assets in read order."""
+    def _select_assets(self, geometry: str, params: dict) -> list[RasterAsset]:
+        """Run the selection over an area and return assets in read order."""
         sql = text(
-            f"""
-            SELECT {self._ASSET_COLUMNS}
-            FROM raster_layers.select_rasters(
-              {geometry_sql}, CAST(:layers AS text[]), :zoom, :tolerance
-            )
-            """
+            f"SELECT {self._ASSET_COLUMNS} FROM ({selection(geometry)}) selected"
         )
         with self.engine.connect() as conn:
             rows = conn.execute(sql, params).mappings().all()
@@ -316,7 +317,7 @@ class RasterIndex:
     ) -> list[RasterAsset]:
         """The rasters to composite for a tile, in compositing order."""
         return self._select_assets(
-            "raster_layers.tile_envelope(:x, :y, :z)",
+            TILE_ENVELOPE,
             dict(x=x, y=y, z=z, layers=layers, zoom=z, tolerance=zoom_tolerance),
         )
 
@@ -333,7 +334,7 @@ class RasterIndex:
         No zoom is involved, so nothing is filtered or flagged as overscaled.
         """
         return self._select_assets(
-            "ST_MakeEnvelope(:west, :south, :east, :north, 4326)",
+            bbox_envelope,
             dict(
                 west=west,
                 south=south,
@@ -346,11 +347,20 @@ class RasterIndex:
         )
 
     def should_generate_tile(self, x: int, y: int, z: int, layers: list[str]) -> bool:
-        sql = text(
-            "SELECT raster_layers.should_generate_tile(:x, :y, :z, CAST(:layers AS text[]))"
-        )
+        """Whether a tile has any asset that isn't overscaled.
+
+        Used to avoid caching (or even rendering) tiles that would only ever be a
+        blurry magnification of data already served at a lower zoom.
+        """
+        sql = text(f"""
+            SELECT EXISTS (
+              SELECT 1 FROM ({selection(TILE_ENVELOPE)}) selected
+              WHERE NOT overscaled
+            )
+            """)
+        params = dict(x=x, y=y, z=z, layers=layers, zoom=z, tolerance=3)
         with self.engine.connect() as conn:
-            return bool(conn.execute(sql, dict(x=x, y=y, z=z, layers=layers)).scalar())
+            return bool(conn.execute(sql, params).scalar())
 
     def layer_bounds(
         self, layers: list[str]
@@ -360,27 +370,24 @@ class RasterIndex:
         `None` when no rasters are indexed for them — the caller decides whether
         that is an empty layer or a typo.
         """
-        sql = text(
-            """
+        sql = text(f"""
             SELECT ST_XMin(e) west, ST_YMin(e) south,
                    ST_XMax(e) east, ST_YMax(e) north
             FROM (
-              SELECT ST_Extent(footprint) e
-              FROM raster_layers.select_rasters(NULL, CAST(:layers AS text[]))
+              SELECT ST_Extent(footprint) e FROM ({selection()}) selected
             ) a
             WHERE e IS NOT NULL
-            """
-        )
+            """)
+        params = dict(layers=layers, zoom=None, tolerance=None)
         with self.engine.connect() as conn:
-            row = conn.execute(sql, dict(layers=layers)).first()
+            row = conn.execute(sql, params).first()
         if row is None:
             return None
         return (row.west, row.south, row.east, row.north)
 
     def footprints(self, layers: list[str]) -> dict[str, Any]:
         """The footprints of a set of layers, as a GeoJSON FeatureCollection."""
-        sql = text(
-            """
+        sql = text(f"""
             SELECT jsonb_build_object(
               'type', 'Feature',
               'geometry', ST_AsGeoJSON(footprint)::jsonb,
@@ -389,11 +396,11 @@ class RasterIndex:
                 'minzoom', minzoom, 'maxzoom', maxzoom, 'dtype', dtype
               )
             )
-            FROM raster_layers.select_rasters(NULL, CAST(:layers AS text[]))
-            """
-        )
+            FROM ({selection()}) selected
+            """)
+        params = dict(layers=layers, zoom=None, tolerance=None)
         with self.engine.connect() as conn:
-            features = [r[0] for r in conn.execute(sql, dict(layers=layers))]
+            features = [r[0] for r in conn.execute(sql, params)]
         return {"type": "FeatureCollection", "features": features}
 
     def footprint_tile(
@@ -401,15 +408,36 @@ class RasterIndex:
     ) -> bytes:
         """Raster footprints for a tile, as Mapbox Vector Tile bytes.
 
+        The raster-side counterpart to Macrostrat's map-footprints layer: an
+        index of *where coverage is*, cheap enough to draw at any zoom, without
+        touching a single COG. No zoom filter — coverage should be visible even
+        where the rasters themselves would be overscaled.
+
+        The MVT layer name `raster_footprints` is a cross-repo contract: it must
+        match the `source-layer` used by any client style.
+
         Empty (zero-length) where nothing intersects, which is a valid empty
         tile as far as a client is concerned.
         """
-        sql = text(
-            "SELECT raster_layers.footprint_tile("
-            ":x, :y, :z, CAST(:layers AS text[]))"
-        )
+        sql = text(f"""
+            WITH selected AS ({selection(TILE_ENVELOPE)}),
+            footprints AS (
+              SELECT
+                id, layer, slug, href, minzoom, maxzoom, dtype,
+                ST_AsMVTGeom(
+                  ST_Transform(ST_Intersection(footprint, {TILE_ENVELOPE}), 3857),
+                  ST_TileEnvelope(:z, :x, :y),
+                  4096, 8, true
+                ) AS geom
+              FROM selected
+            )
+            SELECT ST_AsMVT(footprints, 'raster_footprints', 4096, 'geom')
+            FROM footprints
+            WHERE geom IS NOT NULL
+            """)
+        params = dict(x=x, y=y, z=z, layers=layers, zoom=None, tolerance=None)
         with self.engine.connect() as conn:
-            data = conn.execute(sql, dict(x=x, y=y, z=z, layers=layers)).scalar()
+            data = conn.execute(sql, params).scalar()
         return bytes(data) if data is not None else b""
 
     # -- Internals ---------------------------------------------------------

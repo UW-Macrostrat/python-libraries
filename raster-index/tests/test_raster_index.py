@@ -142,9 +142,7 @@ class TestUnifiedSelection:
         tile = _tile_for(OVERLAP, 12)
         west, south, east, north = web_mercator.bounds(tile)
 
-        by_tile = populated_index.assets_for_tile(
-            tile.x, tile.y, tile.z, ["minerals"]
-        )
+        by_tile = populated_index.assets_for_tile(tile.x, tile.y, tile.z, ["minerals"])
         by_bbox = populated_index.assets_for_bbox(
             west, south, east, north, ["minerals"]
         )
@@ -166,9 +164,12 @@ class TestUnifiedSelection:
     def test_selection_order_is_stable(self, populated_index):
         tile = _tile_for(OVERLAP, 12)
         runs = [
-            [a.slug for a in populated_index.assets_for_tile(
-                tile.x, tile.y, tile.z, ["minerals"]
-            )]
+            [
+                a.slug
+                for a in populated_index.assets_for_tile(
+                    tile.x, tile.y, tile.z, ["minerals"]
+                )
+            ]
             for _ in range(3)
         ]
         assert runs[0] == runs[1] == runs[2] == ["fine", "coarse"]

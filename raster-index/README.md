@@ -33,17 +33,19 @@ index.assets_for_tile(x=180, y=411, z=10, layers=["emit-minerals"])
 
 `schema_files()` returns the SQL defining the schema, in application order, so a
 host application can fold it into its own schema management rather than calling
-`create_schema()`. Two tables and a few functions:
+`create_schema()`. It is **tables and indexes only** — the selection logic is
+query text in `queries.py`, not stored functions, so it ships and versions with
+the code that calls it rather than being a second artifact to keep in step:
 
 - `raster_layers.layer` — a named mosaic, and the defaults its rasters inherit
   (zoom range, rescale range, colormap).
 - `raster_layers.raster` — one COG: `href`, EPSG:4326 `footprint`, zoom range,
   `dtype`/`nbands`/`nodata`, and the full reader metadata as `info`.
-- `raster_layers.get_rasters(x, y, z, layers[])` — asset selection, ordered by
-  layer priority then resolution. The core of the whole package.
-- `raster_layers.should_generate_tile(...)` — whether any asset actually resolves
-  at this zoom, for cache warmers and render short-circuits.
-- `raster_layers.layer_footprints(layers[])` — footprints as GeoJSON features.
+`queries.selection()` is the one query behind every lookup — asset selection
+ordered by layer priority then resolution — composed by `RasterIndex` into
+`assets_for_tile`/`assets_for_bbox`, `should_generate_tile` (whether any asset
+actually resolves at this zoom, for cache warmers and render short-circuits),
+`layer_bounds`, `footprints` (GeoJSON) and `footprint_tile` (MVT).
 
 ## CLI
 

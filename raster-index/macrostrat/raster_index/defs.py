@@ -24,6 +24,9 @@ class RasterAsset(BaseModel):
     minzoom: Optional[int] = None
     maxzoom: Optional[int] = None
     rescale_range: Optional[list[float]] = None
+    # Layer-level today, per-raster once leveling exists. Travels with the asset
+    # so a tile read resolves both "which rasters" and "how to draw them".
+    colormap: Optional[dict[str, Any]] = None
     # True when the requested tile is zoomed in past what this raster resolves.
     overscaled: bool = False
 
