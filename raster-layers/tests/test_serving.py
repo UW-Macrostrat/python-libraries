@@ -264,3 +264,143 @@ class TestColormapVisibility:
             assert len(queries) == 1, "one lookup, not one per concern"
         finally:
             index.assets_for_tile = original
+
+
+class TestLayerMetadata:
+    """The vocabulary a client needs before it can filter by class name."""
+
+    def test_layer_route_reports_categories(self, client):
+        response = client.get("/rasters/minerals/layer")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["slug"] == "minerals"
+        labels = [c["label"] for c in data["categories"]]
+        assert labels == ["Kaolinite", "Alunite", "Chlorite"]
+
+    def test_categories_carry_palette_colors(self, client):
+        """Names and colors in one request, so a legend needs no raster."""
+        response = client.get("/rasters/minerals/layer")
+        by_label = {c["label"]: c["color"] for c in response.json()["categories"]}
+        assert by_label["Alunite"] == list(CATEGORICAL_COLORMAP[2])
+
+    def test_layer_route_reports_colormap(self, client):
+        response = client.get("/rasters/minerals/layer")
+        colormap = response.json()["colormap"]
+        assert colormap["2"] == list(CATEGORICAL_COLORMAP[2])
+
+    def test_class_filter_is_advertised(self, client):
+        """`classes` shows up as an algorithm on the tile route."""
+        response = client.get("/openapi.json")
+        params = response.json()["paths"][
+            "/rasters/minerals/tiles/{tileMatrixSetId}/{z}/{x}/{y}"
+        ]["get"]["parameters"]
+        algorithm = next(p for p in params if p["name"] == "algorithm")
+        assert "classes" in str(algorithm["schema"])
+
+
+class TestClassFiltering:
+    """Isolating classes of a categorical mosaic by name.
+
+    Post-merge masking, so compositing is untouched and excluded classes render
+    transparent while survivors keep the layer's palette.
+    """
+
+    def colors_of(self, response):
+        from PIL import Image
+
+        image = Image.open(BytesIO(response.content)).convert("RGBA")
+        return {c for _, c in image.getcolors(maxcolors=1 << 16)}
+
+    # Only two of the three classes fall in a zoom-12 tile here; zoom 10 sees
+    # all of them, which is what a multi-class assertion needs.
+    ALL_CLASSES_ZOOM = 10
+
+    def filtered(self, client, classes, zoom=12):
+        import json
+
+        return client.get(
+            tile_path(*OVERLAP, zoom),
+            params={
+                "algorithm": "classes",
+                "algorithm_params": json.dumps({"classes": classes}),
+            },
+        )
+
+    def test_unfiltered_tile_draws_every_class(self, client):
+        colors = self.colors_of(client.get(tile_path(*OVERLAP, self.ALL_CLASSES_ZOOM)))
+        for value in (1, 2, 3):
+            assert CATEGORICAL_COLORMAP[value] in colors
+
+    def test_named_class_survives_and_others_do_not(self, client):
+        response = self.filtered(client, ["Alunite"])
+        assert response.status_code == 200
+        colors = self.colors_of(response)
+        assert CATEGORICAL_COLORMAP[2] in colors, "the requested class keeps its color"
+        assert CATEGORICAL_COLORMAP[1] not in colors
+        assert CATEGORICAL_COLORMAP[3] not in colors
+
+    def test_excluded_pixels_are_transparent(self, client):
+        """Masked, not recolored: nothing but the selection is opaque.
+
+        Excluded pixels keep the palette color their value maps to and lose only
+        their alpha, since the mask and the colormap are combined at render time.
+        """
+        colors = self.colors_of(self.filtered(client, ["Alunite"]))
+        assert any(color[3] == 0 for color in colors)
+        opaque = {c for c in colors if c[3] == 255}
+        assert opaque == {CATEGORICAL_COLORMAP[2]}
+
+    def test_several_classes_keep_distinct_colors(self, client):
+        """A multi-class selection reads as a legend, not one highlight color."""
+        colors = self.colors_of(
+            self.filtered(client, ["Alunite", "Chlorite"], self.ALL_CLASSES_ZOOM)
+        )
+        assert {c for c in colors if c[3] == 255} == {
+            CATEGORICAL_COLORMAP[2],
+            CATEGORICAL_COLORMAP[3],
+        }
+
+    def test_labels_are_case_insensitive(self, client):
+        colors = self.colors_of(self.filtered(client, ["alunite"]))
+        assert CATEGORICAL_COLORMAP[2] in colors
+
+    def test_integer_classes_also_work(self, client):
+        """A layer with no vocabulary is still filterable by raw class value."""
+        colors = self.colors_of(self.filtered(client, [2]))
+        assert CATEGORICAL_COLORMAP[2] in colors
+        assert CATEGORICAL_COLORMAP[1] not in colors
+
+    def test_unknown_class_is_a_400(self, client):
+        """Not an empty tile: a typo and an absent mineral must look different."""
+        response = self.filtered(client, ["Unobtainium"])
+        assert response.status_code == 400
+        assert "Kaolinite" in response.text
+
+    def test_empty_selection_is_a_passthrough(self, client):
+        colors = self.colors_of(self.filtered(client, []))
+        assert CATEGORICAL_COLORMAP[1] in colors
+
+    def test_filtering_still_composites_both_rasters(self, client):
+        """Filtering happens after the merge, so asset selection is unchanged."""
+        response = self.filtered(client, ["Alunite"])
+        assert len(response.headers["X-Assets"].split(",")) == 2
+
+    def test_filtered_tile_costs_one_query(self, index):
+        """The vocabulary rides along with the assets, like the colormap."""
+        from macrostrat.raster_layers.backend import PGRasterMosaic
+
+        backend = PGRasterMosaic(input=["minerals"], index=index)
+        queries = []
+        original = index.assets_for_tile
+        index.assets_for_tile = lambda *a, **k: (
+            queries.append(1),
+            original(*a, **k),
+        )[1]
+        try:
+            tile = web_mercator.tile(*OVERLAP, 12)
+            backend.assets_for_tile(tile.x, tile.y, tile.z)
+            assert backend.categories is not None
+            assert backend.colormap is not None
+            assert len(queries) == 1, "one lookup, not one per concern"
+        finally:
+            index.assets_for_tile = original

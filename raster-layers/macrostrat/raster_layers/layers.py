@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from fastapi import APIRouter, FastAPI, Query, Request
-from starlette.responses import Response
 from rio_tiler.types import RIOResampling
+from starlette.responses import Response
 from titiler.core.dependencies import DatasetParams
 from titiler.core.errors import add_exception_handlers
 from titiler.core.resources.enums import OptionalHeader
@@ -47,6 +47,10 @@ class RasterLayerConfig:
     colormap: Optional[dict] = None
     # Look the colormap up from the index when the request doesn't supply one.
     use_index_colormap: bool = True
+    # Whether the layer advertises `?algorithm=classes` for filtering a
+    # classification map down to named classes. Harmless on a continuous layer,
+    # but meaningless there, so it can be turned off.
+    class_filtering: bool = True
     # Forwarded to the backend — notably `allow_overscaled` and `zoom_tolerance`.
     backend_options: dict = field(default_factory=dict)
     optional_headers: list[OptionalHeader] = field(
@@ -64,6 +68,7 @@ class RasterLayerConfig:
             dataset_dependency=_dataset_params(self.resampling),
             default_colormap=self.colormap,
             use_index_colormap=self.use_index_colormap,
+            class_filtering=self.class_filtering,
             backend_options=self.backend_options,
             optional_headers=self.optional_headers,
         )

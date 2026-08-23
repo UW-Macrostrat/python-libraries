@@ -7,7 +7,7 @@ from sqlalchemy.engine import make_url
 from titiler.core.errors import DEFAULT_STATUS_CODES, add_exception_handlers
 
 from macrostrat.database.utils import temporary_database
-from macrostrat.raster_index import RasterIndex
+from macrostrat.raster_index import RasterIndex, categories_from_info, get_raster_info
 from macrostrat.raster_index.testing import CATEGORICAL_COLORMAP, create_test_rasters
 from macrostrat.raster_layers import RasterLayerConfig, register_raster_layers
 
@@ -35,6 +35,13 @@ def index(database_url, pytestconfig, raster_files):
         )
         for slug in ("fine", "coarse"):
             index.add_raster(raster_files[slug], layer="minerals", slug=slug)
+        # The class vocabulary, derived from a raster's band metadata the way
+        # `macrostrat raster set-categories` does it. Filtering by class *name*
+        # depends on this being on the layer.
+        info = get_raster_info(str(raster_files["fine"]))
+        index.set_categories(
+            "minerals", categories_from_info(info.metadata, info.colormap)
+        )
         yield index
 
 

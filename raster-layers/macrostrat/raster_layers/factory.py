@@ -14,6 +14,7 @@ from typing import Any, Optional
 from attrs import define, field
 from fastapi import Depends, Path, Query
 from starlette.responses import JSONResponse, Response
+from titiler.core.algorithm import Algorithms
 from titiler.core.utils import render_image
 from titiler.mosaic.factory import MosaicTilerFactory
 from typing_extensions import Annotated
@@ -21,6 +22,7 @@ from typing_extensions import Annotated
 from macrostrat.raster_index import RasterIndex
 from macrostrat.utils import get_logger
 
+from .algorithms import categorical_algorithms
 from .backend import PGRasterMosaic
 
 log = get_logger(__name__)
@@ -74,9 +76,20 @@ class RasterMosaicFactory(MosaicTilerFactory):
     # The viewer template pulls in remote assets; not useful for these layers.
     add_viewer: bool = field(default=False)
 
+    # Whether these routes advertise the categorical class filter
+    # (`?algorithm=classes`). On by default — a continuous layer can turn it off
+    # rather than offering a filter that can never match.
+    class_filtering: bool = field(default=True)
+    # An explicit algorithm registry, if a host application wants to add its own.
+    algorithms: Optional[Algorithms] = field(default=None)
+
     def __attrs_post_init__(self):
         if self.index is None:
             raise ValueError("RasterMosaicFactory requires a RasterIndex")
+        if self.algorithms is not None:
+            self.process_dependency = self.algorithms.dependency
+        elif self.class_filtering:
+            self.process_dependency = categorical_algorithms().dependency
         # titiler constructs the backend itself, and `backend_dependency` can't
         # carry a non-request-scoped object, so bind the index with a partial.
         self.backend = partial(PGRasterMosaic, index=self.index, **self.backend_options)
@@ -85,7 +98,52 @@ class RasterMosaicFactory(MosaicTilerFactory):
 
     def register_routes(self):
         super().register_routes()
+        self.layer_metadata()
         self.footprints()
+
+    def layer_metadata(self):
+        """What this layer is: its palette and its class vocabulary.
+
+        The counterpart to filtering by class name — a client needs the names
+        before it can ask for one. Serving them from the index means a client
+        needs no reference raster and no GDAL metadata parsing to draw a legend,
+        and the request reads no pixels.
+
+        A route may composite several indexed layers, so `layers` reports all of
+        them while `colormap` and `categories` resolve the way rendering does:
+        the first layer that declares one wins.
+        """
+
+        @self.router.get(
+            "/layer",
+            responses={200: {"description": "The layer's definition and vocabulary"}},
+        )
+        def layer_metadata(src_path=Depends(self.path_dependency)):
+            slugs = list(src_path)
+            definitions = [d for d in (self.index.layer(s) for s in slugs) if d]
+            if not definitions:
+                return JSONResponse(
+                    {"detail": f"No indexed layer named {', '.join(slugs)}"},
+                    status_code=404,
+                )
+
+            primary = definitions[0]
+            colormap = _first(d.colormap for d in definitions)
+            categories = _first(d.categories for d in definitions)
+            return JSONResponse(
+                {
+                    "slug": primary.slug,
+                    "name": primary.name,
+                    "description": primary.description,
+                    "layers": slugs,
+                    "minzoom": primary.minzoom,
+                    "maxzoom": primary.maxzoom,
+                    "colormap": _json_colormap(colormap),
+                    "categories": [
+                        c.model_dump(mode="json") for c in (categories or [])
+                    ],
+                }
+            )
 
     def footprints(self):
         """Coverage of these layers, without reading any pixels."""
@@ -142,6 +200,21 @@ class RasterMosaicFactory(MosaicTilerFactory):
             return render_image(image, colormap=colormap, **kwargs)
 
         return render
+
+
+def _first(values):
+    """The first truthy value, or None — the precedence rendering already uses."""
+    for value in values:
+        if value:
+            return value
+    return None
+
+
+def _json_colormap(colormap: Optional[dict]) -> Optional[dict]:
+    """A colormap in JSON form: string keys, list colors, alpha filled in."""
+    if not colormap:
+        return None
+    return {str(k): list(v) for k, v in normalize_colormap(colormap).items()}
 
 
 def normalize_colormap(colormap: dict) -> dict:

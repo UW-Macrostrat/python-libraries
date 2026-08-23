@@ -107,16 +107,35 @@ class PGRasterMosaic(BaseBackend):
                 return asset.colormap
         return None
 
-    def tile(self, *args: Any, **kwargs: Any):
-        """Read a tile, tagging it with the colormap its assets carried.
+    @property
+    def categories(self) -> Optional[list]:
+        """The class vocabulary for the assets resolved on this request, if any.
 
-        Rendering happens back in the route, after the reader is closed, so the
-        colormap rides along on the image rather than being looked up again.
+        Same precedence as the colormap, and it came back on the same query.
+        """
+        for asset in self.resolved_assets:
+            if asset.categories:
+                return [c.model_dump(mode="json") for c in asset.categories]
+        return None
+
+    def tile(self, *args: Any, **kwargs: Any):
+        """Read a tile, tagging it with what its assets said about themselves.
+
+        Rendering (and any post-processing) happens back in the route, after the
+        reader is closed, so the colormap and class vocabulary ride along on the
+        image rather than being looked up again. This is what lets a request that
+        filters by class name still cost one database query.
         """
         image, assets = super().tile(*args, **kwargs)
+        metadata = {}
         colormap = self.colormap
         if colormap is not None:
-            image.metadata = {**(image.metadata or {}), "colormap": colormap}
+            metadata["colormap"] = colormap
+        categories = self.categories
+        if categories is not None:
+            metadata["categories"] = categories
+        if metadata:
+            image.metadata = {**(image.metadata or {}), **metadata}
         return image, assets
 
     def assets_for_point(
