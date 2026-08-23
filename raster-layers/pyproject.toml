@@ -1,6 +1,6 @@
 [project]
 name = "macrostrat.raster_layers"
-version = "0.2.0"
+version = "0.2.1"
 description = "Serve indexed cloud-optimized rasters as mosaicked tile layers"
 authors = [{ name = "Daven Quinn", email = "dev@davenquinn.com" }]
 requires-python = ">=3.11,<4"

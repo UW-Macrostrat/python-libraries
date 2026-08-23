@@ -6,7 +6,9 @@ be *rendered and mounted*. Written as data so a host application declares its
 raster layers in a list, the way the tileserver already declares vector layers.
 """
 
+import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Optional
 
 from fastapi import APIRouter, FastAPI, Query, Request
@@ -75,19 +77,80 @@ class RasterLayerConfig:
         return factory.router
 
 
-async def _empty_tile(request: Request, exc: Exception) -> Response:
-    """An empty, explicitly zero-length 204.
+# A tile route's path tail: `/tiles/{tms}/{z}/{x}/{y}`, optionally `@{scale}x`
+# and a format extension. Used only to tell a tile request apart from a `/point`
+# or `/assets` one, and to size the empty image.
+_TILE_PATH = re.compile(
+    r"/tiles/[^/]+/\d+/\d+/\d+(?:@(?P<scale>\d+)x)?(?:\.(?P<format>\w+))?$"
+)
 
-    Two things have to be right here, because running off the edge of coverage
-    is routine and must never reach the client as an error:
+# Every tile grid served here is 256-based; `@2x` doubles it, which is what a
+# tile *with* data comes back as.
+TILE_SIZE = 256
 
-    - **No body.** titiler's own handler renders a JSON payload at this status,
-      and a 204 carrying a body is malformed.
-    - **An explicit `Content-Length: 0`.** Starlette omits the header entirely
-      for a 204, which leaves the response close-delimited; Varnish then tries
-      to read a body it will never get and fails the fetch with a 503.
+# Formats an empty tile can be drawn in. Anything else (JPEG, which has no alpha
+# channel, or a data format like NPY) keeps the bodyless 204.
+TRANSPARENT_FORMATS = {None, "png"}
+
+
+@lru_cache(maxsize=8)
+def _transparent_png(size: int) -> bytes:
+    """A fully transparent, fully masked PNG of the requested size.
+
+    Rendered the same way a real tile is, rather than hand-rolled, so it is a
+    valid single-band-plus-alpha PNG by construction. Cached: there is one per
+    tile size, and no-coverage requests are constant while panning.
+    """
+    import numpy
+    from rio_tiler.utils import render
+
+    data = numpy.zeros((1, size, size), dtype="uint8")
+    mask = numpy.zeros((size, size), dtype="uint8")
+    return render(data, mask, img_format="PNG")
+
+
+def _no_content() -> Response:
+    """A bodyless, explicitly zero-length 204.
+
+    An explicit `Content-Length: 0` matters: Starlette omits the header entirely
+    for a 204, which leaves the response close-delimited; Varnish then tries to
+    read a body it will never get and fails the fetch with a 503.
     """
     return Response(status_code=204, headers={"content-length": "0"})
+
+
+async def _empty_tile(request: Request, exc: Exception) -> Response:
+    """No coverage: a transparent tile for image requests, a 204 otherwise.
+
+    Running off the edge of coverage is routine and must never reach the client
+    as an error. A 204 looked like the honest answer, but **mapbox-gl cannot
+    consume it**: 204 satisfies `response.ok`, so it reads the body into a
+    zero-length `ArrayBuffer`, which is truthy, and hands it to
+    `createImageBitmap` — surfacing as "The image could not be decoded" on every
+    tile past the edge of the data. The status was never the problem; asking a
+    raster client to interpret a status instead of an image was.
+
+    So an image request gets a real, fully transparent image, which every client
+    already knows how to draw. Non-image endpoints (`/point`, `/assets`) keep the
+    204, where nothing ever had trouble with it.
+    """
+    match = _TILE_PATH.search(request.url.path)
+    if match is None:
+        return _no_content()
+
+    # The extension-less routes take the format as `?f=`; no format at all means
+    # titiler would have chosen PNG for masked data anyway.
+    fmt = match.group("format") or request.query_params.get("f")
+    if fmt is not None:
+        fmt = fmt.lower()
+    if fmt not in TRANSPARENT_FORMATS:
+        return _no_content()
+
+    scale = int(match.group("scale") or 1)
+    return Response(
+        _transparent_png(scale * TILE_SIZE),
+        media_type="image/png",
+    )
 
 
 def install_exception_handlers(app: FastAPI) -> None:

@@ -43,15 +43,22 @@ class TestTiles:
         assets = response.headers["X-Assets"].split(",")
         assert len(assets) == 2
 
-    def test_tile_outside_coverage_is_empty(self, client):
-        """204, not a 500.
+    def test_tile_outside_coverage_is_a_transparent_image(self, client):
+        """A drawable empty tile, not a 500 and not a 204.
 
         Panning past the edge of coverage is normal operation, so it must never
         surface as a server error — the whole point of installing the mosaic
-        exception handlers with the routes.
+        exception handlers with the routes. It also can't be a bodyless 204:
+        mapbox-gl treats that as a successful response and fails to decode the
+        empty body (see `_empty_tile`).
         """
+        from PIL import Image
+
         response = client.get(tile_path(*EMPTY, 12))
-        assert response.status_code == 204
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        image = Image.open(BytesIO(response.content)).convert("RGBA")
+        assert {c for _, c in image.getcolors(maxcolors=1 << 16)} == {(0, 0, 0, 0)}
 
     def test_overscaled_tile_still_renders(self, client):
         """Zooming past native resolution magnifies rather than disappearing."""
@@ -149,9 +156,29 @@ class TestFootprints:
         assert response.content == b""
 
 
-def test_empty_tile_has_no_body(client):
-    """A 204 carrying a body is malformed and breaks caching proxies."""
-    response = client.get(tile_path(*EMPTY, 12))
+def test_empty_tile_matches_the_requested_size(client):
+    """`@2x` doubles the grid's 256, the same as a tile with data."""
+    from PIL import Image
+
+    response = client.get(tile_path(*EMPTY, 12, "@2x.png"))
+    assert response.status_code == 200
+    assert Image.open(BytesIO(response.content)).size == (512, 512)
+
+
+def test_empty_tile_in_an_opaque_format_stays_a_204(client):
+    """JPEG has no alpha channel, so there is no empty tile to draw."""
+    response = client.get(tile_path(*EMPTY, 12, ".jpg"))
+    assert response.status_code == 204
+    assert response.content == b""
+
+
+def test_empty_point_query_has_no_body(client):
+    """A 204 carrying a body is malformed and breaks caching proxies.
+
+    Point queries keep the 204 — the status is only a problem for clients that
+    expect an image back.
+    """
+    response = client.get(f"/rasters/minerals/point/{EMPTY[0]},{EMPTY[1]}")
     assert response.status_code == 204
     assert response.content == b""
     assert "content-type" not in response.headers

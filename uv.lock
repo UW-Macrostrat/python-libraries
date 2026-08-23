@@ -909,7 +909,7 @@ dev = [
 
 [[package]]
 name = "macrostrat-raster-layers"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "raster-layers" }
 dependencies = [
     { name = "attrs" },

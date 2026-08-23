@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1] - 2026-08-22
+
+- Serve a transparent PNG where a layer has no coverage, instead of a bodyless
+  204. mapbox-gl treats a 204 as a successful response and then fails to decode
+  the empty body, so every tile past the edge of the data surfaced as "the image
+  could not be decoded". `/point` and non-PNG formats keep the 204
+
 ## [0.2.0] - 2026-08-22
 
 - Filter a categorical mosaic to named classes:
