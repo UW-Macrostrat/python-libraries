@@ -376,7 +376,7 @@ dev = [{ name = "macrostrat-utils", editable = "../utils" }]
 
 [[package]]
 name = "macrostrat-raster-index"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "macrostrat-database" },

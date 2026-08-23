@@ -214,6 +214,103 @@ def set_colormap(
     print(f"[green]Set a {len(colormap)}-entry colormap on [bold]{layer}[/bold]")
 
 
+@cli.command(name="set-categories")
+def set_categories(
+    ctx: Context,
+    layer: str,
+    source: Optional[str] = Option(
+        None,
+        "--from",
+        help="Raster (href or indexed slug) whose band metadata names the classes",
+    ),
+    from_json: Optional[str] = Option(
+        None,
+        "--from-json",
+        help="JSON file holding a {value: label} mapping or a list of categories",
+    ),
+    qml: Optional[str] = Option(
+        None, "--qml", help="QGIS .qml paletted style naming the classes"
+    ),
+    metadata_key: Optional[str] = Option(
+        None,
+        "--metadata-key",
+        help="Band-metadata item to read (e.g. MINERAL_CLASSES). Inferred if omitted.",
+    ),
+):
+    """Give a categorical layer a class vocabulary — names for its integers.
+
+    Classification maps address classes by integer, which is no way to ask for a
+    mineral. Resolving names once at ingest means a tile request can name what it
+    wants (`?algorithm=classes&algorithm_params={"classes":["Kaolinite"]}`) and a
+    client can draw a legend without opening a raster.
+
+    Labels come from the raster's GDAL band metadata by default — the same thing
+    `raster info --metadata` and `gdalinfo` print — joined to its color table.
+    `--qml` and `--from-json` cover sources that label their classes elsewhere,
+    or a vocabulary that needs correcting without touching data.
+    """
+    from .categories import (
+        categories_from_info,
+        categories_from_json,
+        categories_from_qml,
+    )
+
+    sources = [s for s in (source, from_json, qml) if s is not None]
+    if len(sources) != 1:
+        raise BadParameter("Pass exactly one of --from, --from-json or --qml")
+
+    index = index_for(ctx)
+    existing = {l.slug: l for l in index.layers()}
+    if layer not in existing:
+        print(f"[yellow]Layer [bold]{layer}[/bold] is not defined")
+        raise Exit(1)
+
+    colormap = existing[layer].colormap
+
+    try:
+        if from_json is not None:
+            categories = categories_from_json(from_json, colormap)
+        elif qml is not None:
+            categories = categories_from_qml(qml)
+        else:
+            info, table = _raster_metadata(index, source, layer)
+            categories = categories_from_info(info, table or colormap, key=metadata_key)
+    except (ValueError, OSError) as err:
+        print(f"[red]{err}")
+        raise Exit(1)
+
+    index.set_categories(layer, categories)
+
+    table_view = Table("Value", "Class", "Color")
+    for category in categories:
+        color = "" if category.color is None else str(tuple(category.color))
+        table_view.add_row(str(category.value), category.label, color)
+    print(table_view)
+    print(f"[green]Set a {len(categories)}-class vocabulary on [bold]{layer}[/bold]")
+
+
+def _raster_metadata(
+    index: RasterIndex, source: str, layer: str
+) -> tuple[dict, Optional[dict]]:
+    """Reader metadata for a raster, from the index if it is already there.
+
+    Registering a raster stores its full `src.info()` output, so a vocabulary can
+    usually be derived without reopening a file in object storage. Falling back
+    to reading it is what makes `--from` work for a raster that isn't indexed
+    (or was indexed before this metadata was kept).
+    """
+    stored = index.raster_info(source, layer=layer)
+    if stored and stored.get("band_metadata"):
+        # The color table is deliberately not stored per raster, so a colormap
+        # for the labels has to come from the layer.
+        return stored, None
+
+    from .footprints import get_raster_info
+
+    info = get_raster_info(source)
+    return info.metadata, info.colormap
+
+
 @cli.command(name="add")
 def add(
     ctx: Context,
@@ -283,14 +380,39 @@ def remove(ctx: Context, href: str):
 
 
 @cli.command(name="info")
-def info(href: str):
+def info(
+    href: str,
+    metadata: bool = Option(
+        False,
+        "--metadata",
+        "--full",
+        help="Include full reader metadata, including per-band metadata",
+    ),
+):
     """Show the metadata that would be indexed for a raster.
 
     Reads the raster directly, so it needs no database.
+
+    `--metadata` adds the full reader output. That is where a classification
+    map's class names live (as a band-metadata item), so it is the way to find
+    out what `set-categories` has to work with — candidate vocabularies are
+    called out explicitly.
     """
+    from .categories import class_metadata_candidates
     from .footprints import get_raster_info
 
-    print(get_raster_info(href).model_dump(exclude={"metadata"}))
+    info = get_raster_info(href)
+    print(info.model_dump(exclude={"metadata"}))
+    if not metadata:
+        return
+
+    print(info.metadata)
+    candidates = class_metadata_candidates(info.metadata)
+    if not candidates:
+        print("[dim]No band-metadata item parses as a class vocabulary")
+        return
+    for key, mapping in candidates.items():
+        print(f"[green]Class vocabulary [bold]{key}[/bold] ({len(mapping)} classes)")
 
 
 @cli.command(name="assets")

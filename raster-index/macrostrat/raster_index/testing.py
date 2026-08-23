@@ -18,6 +18,8 @@ __all__ = [
     "create_test_raster",
     "create_test_rasters",
     "CATEGORICAL_COLORMAP",
+    "CATEGORICAL_CLASSES",
+    "CLASS_METADATA_KEY",
     "FINE_BOUNDS",
     "COARSE_BOUNDS",
     "ELSEWHERE_BOUNDS",
@@ -40,6 +42,20 @@ CATEGORICAL_COLORMAP = {
 }
 
 
+# Class names for the values in `CATEGORICAL_COLORMAP`, written into band
+# metadata the way the EMIT mineral maps write theirs: a Python-literal dict
+# under a producer-chosen key. Value 0 is nodata and so is deliberately unnamed.
+CATEGORICAL_CLASSES = {
+    1: "Kaolinite",
+    2: "Alunite",
+    3: "Chlorite",
+}
+
+# The band-metadata item holding the class names. Matches what the EMIT rasters
+# use, since that is the case the ingest path has to handle.
+CLASS_METADATA_KEY = "MINERAL_CLASSES"
+
+
 def create_test_raster(
     path: Path,
     bounds: tuple[float, float, float, float],
@@ -47,6 +63,7 @@ def create_test_raster(
     size: int = 256,
     values: Optional[np.ndarray] = None,
     colormap: Optional[dict] = CATEGORICAL_COLORMAP,
+    classes: Optional[dict] = CATEGORICAL_CLASSES,
     nodata: Optional[float] = 0,
     crs: str = "EPSG:4326",
 ) -> Path:
@@ -55,6 +72,9 @@ def create_test_raster(
     Data is banded across the image so a composited tile visibly differs from
     either source, and the border row/column is left as nodata so masking is
     exercised too.
+
+    `classes` is written as band metadata, so the fixtures exercise deriving a
+    class vocabulary from a real GDAL header rather than from a hand-built dict.
     """
     west, south, east, north = bounds
     if values is None:
@@ -87,6 +107,9 @@ def create_test_raster(
         dst.write(values, 1)
         if colormap is not None:
             dst.write_colormap(1, {k: v for k, v in colormap.items()})
+        if classes is not None:
+            # Stringified exactly as GDAL stores it, so parsing is tested too.
+            dst.update_tags(1, **{CLASS_METADATA_KEY: str(classes)})
         dst.build_overviews([2, 4])
 
     return path

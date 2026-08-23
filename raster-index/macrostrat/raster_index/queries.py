@@ -42,10 +42,16 @@ SELECTION = """
       coalesce(r.maxzoom, l.maxzoom) maxzoom,
       r.dtype,
       coalesce(r.rescale_range, l.rescale_range) rescale_range,
-      -- Layer-level, but selected per row so a raster carries how to draw it as
-      -- well as where it is. A tile read then resolves both at once, and
-      -- per-raster overrides (leveling) have somewhere to go.
+      -- Layer-level, but selected per row so a raster carries how to draw it
+      -- and what its values mean, as well as where it is. A tile read then
+      -- resolves all of it at once, and per-raster overrides (leveling) have
+      -- somewhere to go.
       l.colormap,
+      -- The class vocabulary for categorical layers, stored inside the layer's
+      -- `metadata`. Selected here for the same reason as the colormap: a tile
+      -- that filters by class name must not cost a second query to find out
+      -- what the names mean.
+      l.metadata -> 'categories' categories,
       coalesce(CAST(:zoom AS integer) > coalesce(r.maxzoom, l.maxzoom), false)
         overscaled
     FROM raster_layers.raster r

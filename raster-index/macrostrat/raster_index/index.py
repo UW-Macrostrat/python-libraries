@@ -16,7 +16,7 @@ from sqlalchemy.engine import Connection, Engine
 
 from macrostrat.utils import get_logger
 
-from .defs import LayerDefinition, RasterAsset, RasterInfo
+from .defs import LayerDefinition, RasterAsset, RasterCategory, RasterInfo
 from .footprints import get_raster_info
 from .queries import TILE_ENVELOPE, bbox_envelope, selection
 
@@ -100,6 +100,8 @@ class RasterIndex:
         """Create or update a layer definition.
 
         Idempotent: re-registering a layer overwrites the fields it specifies.
+        `metadata` (and so the class vocabulary inside it) is the exception — it
+        is left alone when not supplied, rather than being nulled out.
         """
         if isinstance(layer, str):
             layer = LayerDefinition(slug=layer, **kwargs)
@@ -120,7 +122,11 @@ class RasterIndex:
               maxzoom = excluded.maxzoom,
               rescale_range = excluded.rescale_range,
               colormap = excluded.colormap,
-              metadata = excluded.metadata
+              -- Unlike the other fields, an unspecified `metadata` leaves what
+              -- is there alone. The class vocabulary lives in this column and is
+              -- written by a separate command, so a later `define-layer` that
+              -- says nothing about metadata must not silently destroy it.
+              metadata = coalesce(excluded.metadata, layer.metadata)
             """)
         params = dict(
             slug=layer.slug,
@@ -130,7 +136,7 @@ class RasterIndex:
             maxzoom=layer.maxzoom,
             rescale_range=layer.rescale_range,
             colormap=_json(layer.colormap),
-            metadata=_json(layer.metadata),
+            metadata=_json(_stored_metadata(layer)),
         )
         with self.engine.begin() as conn:
             conn.execute(sql, params)
@@ -146,15 +152,64 @@ class RasterIndex:
             """)
         with self.engine.connect() as conn:
             rows = conn.execute(sql).mappings().all()
-        return [
-            LayerDefinition(
-                **{
-                    **dict(row),
-                    "rescale_range": _floats(row["rescale_range"]),
-                }
-            )
-            for row in rows
-        ]
+        return [_layer_from_row(row) for row in rows]
+
+    def layer(self, slug: str) -> Optional[LayerDefinition]:
+        """One layer definition, or None if it isn't defined.
+
+        The serving side exposes this so a client can fetch a layer's palette and
+        class vocabulary in a single request, instead of reading them out of a
+        raster it had to know the name of.
+        """
+        sql = text("""
+            SELECT slug, name, description, minzoom, maxzoom, rescale_range,
+                   colormap, metadata
+            FROM raster_layers.layer
+            WHERE slug = :slug
+            """)
+        with self.engine.connect() as conn:
+            row = conn.execute(sql, dict(slug=slug)).mappings().first()
+        if row is None:
+            return None
+        return _layer_from_row(row)
+
+    # -- Class vocabularies ------------------------------------------------
+
+    def get_categories(self, layer: str) -> list[RasterCategory]:
+        """The class vocabulary of a categorical layer, in class order."""
+        sql = text(
+            "SELECT metadata -> 'categories' FROM raster_layers.layer "
+            "WHERE slug = :slug"
+        )
+        with self.engine.connect() as conn:
+            value = conn.execute(sql, dict(slug=layer)).scalar()
+        return _categories(value)
+
+    def set_categories(
+        self, layer: str, categories: Iterable[RasterCategory]
+    ) -> list[RasterCategory]:
+        """Store a layer's class vocabulary.
+
+        Merged into `metadata` rather than replacing it: the column holds other
+        layer-level metadata, and setting a vocabulary must not silently drop it.
+        """
+        resolved = sorted(categories, key=lambda c: c.value)
+        sql = text("""
+            UPDATE raster_layers.layer
+            SET metadata = coalesce(metadata, '{}'::jsonb)
+                           || jsonb_build_object('categories', CAST(:categories AS jsonb))
+            WHERE slug = :slug
+            """)
+        params = dict(
+            slug=layer,
+            categories=json.dumps([c.model_dump(mode="json") for c in resolved]),
+        )
+        with self.engine.begin() as conn:
+            res = conn.execute(sql, params)
+        if res.rowcount == 0:
+            raise ValueError(f"Layer {layer!r} is not defined")
+        log.info("Set a %d-class vocabulary on layer %s", len(resolved), layer)
+        return resolved
 
     def remove_layer(self, slug: str, *, cascade: bool = False) -> int:
         """Delete a layer. Its rasters must be gone first unless `cascade`."""
@@ -283,6 +338,27 @@ class RasterIndex:
             )
         return res.rowcount
 
+    def raster_info(
+        self, ref: str, *, layer: Optional[str] = None
+    ) -> Optional[dict[str, Any]]:
+        """The stored reader metadata for a raster, by href or slug.
+
+        `add_raster` keeps the full `src.info()` output, so anything derived from
+        a raster's headers — a class vocabulary, notably — can be recovered from
+        the index without reopening the file in object storage.
+        """
+        sql = "SELECT info FROM raster_layers.raster WHERE (href = :ref OR slug = :ref)"
+        params: dict[str, Any] = dict(ref=ref)
+        if layer is not None:
+            sql += " AND layer = :layer"
+            params["layer"] = layer
+        sql += " ORDER BY id LIMIT 1"
+        with self.engine.connect() as conn:
+            row = conn.execute(text(sql), params).first()
+        if row is None:
+            return None
+        return row[0]
+
     # -- Raster selection --------------------------------------------------
     #
     # Every lookup composes `queries.selection`, so the ordering and zoom rules
@@ -291,7 +367,8 @@ class RasterIndex:
 
     # Columns needed to build a `RasterAsset`.
     _ASSET_COLUMNS = (
-        "href, layer, slug, minzoom, maxzoom, rescale_range, colormap, overscaled"
+        "href, layer, slug, minzoom, maxzoom, rescale_range, colormap, "
+        "categories, overscaled"
     )
 
     def _select_assets(self, geometry: str, params: dict) -> list[RasterAsset]:
@@ -456,6 +533,47 @@ class RasterIndex:
 def default_slug(href: str) -> str:
     """A raster's identifier within its layer, from the tail of its href."""
     return Path(href.split("?")[0]).stem
+
+
+def _layer_from_row(row) -> LayerDefinition:
+    """A layer definition from a `layer` row, with categories lifted out.
+
+    `categories` lives inside the `metadata` jsonb column but is modeled as its
+    own field, so it is removed from `metadata` here and folded back in by
+    `_stored_metadata` on write — a round trip that leaves the column with one
+    copy of the vocabulary rather than two.
+    """
+    metadata = dict(row["metadata"] or {})
+    categories = _categories(metadata.pop("categories", None))
+    return LayerDefinition(
+        **{
+            **dict(row),
+            "rescale_range": _floats(row["rescale_range"]),
+            "metadata": metadata or None,
+            "categories": categories or None,
+        }
+    )
+
+
+def _stored_metadata(layer: LayerDefinition) -> Optional[dict]:
+    """The `metadata` column's value for a layer, with categories folded in."""
+    metadata = dict(layer.metadata or {})
+    if layer.categories:
+        metadata["categories"] = [
+            c.model_dump(mode="json")
+            for c in sorted(layer.categories, key=lambda c: c.value)
+        ]
+    return metadata or None
+
+
+def _categories(value: Optional[Any]) -> list[RasterCategory]:
+    """Coerce a stored `categories` value into models, in class order."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = json.loads(value)
+    categories = [RasterCategory(**item) for item in value]
+    return sorted(categories, key=lambda c: c.value)
 
 
 def _json(value: Optional[dict]) -> Optional[str]:

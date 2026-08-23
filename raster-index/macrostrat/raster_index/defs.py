@@ -9,7 +9,23 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-__all__ = ["RasterAsset", "RasterInfo", "LayerDefinition"]
+__all__ = ["RasterAsset", "RasterInfo", "LayerDefinition", "RasterCategory"]
+
+
+class RasterCategory(BaseModel):
+    """One class in a categorical raster's vocabulary.
+
+    Classification maps address their classes by integer, but people address
+    them by name. This is the join between the two, resolved once at ingest
+    (from GDAL band metadata and the color table) and stored on the layer, so
+    neither the tile server nor a client has to re-derive it.
+    """
+
+    value: int
+    label: str
+    # From the raster's color table, where it has one. Carried alongside the
+    # label so a client can draw a legend from a single request.
+    color: Optional[tuple[int, int, int, int]] = None
 
 
 class RasterAsset(BaseModel):
@@ -27,6 +43,10 @@ class RasterAsset(BaseModel):
     # Layer-level today, per-raster once leveling exists. Travels with the asset
     # so a tile read resolves both "which rasters" and "how to draw them".
     colormap: Optional[dict[str, Any]] = None
+    # The layer's class vocabulary, for categorical rasters. Like `colormap`,
+    # it travels with the asset so a tile read resolves both "which rasters" and
+    # "what the values mean" in one query.
+    categories: Optional[list[RasterCategory]] = None
     # True when the requested tile is zoomed in past what this raster resolves.
     overscaled: bool = False
 
@@ -61,3 +81,8 @@ class LayerDefinition(BaseModel):
     rescale_range: Optional[list[float]] = None
     colormap: Optional[dict[str, Any]] = None
     metadata: Optional[dict[str, Any]] = None
+    # Stored inside `metadata`, but modeled separately: the vocabulary is a
+    # first-class part of what a categorical layer *is*, while `metadata` is the
+    # jsonb column that happens to hold it (which is why this needed no schema
+    # change). `RasterIndex` folds it in on write and lifts it back out on read.
+    categories: Optional[list[RasterCategory]] = None

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1] - 2026-08-22
+
+- Serve a transparent PNG where a layer has no coverage, instead of a bodyless
+  204. mapbox-gl treats a 204 as a successful response and then fails to decode
+  the empty body, so every tile past the edge of the data surfaced as "the image
+  could not be decoded". `/point` and non-PNG formats keep the 204
+
+## [0.2.0] - 2026-08-22
+
+- Filter a categorical mosaic to named classes:
+  `?algorithm=classes&algorithm_params={"classes":["Kaolinite"]}`. Applied after
+  compositing, so excluded classes are masked and survivors keep the layer's
+  palette
+- New `/layer` route reporting a layer's palette and class vocabulary, so a
+  client can build a legend without reading a raster
+- Requires `macrostrat.raster_index` 0.2.0, which carries `categories` on assets
+
 ## [0.1.1] - 2026-08-12
 
 - Resolve colormaps from the assets a tile read already fetched, rather than

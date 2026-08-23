@@ -7,7 +7,14 @@ they cover, and *which named layer* they belong to, so a tile server can answer
 Serving is a separate concern, handled by `macrostrat.raster_layers`.
 """
 
-from .defs import LayerDefinition, RasterAsset, RasterInfo
+from .categories import (
+    categories_from_info,
+    categories_from_json,
+    categories_from_mapping,
+    categories_from_qml,
+    class_metadata_candidates,
+)
+from .defs import LayerDefinition, RasterAsset, RasterCategory, RasterInfo
 from .footprints import get_raster_info
 from .index import RasterIndex, schema_files
 from .scan import BucketPrefix, RasterObject, parse_bucket_url, scan_prefix
@@ -23,4 +30,10 @@ __all__ = [
     "RasterAsset",
     "RasterInfo",
     "LayerDefinition",
+    "RasterCategory",
+    "categories_from_info",
+    "categories_from_json",
+    "categories_from_mapping",
+    "categories_from_qml",
+    "class_metadata_candidates",
 ]
