@@ -376,7 +376,7 @@ dev = [{ name = "macrostrat-utils", editable = "../utils" }]
 
 [[package]]
 name = "macrostrat-raster-index"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "macrostrat-database" },
@@ -393,6 +393,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+footprints = [
+    { name = "shapely" },
+]
 s3 = [
     { name = "boto3" },
 ]
@@ -416,10 +419,11 @@ requires-dist = [
     { name = "rasterio", specifier = ">=1.4,<2" },
     { name = "rich", specifier = ">=13,<16" },
     { name = "rio-tiler", specifier = ">=8,<9" },
+    { name = "shapely", marker = "extra == 'footprints'", specifier = ">=2,<3" },
     { name = "sqlalchemy", specifier = ">=2.0.18,<3" },
     { name = "typer", specifier = ">=0.12,<0.27" },
 ]
-provides-extras = ["s3"]
+provides-extras = ["s3", "footprints"]
 
 [package.metadata.requires-dev]
 dev = [
