@@ -431,3 +431,99 @@ class TestClassFiltering:
             assert len(queries) == 1, "one lookup, not one per concern"
         finally:
             index.assets_for_tile = original
+
+
+class TestDatasetFilter:
+    """`?datasets=` views one raster *through* the mosaic.
+
+    The point is that a focused dataset is not a special case: it keeps the
+    layer's palette, its class vocabulary, the transparent empty tile and the
+    per-asset point query, because it is the same route with a narrower asset
+    selection.
+    """
+
+    def test_narrows_the_assets_read(self, client):
+        response = client.get(tile_path(*OVERLAP, 12), params={"datasets": "fine"})
+        assert response.status_code == 200
+        assert response.headers["X-Assets"].split(",") == [
+            a for a in response.headers["X-Assets"].split(",") if a.endswith("fine.tif")
+        ]
+
+    def test_unfiltered_still_composites_both(self, client):
+        response = client.get(tile_path(*OVERLAP, 12))
+        assert len(response.headers["X-Assets"].split(",")) == 2
+
+    def test_the_layer_palette_still_applies(self, client):
+        """The whole reason for routing this through the mosaic."""
+        from PIL import Image
+
+        response = client.get(tile_path(*OVERLAP, 12), params={"datasets": "coarse"})
+        image = Image.open(BytesIO(response.content)).convert("RGBA")
+        colors = {c for _, c in image.getcolors(maxcolors=1 << 16)}
+        assert (218, 50, 132, 255) in colors
+
+    def test_class_filtering_composes_with_it(self, client):
+        """A focused dataset can still be filtered to named classes."""
+        import json
+
+        from PIL import Image
+
+        response = client.get(
+            tile_path(*OVERLAP, 12),
+            params={
+                "datasets": "coarse",
+                "algorithm": "classes",
+                "algorithm_params": json.dumps({"classes": ["Alunite"]}),
+            },
+        )
+        assert response.status_code == 200
+        image = Image.open(BytesIO(response.content)).convert("RGBA")
+        colors = {c for _, c in image.getcolors(maxcolors=1 << 16)}
+        assert {c for c in colors if c[3] == 255} == {CATEGORICAL_COLORMAP[2]}
+
+    def test_comma_separated_slugs(self, client):
+        response = client.get(
+            tile_path(*OVERLAP, 12), params={"datasets": "fine,coarse"}
+        )
+        assert len(response.headers["X-Assets"].split(",")) == 2
+
+    def test_whitespace_is_tolerated(self, client):
+        response = client.get(
+            tile_path(*OVERLAP, 12), params={"datasets": " fine , coarse "}
+        )
+        assert response.status_code == 200
+        assert len(response.headers["X-Assets"].split(",")) == 2
+
+    def test_a_dataset_with_no_coverage_here_is_an_empty_tile(self, client):
+        """Same transparent PNG as running off the edge of the whole layer."""
+        response = client.get(tile_path(*OVERLAP, 12), params={"datasets": "elsewhere"})
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+
+    def test_point_query_narrows_too(self, client):
+        lon, lat = OVERLAP
+        response = client.get(
+            f"/rasters/minerals/point/{lon},{lat}", params={"datasets": "fine"}
+        )
+        assert response.status_code == 200
+        assert len(response.json()["assets"]) == 1
+
+    def test_point_query_unfiltered_reports_every_raster(self, client):
+        """What the client's dataset picker is built from: the overlap itself."""
+        lon, lat = OVERLAP
+        response = client.get(f"/rasters/minerals/point/{lon},{lat}")
+        assert len(response.json()["assets"]) == 2
+
+    def test_footprints_narrow_too(self, client):
+        response = client.get(
+            "/rasters/minerals/footprints", params={"datasets": "coarse"}
+        )
+        slugs = [f["properties"]["slug"] for f in response.json()["features"]]
+        assert slugs == ["coarse"]
+
+    def test_datasets_is_advertised(self, client):
+        response = client.get("/openapi.json")
+        params = response.json()["paths"][
+            "/rasters/minerals/tiles/{tileMatrixSetId}/{z}/{x}/{y}"
+        ]["get"]["parameters"]
+        assert "datasets" in [p["name"] for p in params]

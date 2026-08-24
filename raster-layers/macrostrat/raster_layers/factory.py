@@ -8,6 +8,7 @@ the layer's own default colormap and a footprints layer.
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 from typing import Any, Optional
 
@@ -15,6 +16,7 @@ from attrs import define, field
 from fastapi import Depends, Path, Query
 from starlette.responses import JSONResponse, Response
 from titiler.core.algorithm import Algorithms
+from titiler.core.dependencies import DefaultDependency
 from titiler.core.utils import render_image
 from titiler.mosaic.factory import MosaicTilerFactory
 from typing_extensions import Annotated
@@ -27,7 +29,13 @@ from .backend import PGRasterMosaic
 
 log = get_logger(__name__)
 
-__all__ = ["RasterMosaicFactory", "fixed_layers", "LayerListParams", "MVT_MEDIA_TYPE"]
+__all__ = [
+    "RasterMosaicFactory",
+    "fixed_layers",
+    "LayerListParams",
+    "DatasetParams",
+    "MVT_MEDIA_TYPE",
+]
 
 MVT_MEDIA_TYPE = "application/vnd.mapbox-vector-tile"
 
@@ -43,6 +51,37 @@ def fixed_layers(*slugs: str) -> Callable[[], list[str]]:
         return list(slugs)
 
     return dependency
+
+
+@dataclass
+class DatasetParams(DefaultDependency):
+    """Narrow a mosaic to specific rasters, by slug.
+
+    Flowed in through titiler's `backend_dependency`, which is splatted into the
+    backend constructor on *every* route — so `?datasets=` applies uniformly to
+    tiles, `/point`, `/info` and `/assets` without each route knowing about it.
+
+    `DefaultDependency.as_dict()` drops `None`, so an absent parameter leaves the
+    backend at its default of "every raster in the layer".
+    """
+
+    rasters: Annotated[
+        Optional[str],
+        Query(
+            alias="datasets",
+            description=(
+                "Comma-separated raster slugs to restrict the mosaic to — one "
+                "dataset viewed through the layer, keeping the layer's palette "
+                "and class vocabulary. Slugs come from `/footprints`."
+            ),
+        ),
+    ] = None
+
+    def __post_init__(self):
+        """Parse the comma-delimited form into the list the backend wants."""
+        if isinstance(self.rasters, str):
+            slugs = [slug.strip() for slug in self.rasters.split(",") if slug.strip()]
+            self.rasters = slugs or None
 
 
 def LayerListParams(
@@ -72,6 +111,10 @@ class RasterMosaicFactory(MosaicTilerFactory):
 
     # Forwarded to `PGRasterMosaic` (e.g. `allow_overscaled`, `zoom_tolerance`).
     backend_options: dict = field(factory=dict)
+
+    # Per-request backend arguments. Defaults to `?datasets=` support; a host
+    # application can substitute its own.
+    backend_dependency: Any = field(default=DatasetParams)
 
     # The viewer template pulls in remote assets; not useful for these layers.
     add_viewer: bool = field(default=False)
@@ -163,18 +206,26 @@ class RasterMosaicFactory(MosaicTilerFactory):
             x: Annotated[int, Path(description="Tile column")],
             y: Annotated[int, Path(description="Tile row")],
             src_path=Depends(self.path_dependency),
+            backend_params=Depends(self.backend_dependency),
         ):
             """Raster footprints as a vector tile (layer `raster_footprints`)."""
-            data = self.index.footprint_tile(x, y, z, src_path)
+            data = self.index.footprint_tile(
+                x, y, z, src_path, **backend_params.as_dict()
+            )
             return Response(data, media_type=MVT_MEDIA_TYPE)
 
         @self.router.get(
             "/footprints",
             responses={200: {"description": "Raster footprints as GeoJSON"}},
         )
-        def footprints(src_path=Depends(self.path_dependency)):
+        def footprints(
+            src_path=Depends(self.path_dependency),
+            backend_params=Depends(self.backend_dependency),
+        ):
             """Every footprint in these layers, as a GeoJSON FeatureCollection."""
-            return JSONResponse(self.index.footprints(src_path))
+            return JSONResponse(
+                self.index.footprints(src_path, **backend_params.as_dict())
+            )
 
     # -- Colormap resolution -----------------------------------------------
 

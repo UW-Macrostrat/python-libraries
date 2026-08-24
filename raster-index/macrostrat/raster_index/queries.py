@@ -63,6 +63,14 @@ SELECTION = """
         CAST(:layers AS text[]) IS NULL
         OR r.layer = ANY(CAST(:layers AS text[]))
       )
+      -- Narrow to specific rasters within the layer. This is what lets a client
+      -- view one dataset *through the mosaic* — same palette, same class
+      -- vocabulary, same empty-tile behavior — rather than through a separate
+      -- single-file route with its own rendering rules.
+      AND (
+        CAST(:rasters AS text[]) IS NULL
+        OR r.slug = ANY(CAST(:rasters AS text[]))
+      )
       AND ({geometry} IS NULL OR ST_Intersects(r.footprint, {geometry}))
       AND (
         CAST(:zoom AS integer) IS NULL
@@ -83,6 +91,9 @@ def selection(geometry: str = "NULL") -> str:
     caller passing several layers gets them stacked in the order it asked for,
     and within a layer the highest-resolution raster wins the pixel. `slug`
     breaks remaining ties so results are stable.
+
+    `:rasters` NULL means "every raster in the layers"; a list narrows to those
+    slugs, which is how a single dataset is served through the mosaic.
 
     `:zoom` NULL disables zoom filtering — a bbox or footprint query has no
     zoom. When given, `:tolerance` admits rasters slightly coarser than the

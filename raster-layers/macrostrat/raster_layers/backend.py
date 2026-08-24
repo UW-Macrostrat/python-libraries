@@ -47,6 +47,13 @@ class PGRasterMosaic(BaseBackend):
     reader: type[BaseReader] = attr.ib(default=Reader)
     reader_options: dict = attr.ib(factory=dict)
 
+    # Narrow the mosaic to specific raster slugs. This is how a single dataset is
+    # viewed *through* the layer — same palette, class vocabulary, empty-tile
+    # behavior and point queries as the full mosaic — rather than through a
+    # separate single-file route with its own rendering rules. Request-scoped:
+    # titiler's `backend_dependency` supplies it per request.
+    rasters: Optional[list[str]] = attr.ib(default=None)
+
     # Forwarded to `raster_layers.get_rasters`: how far below a raster's own
     # minzoom it may still be read.
     zoom_tolerance: int = attr.ib(default=3)
@@ -72,7 +79,7 @@ class PGRasterMosaic(BaseBackend):
         if isinstance(self.input, str):
             self.input = [self.input]
 
-        bounds = self.index.layer_bounds(self.input)
+        bounds = self.index.layer_bounds(self.input, rasters=self.rasters)
         if bounds is not None:
             self.bounds = bounds
 
@@ -88,7 +95,12 @@ class PGRasterMosaic(BaseBackend):
 
     def assets_for_tile(self, x: int, y: int, z: int, **kwargs: Any) -> list[str]:
         assets = self.index.assets_for_tile(
-            x, y, z, self.input, zoom_tolerance=self.zoom_tolerance
+            x,
+            y,
+            z,
+            self.input,
+            zoom_tolerance=self.zoom_tolerance,
+            rasters=self.rasters,
         )
         if not self.allow_overscaled:
             assets = [a for a in assets if not a.overscaled]
@@ -163,5 +175,7 @@ class PGRasterMosaic(BaseBackend):
             xmin, ymin, xmax, ymax = transform_bounds(
                 coord_crs, WGS84_CRS, xmin, ymin, xmax, ymax
             )
-        assets = self.index.assets_for_bbox(xmin, ymin, xmax, ymax, self.input)
+        assets = self.index.assets_for_bbox(
+            xmin, ymin, xmax, ymax, self.input, rasters=self.rasters
+        )
         return [a.href for a in assets]

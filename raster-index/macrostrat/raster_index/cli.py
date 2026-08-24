@@ -316,10 +316,97 @@ def add(
     ctx: Context,
     hrefs: list[str] = Argument(..., help="Raster URLs or paths"),
     layer: str = Option(..., "--layer", "-l", help="Layer to add rasters to"),
+    mask_footprints: bool = Option(
+        False,
+        "--mask-footprints",
+        help="Trace footprints from each raster's validity mask (reads the mask)",
+    ),
 ):
     """Register rasters in a layer, reading footprints and zoom ranges."""
-    results = index_for(ctx).add_rasters(hrefs, layer)
+    results = index_for(ctx).add_rasters(hrefs, layer, mask_footprint=mask_footprints)
     print(f"[green]Registered {len(results)}/{len(hrefs)} rasters in {layer}")
+
+
+@cli.command(name="refine-footprints")
+def refine_footprints(
+    ctx: Context,
+    layer: str,
+    slug: Optional[str] = Option(
+        None, "--slug", "-s", help="Refine a single raster instead of the whole layer"
+    ),
+    max_size: int = Option(
+        1024, "--max-size", help="Longest edge, in pixels, of the decimated mask read"
+    ),
+    max_vertices: int = Option(
+        500, "--max-vertices", help="Vertex budget for the stored geometry"
+    ),
+    dry_run: bool = Option(
+        False, "--dry-run", help="Report what would change without writing"
+    ),
+):
+    """Trace footprints from each raster's validity mask.
+
+    A bounding box is a cheap footprint and a poor one: a diagonal swath inside
+    its own bbox is selected — and opened over the network — by every tile in the
+    box, most of which contain nothing but nodata. This replaces the box with the
+    shape of the data, so those tiles stop selecting the raster at all.
+
+    It reads each raster's mask (decimated, through overviews where they exist),
+    so it is a deliberate step rather than part of registration. Re-runnable: the
+    footprint is derived from the file, never from the stored geometry, so a
+    second run with different settings simply replaces it.
+    """
+    from .mask_footprint import mask_footprint
+
+    index = index_for(ctx)
+    rasters = index.rasters(layer)
+    if slug is not None:
+        rasters = [r for r in rasters if r["slug"] == slug]
+    if not rasters:
+        print(f"[yellow]No rasters to refine in [bold]{layer}[/bold]")
+        raise Exit(1)
+
+    table = Table("Raster", "Coverage of bbox", "Vertices", "Parts")
+    refined = 0
+    unchanged = 0
+    failed = 0
+
+    for raster in rasters:
+        try:
+            result = mask_footprint(
+                raster["href"], max_size=max_size, max_vertices=max_vertices
+            )
+        except Exception as err:
+            # One unreadable raster shouldn't abandon the rest of the layer.
+            print(f"[red]{raster['slug']}: {err}")
+            failed += 1
+            continue
+
+        if result is None:
+            # Fills its own bounding box; a traced rectangle would only add
+            # vertices for the selection query to test against.
+            unchanged += 1
+            table.add_row(raster["slug"], "100% (bbox kept)", "—", "—")
+            continue
+
+        table.add_row(
+            raster["slug"],
+            f"{100 * result.area_fraction:.1f}%",
+            str(result.vertices),
+            str(result.parts),
+        )
+        if not dry_run:
+            index.update_footprint(raster["href"], result.geometry)
+        refined += 1
+
+    print(table)
+    verb = "Would refine" if dry_run else "Refined"
+    summary = f"[green]{verb} {refined} footprint(s)"
+    if unchanged:
+        summary += f"; {unchanged} already fill their bounding box"
+    if failed:
+        summary += f"; [red]{failed} failed"
+    print(summary)
 
 
 @cli.command(name="scan")
@@ -337,6 +424,15 @@ def scan(
     ),
     public_url: Optional[str] = Option(
         None, help="Rewrite hrefs onto this origin (inferred from https URLs)"
+    ),
+    mask_footprints: bool = Option(
+        False,
+        "--mask-footprints",
+        help=(
+            "Trace footprints from each raster's validity mask rather than using "
+            "its bounding box. Reads each mask, so a large bucket takes a while; "
+            "`refine-footprints` does the same job after the fact."
+        ),
     ),
 ):
     """Register every raster under a bucket prefix.
@@ -365,7 +461,9 @@ def scan(
         print(f"[dim]{len(objects)} rasters (dry run — nothing registered)")
         return
 
-    results = index_for(ctx).add_rasters([o.href for o in objects], layer)
+    results = index_for(ctx).add_rasters(
+        [o.href for o in objects], layer, mask_footprint=mask_footprints
+    )
     print(f"[green]Registered {len(results)}/{len(objects)} rasters in {layer}")
 
 

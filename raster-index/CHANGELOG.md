@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2026-08-23
+
+- Footprints can be traced from a raster's validity mask instead of its bounding
+  box, so tiles outside the data stop selecting it: `refine-footprints` for
+  indexed rasters, `--mask-footprints` on `add`/`scan` for new ones. The mask is
+  read decimated (through overviews where present) and the result generalized to
+  a vertex budget, then grown so it still covers its own data. Needs the new
+  `footprints` extra (shapely)
+- Selection accepts a `rasters=` filter, narrowing a layer to specific slugs
+- `RasterIndex.update_footprint()`, and `add_raster(mask_footprint=True)`
+- `register_layer` no longer nulls `metadata` when it isn't supplied
+
 ## [0.2.0] - 2026-08-22
 
 - Layers can carry a class vocabulary — named classes for a categorical raster's

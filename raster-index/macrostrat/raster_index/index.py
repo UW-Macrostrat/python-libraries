@@ -239,6 +239,7 @@ class RasterIndex:
         maxzoom: Optional[int] = None,
         ensure_layer: bool = True,
         reader_options: Optional[dict] = None,
+        mask_footprint: bool = False,
     ) -> RasterInfo:
         """Register a raster, reading its metadata if not supplied.
 
@@ -247,12 +248,31 @@ class RasterIndex:
         consequence worth knowing — a raster belongs to exactly one layer, so
         registering the same href under a different layer *moves* it rather than
         adding a second copy.
+
+        `mask_footprint` trades registration time for query selectivity: the
+        footprint follows the valid data rather than the file's corners, so tiles
+        outside the data stop selecting this raster at all.
         """
         href = str(href)
         if info is None:
             info = get_raster_info(href, **(reader_options or {}))
         if slug is None:
             slug = default_slug(href)
+
+        geometry = info.geometry
+        if mask_footprint:
+            # Reads the raster's mask, so it is opt-in — see `mask_footprint`.
+            # `None` means the data fills its bounding box and the bbox stands.
+            from .mask_footprint import mask_footprint as compute_mask_footprint
+
+            derived = compute_mask_footprint(href, **(reader_options or {}))
+            if derived is not None:
+                log.info(
+                    "Footprint for %s covers %.1f%% of its bounding box",
+                    slug,
+                    100 * derived.area_fraction,
+                )
+                geometry = derived.geometry
 
         if ensure_layer:
             self._ensure_layer(layer)
@@ -285,7 +305,7 @@ class RasterIndex:
             layer=layer,
             slug=slug,
             href=href,
-            geometry=json.dumps(info.geometry),
+            geometry=json.dumps(geometry),
             minzoom=minzoom if minzoom is not None else info.minzoom,
             maxzoom=maxzoom if maxzoom is not None else info.maxzoom,
             dtype=info.dtype,
@@ -337,6 +357,30 @@ class RasterIndex:
                 dict(href=href),
             )
         return res.rowcount
+
+    def update_footprint(self, href: str, geometry: dict[str, Any]) -> None:
+        """Replace a raster's footprint.
+
+        `ST_MakeValid` + `ST_CollectionExtract` rather than storing the geometry
+        as handed over: an invalid ring would make every `ST_Intersects` against
+        this row raise, which would take out the whole layer rather than one
+        raster.
+        """
+        sql = text("""
+            UPDATE raster_layers.raster
+            SET footprint = ST_Multi(
+                  ST_CollectionExtract(
+                    ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(:geometry), 4326)),
+                    3
+                  )
+                ),
+                updated_at = now()
+            WHERE href = :href
+            """)
+        with self.engine.begin() as conn:
+            res = conn.execute(sql, dict(href=href, geometry=json.dumps(geometry)))
+        if res.rowcount == 0:
+            raise ValueError(f"No indexed raster with href {href!r}")
 
     def raster_info(
         self, ref: str, *, layer: Optional[str] = None
@@ -391,11 +435,24 @@ class RasterIndex:
         layers: list[str],
         *,
         zoom_tolerance: int = 3,
+        rasters: Optional[list[str]] = None,
     ) -> list[RasterAsset]:
-        """The rasters to composite for a tile, in compositing order."""
+        """The rasters to composite for a tile, in compositing order.
+
+        `rasters` narrows the mosaic to specific slugs — one dataset viewed
+        through the layer rather than on its own terms.
+        """
         return self._select_assets(
             TILE_ENVELOPE,
-            dict(x=x, y=y, z=z, layers=layers, zoom=z, tolerance=zoom_tolerance),
+            dict(
+                x=x,
+                y=y,
+                z=z,
+                layers=layers,
+                rasters=rasters,
+                zoom=z,
+                tolerance=zoom_tolerance,
+            ),
         )
 
     def assets_for_bbox(
@@ -405,6 +462,8 @@ class RasterIndex:
         east: float,
         north: float,
         layers: list[str],
+        *,
+        rasters: Optional[list[str]] = None,
     ) -> list[RasterAsset]:
         """The rasters intersecting a WGS84 bounding box, in compositing order.
 
@@ -418,12 +477,21 @@ class RasterIndex:
                 east=east,
                 north=north,
                 layers=layers,
+                rasters=rasters,
                 zoom=None,
                 tolerance=None,
             ),
         )
 
-    def should_generate_tile(self, x: int, y: int, z: int, layers: list[str]) -> bool:
+    def should_generate_tile(
+        self,
+        x: int,
+        y: int,
+        z: int,
+        layers: list[str],
+        *,
+        rasters: Optional[list[str]] = None,
+    ) -> bool:
         """Whether a tile has any asset that isn't overscaled.
 
         Used to avoid caching (or even rendering) tiles that would only ever be a
@@ -435,12 +503,14 @@ class RasterIndex:
               WHERE NOT overscaled
             )
             """)
-        params = dict(x=x, y=y, z=z, layers=layers, zoom=z, tolerance=3)
+        params = dict(
+            x=x, y=y, z=z, layers=layers, rasters=rasters, zoom=z, tolerance=3
+        )
         with self.engine.connect() as conn:
             return bool(conn.execute(sql, params).scalar())
 
     def layer_bounds(
-        self, layers: list[str]
+        self, layers: list[str], *, rasters: Optional[list[str]] = None
     ) -> Optional[tuple[float, float, float, float]]:
         """The combined extent of a set of layers, in EPSG:4326.
 
@@ -455,14 +525,16 @@ class RasterIndex:
             ) a
             WHERE e IS NOT NULL
             """)
-        params = dict(layers=layers, zoom=None, tolerance=None)
+        params = dict(layers=layers, rasters=rasters, zoom=None, tolerance=None)
         with self.engine.connect() as conn:
             row = conn.execute(sql, params).first()
         if row is None:
             return None
         return (row.west, row.south, row.east, row.north)
 
-    def footprints(self, layers: list[str]) -> dict[str, Any]:
+    def footprints(
+        self, layers: list[str], *, rasters: Optional[list[str]] = None
+    ) -> dict[str, Any]:
         """The footprints of a set of layers, as a GeoJSON FeatureCollection."""
         sql = text(f"""
             SELECT jsonb_build_object(
@@ -475,13 +547,19 @@ class RasterIndex:
             )
             FROM ({selection()}) selected
             """)
-        params = dict(layers=layers, zoom=None, tolerance=None)
+        params = dict(layers=layers, rasters=rasters, zoom=None, tolerance=None)
         with self.engine.connect() as conn:
             features = [r[0] for r in conn.execute(sql, params)]
         return {"type": "FeatureCollection", "features": features}
 
     def footprint_tile(
-        self, x: int, y: int, z: int, layers: Optional[list[str]] = None
+        self,
+        x: int,
+        y: int,
+        z: int,
+        layers: Optional[list[str]] = None,
+        *,
+        rasters: Optional[list[str]] = None,
     ) -> bytes:
         """Raster footprints for a tile, as Mapbox Vector Tile bytes.
 
@@ -512,7 +590,9 @@ class RasterIndex:
             FROM footprints
             WHERE geom IS NOT NULL
             """)
-        params = dict(x=x, y=y, z=z, layers=layers, zoom=None, tolerance=None)
+        params = dict(
+            x=x, y=y, z=z, layers=layers, rasters=rasters, zoom=None, tolerance=None
+        )
         with self.engine.connect() as conn:
             data = conn.execute(sql, params).scalar()
         return bytes(data) if data is not None else b""

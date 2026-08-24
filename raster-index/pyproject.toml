@@ -1,6 +1,6 @@
 [project]
 name = "macrostrat.raster_index"
-version = "0.2.0"
+version = "0.3.0"
 description = "An index of cloud-optimized raster datasets, for mosaicked tile serving"
 authors = [{ name = "Daven Quinn", email = "dev@davenquinn.com" }]
 requires-python = ">=3.11,<4"
@@ -35,6 +35,10 @@ Documentation = "https://github.com/UW-Macrostrat/python-libraries/tree/main/ras
 [project.optional-dependencies]
 # Scanning object stores for rasters to register
 s3 = ["boto3>=1.28.50,<2"]
+# Deriving footprints from a raster's validity mask. Optional because only the
+# indexing side computes them; the tile server that queries the result doesn't
+# need shapely.
+footprints = ["shapely>=2,<3"]
 
 [project.scripts]
 raster-index = "macrostrat.raster_index.cli:cli"

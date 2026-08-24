@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0] - 2026-08-23
+
+- `?datasets=` narrows a mosaic to specific rasters by slug, so a single dataset
+  can be viewed through the layer — keeping its palette, class vocabulary,
+  transparent empty tiles and per-asset point queries — rather than through a
+  separate single-file route. Applies to tiles, `/point`, `/info`, `/assets` and
+  `/footprints`, via titiler's `backend_dependency`
+- Requires `macrostrat.raster_index` 0.3.0
+
 ## [0.2.1] - 2026-08-22
 
 - Serve a transparent PNG where a layer has no coverage, instead of a bodyless
