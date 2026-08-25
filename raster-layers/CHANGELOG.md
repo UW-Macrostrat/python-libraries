@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.1] - 2026-08-25
+
+- A mosaic advertises the zoom range its rasters actually resolve, rather than
+  the tile grid's 0-24. Affects `/info`, `tilejson.json` and WMTS capabilities;
+  serving is unchanged, so overscaled tiles still render
+- Bounds and zoom range come from one query, so backend construction still costs
+  a single round trip
+- Requires `macrostrat.raster_index` 0.3.1
+
 ## [0.3.0] - 2026-08-23
 
 - `?datasets=` narrows a mosaic to specific rasters by slug, so a single dataset

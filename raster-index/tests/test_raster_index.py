@@ -173,3 +173,39 @@ class TestUnifiedSelection:
             for _ in range(3)
         ]
         assert runs[0] == runs[1] == runs[2] == ["fine", "coarse"]
+
+
+class TestLayerExtent:
+    """Bounds and native zoom range, answered together.
+
+    The zoom range is what `/info`, `tilejson.json` and WMTS advertise. Claiming
+    the tile grid's full 0-24 tells clients there is data at resolutions no
+    raster in the layer can produce — and in WMTS it costs one
+    `TileMatrixLimits` block per claimed zoom, per advertised layer.
+    """
+
+    def test_zoom_range_spans_the_rasters(self, populated_index):
+        rasters = populated_index.rasters("minerals")
+        extent = populated_index.layer_extent(["minerals"])
+        assert extent is not None
+        assert extent.minzoom == min(r["minzoom"] for r in rasters)
+        assert extent.maxzoom == max(r["maxzoom"] for r in rasters)
+
+    def test_zoom_range_is_narrower_than_the_grid(self, populated_index):
+        """Otherwise there was no point doing this."""
+        extent = populated_index.layer_extent(["minerals"])
+        assert extent.maxzoom < 24
+
+    def test_bounds_match_the_dedicated_helper(self, populated_index):
+        extent = populated_index.layer_extent(["minerals"])
+        assert extent.bounds == populated_index.layer_bounds(["minerals"])
+
+    def test_narrowing_to_a_raster_narrows_the_range(self, populated_index):
+        """`?datasets=` should narrow what the mosaic claims about itself."""
+        whole = populated_index.layer_extent(["minerals"])
+        fine = populated_index.layer_extent(["minerals"], rasters=["fine"])
+        assert fine is not None
+        assert (fine.minzoom, fine.maxzoom) != (whole.minzoom, whole.maxzoom)
+
+    def test_empty_layer_has_no_extent(self, populated_index):
+        assert populated_index.layer_extent(["minerals"], rasters=["nope"]) is None

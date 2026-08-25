@@ -527,3 +527,51 @@ class TestDatasetFilter:
             "/rasters/minerals/tiles/{tileMatrixSetId}/{z}/{x}/{y}"
         ]["get"]["parameters"]
         assert "datasets" in [p["name"] for p in params]
+
+
+class TestAdvertisedZoomRange:
+    """What the mosaic says about itself.
+
+    Reporting the tile grid's 0-24 instead of the layer's real range misleads
+    every client that reads `/info` or `tilejson.json`, and inflates the WMTS
+    capabilities document by a `TileMatrixLimits` block per claimed zoom per
+    advertised layer.
+    """
+
+    def test_backend_reports_the_layers_range(self, index):
+        from macrostrat.raster_layers.backend import PGRasterMosaic
+
+        backend = PGRasterMosaic(input=["minerals"], index=index)
+        rasters = index.rasters("minerals")
+        assert backend.minzoom == min(r["minzoom"] for r in rasters)
+        assert backend.maxzoom == max(r["maxzoom"] for r in rasters)
+        assert backend.maxzoom < web_mercator.maxzoom
+
+    def test_tilejson_advertises_it(self, client):
+        response = client.get(f"/rasters/minerals/{TMS}/tilejson.json")
+        data = response.json()
+        assert data["maxzoom"] < 24
+        assert data["minzoom"] >= 0
+
+    def test_overscaled_tiles_still_render(self, client):
+        """The advertised range is metadata, not a gate.
+
+        Serving past native resolution is deliberate (`allow_overscaled`), and
+        rio-tiler does no zoom validation in `tile()` — so narrowing what we
+        advertise must not narrow what we serve.
+        """
+        response = client.get(tile_path(*OVERLAP, 22))
+        assert response.status_code == 200
+
+    def test_one_query_for_bounds_and_zooms(self, index):
+        """Backend construction happens per request, on every route."""
+        queries = []
+        original = index.layer_extent
+        index.layer_extent = lambda *a, **k: (queries.append(1), original(*a, **k))[1]
+        try:
+            from macrostrat.raster_layers.backend import PGRasterMosaic
+
+            PGRasterMosaic(input=["minerals"], index=index)
+            assert len(queries) == 1
+        finally:
+            index.layer_extent = original

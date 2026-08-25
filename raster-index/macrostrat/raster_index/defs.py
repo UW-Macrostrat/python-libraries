@@ -9,7 +9,13 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-__all__ = ["RasterAsset", "RasterInfo", "LayerDefinition", "RasterCategory"]
+__all__ = [
+    "RasterAsset",
+    "RasterInfo",
+    "LayerDefinition",
+    "RasterCategory",
+    "LayerExtent",
+]
 
 
 class RasterCategory(BaseModel):
@@ -26,6 +32,20 @@ class RasterCategory(BaseModel):
     # From the raster's color table, where it has one. Carried alongside the
     # label so a client can draw a legend from a single request.
     color: Optional[tuple[int, int, int, int]] = None
+
+
+class LayerExtent(BaseModel):
+    """What a set of layers covers, and at what resolutions.
+
+    Bounds and zoom range together because they are answered by one query, and a
+    tile route asks for both on every request — see `RasterIndex.layer_extent`.
+    """
+
+    bounds: tuple[float, float, float, float]
+    # Native zoom range across the selected rasters. `None` where no raster
+    # records one, which is the caller's cue to fall back to the tile grid's.
+    minzoom: Optional[int] = None
+    maxzoom: Optional[int] = None
 
 
 class RasterAsset(BaseModel):

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.1] - 2026-08-25
+
+- `RasterIndex.layer_extent()` returns bounds *and* the native zoom range of the
+  selected rasters in one query; `layer_bounds()` delegates to it
+
 ## [0.3.0] - 2026-08-23
 
 - Footprints can be traced from a raster's validity mask instead of its bounding

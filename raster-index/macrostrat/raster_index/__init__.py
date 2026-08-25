@@ -14,7 +14,7 @@ from .categories import (
     categories_from_qml,
     class_metadata_candidates,
 )
-from .defs import LayerDefinition, RasterAsset, RasterCategory, RasterInfo
+from .defs import LayerDefinition, LayerExtent, RasterAsset, RasterCategory, RasterInfo
 from .footprints import get_raster_info
 from .index import RasterIndex, schema_files
 from .scan import BucketPrefix, RasterObject, parse_bucket_url, scan_prefix
@@ -30,6 +30,7 @@ __all__ = [
     "RasterAsset",
     "RasterInfo",
     "LayerDefinition",
+    "LayerExtent",
     "RasterCategory",
     "categories_from_info",
     "categories_from_json",

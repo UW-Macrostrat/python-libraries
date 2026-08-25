@@ -16,7 +16,7 @@ from sqlalchemy.engine import Connection, Engine
 
 from macrostrat.utils import get_logger
 
-from .defs import LayerDefinition, RasterAsset, RasterCategory, RasterInfo
+from .defs import LayerDefinition, LayerExtent, RasterAsset, RasterCategory, RasterInfo
 from .footprints import get_raster_info
 from .queries import TILE_ENVELOPE, bbox_envelope, selection
 
@@ -509,19 +509,30 @@ class RasterIndex:
         with self.engine.connect() as conn:
             return bool(conn.execute(sql, params).scalar())
 
-    def layer_bounds(
+    def layer_extent(
         self, layers: list[str], *, rasters: Optional[list[str]] = None
-    ) -> Optional[tuple[float, float, float, float]]:
-        """The combined extent of a set of layers, in EPSG:4326.
+    ) -> Optional[LayerExtent]:
+        """What a set of layers covers, and the zoom range its rasters resolve.
 
-        `None` when no rasters are indexed for them — the caller decides whether
-        that is an empty layer or a typo.
+        One query for both, because a tile route asks for both when it builds a
+        backend — and it does that on every request.
+
+        The zoom range matters beyond bookkeeping: it is what `/info`,
+        `tilejson.json` and the WMTS capabilities document advertise. Reporting
+        the tile grid's range instead (0–24) tells clients there is data at
+        resolutions no raster in the layer can produce.
+
+        `None` when no rasters are indexed — the caller decides whether that is
+        an empty layer or a typo.
         """
         sql = text(f"""
             SELECT ST_XMin(e) west, ST_YMin(e) south,
-                   ST_XMax(e) east, ST_YMax(e) north
+                   ST_XMax(e) east, ST_YMax(e) north,
+                   mn minzoom, mx maxzoom
             FROM (
-              SELECT ST_Extent(footprint) e FROM ({selection()}) selected
+              SELECT ST_Extent(footprint) e,
+                     min(minzoom) mn, max(maxzoom) mx
+              FROM ({selection()}) selected
             ) a
             WHERE e IS NOT NULL
             """)
@@ -530,7 +541,24 @@ class RasterIndex:
             row = conn.execute(sql, params).first()
         if row is None:
             return None
-        return (row.west, row.south, row.east, row.north)
+        return LayerExtent(
+            bounds=(row.west, row.south, row.east, row.north),
+            minzoom=row.minzoom,
+            maxzoom=row.maxzoom,
+        )
+
+    def layer_bounds(
+        self, layers: list[str], *, rasters: Optional[list[str]] = None
+    ) -> Optional[tuple[float, float, float, float]]:
+        """The combined extent of a set of layers, in EPSG:4326.
+
+        `None` when no rasters are indexed for them — the caller decides whether
+        that is an empty layer or a typo.
+        """
+        extent = self.layer_extent(layers, rasters=rasters)
+        if extent is None:
+            return None
+        return extent.bounds
 
     def footprints(
         self, layers: list[str], *, rasters: Optional[list[str]] = None

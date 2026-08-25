@@ -79,13 +79,23 @@ class PGRasterMosaic(BaseBackend):
         if isinstance(self.input, str):
             self.input = [self.input]
 
-        bounds = self.index.layer_bounds(self.input, rasters=self.rasters)
-        if bounds is not None:
-            self.bounds = bounds
-
-        # Without a mosaic document, the grid is the only authority on zoom range.
+        # The tile grid's range is only a fallback. A mosaic that claims data
+        # from zoom 0 to 24 misleads every client that reads `/info`,
+        # `tilejson.json` or the WMTS capabilities — and in WMTS it is expensive,
+        # since each advertised layer carries one `TileMatrixLimits` block per
+        # zoom level it claims.
         self.minzoom = self.tms.minzoom
         self.maxzoom = self.tms.maxzoom
+
+        # Bounds and zoom range in one query: this runs per request, on every
+        # route, so it is not a place to spend a second round trip.
+        extent = self.index.layer_extent(self.input, rasters=self.rasters)
+        if extent is not None:
+            self.bounds = extent.bounds
+            if extent.minzoom is not None:
+                self.minzoom = extent.minzoom
+            if extent.maxzoom is not None:
+                self.maxzoom = extent.maxzoom
 
     # -- Asset lookup ------------------------------------------------------
     #
