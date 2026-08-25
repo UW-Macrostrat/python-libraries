@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2] - 2026-08-25
+
+- Fix: a mounted layer advertised URLs that 404. `register_raster_layers` now
+  tells each factory the prefix it is mounted at, so TileJSON `tiles` entries
+  (and any WMTS templates) resolve. `RasterLayerConfig.router()` takes an
+  optional `prefix`
+
 ## [0.3.1] - 2026-08-25
 
 - A mosaic advertises the zoom range its rasters actually resolve, rather than

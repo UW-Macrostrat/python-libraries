@@ -575,3 +575,24 @@ class TestAdvertisedZoomRange:
             assert len(queries) == 1
         finally:
             index.layer_extent = original
+
+
+class TestAdvertisedURLsResolve:
+    """A layer must not advertise URLs that 404.
+
+    Including a router does not tell it where it is mounted, and titiler builds
+    absolute URLs from `router_prefix`. Left empty, TileJSON advertised
+    `/tiles/...` instead of `/rasters/minerals/tiles/...` — broken for every
+    consumer that follows the document, and invisible to any client that builds
+    tile URLs itself.
+    """
+
+    def test_tilejson_tiles_are_fetchable(self, client):
+        tilejson = client.get(f"/rasters/minerals/{TMS}/tilejson.json").json()
+        url = tilejson["tiles"][0]
+        assert "/rasters/minerals/" in url
+
+        path = url.split("testserver", 1)[-1]
+        for placeholder, value in (("{z}", "12"), ("{x}", "873"), ("{y}", "1587")):
+            path = path.replace(placeholder, value)
+        assert client.get(path).status_code in (200, 204)

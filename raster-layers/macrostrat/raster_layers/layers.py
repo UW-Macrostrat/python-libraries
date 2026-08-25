@@ -63,9 +63,19 @@ class RasterLayerConfig:
     def layer_slugs(self) -> list[str]:
         return self.layers or [self.slug]
 
-    def router(self, index: RasterIndex) -> APIRouter:
+    def router(self, index: RasterIndex, prefix: str = "") -> APIRouter:
+        """This layer's routes, to be mounted at `prefix`.
+
+        `prefix` has to be given as well as used at mount time: including a
+        router does not tell it where it lives, and titiler builds absolute URLs
+        from `router_prefix`. Left empty, every URL the layer advertises — the
+        TileJSON `tiles` entries, and any WMTS `ResourceURL` templates — points
+        at `/tiles/...` rather than `<prefix>/tiles/...`, and 404s for whoever
+        follows it.
+        """
         factory = RasterMosaicFactory(
             index=index,
+            router_prefix=prefix,
             path_dependency=fixed_layers(*self.layer_slugs),
             dataset_dependency=_dataset_params(self.resampling),
             default_colormap=self.colormap,
@@ -180,9 +190,10 @@ def register_raster_layers(
     """Mount each layer at `<prefix>/<slug>`."""
     install_exception_handlers(app)
     for config in configs:
+        mount = f"{prefix}/{config.slug}"
         app.include_router(
-            config.router(index),
-            prefix=f"{prefix}/{config.slug}",
+            config.router(index, mount),
+            prefix=mount,
             tags=tags or ["Rasters"],
         )
 
