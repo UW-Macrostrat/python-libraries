@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.6.0] - 2026-08-28
+
+- Add `copy_settings` to `template_database` (default on): replay the source's
+  database-level settings onto the copy, which `CREATE DATABASE ... TEMPLATE`
+  does not do. Exposed separately as `copy_database_settings`.
+- Fix `drop_database(force=True)` connecting with no database name, which let
+  libpq fall back to `PGDATABASE` and target an unrelated database.
+- Add `maintenance_url` for cluster-level connections.
+- `template_database(close_source_connections=True)` now evicts sessions from a
+  maintenance connection, so it can clear the last one.
+
 ## [4.5.0] - 2026-07-05
 
 - Add `on_error` hook to `Database.run_query` to allow for custom error handling

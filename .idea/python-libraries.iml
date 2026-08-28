@@ -19,6 +19,7 @@
       <sourceFolder url="file://$MODULE_DIR$/app-frame/macrostrat/app_frame" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/database/macrostrat" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/dinosaur/macrostrat" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/raster-index" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/app-frame/dist" />
       <excludeFolder url="file://$MODULE_DIR$/database/dist" />
@@ -28,6 +29,7 @@
       <excludeFolder url="file://$MODULE_DIR$/dinosaur/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/app-frame/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/database/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/raster-index/.venv" />
     </content>
     <orderEntry type="jdk" jdkName="uv (python-libraries)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

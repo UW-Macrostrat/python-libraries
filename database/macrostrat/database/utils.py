@@ -133,13 +133,55 @@ def drop_database(_input: DatabaseInput, force=None, allow_missing=False):
         _drop_database(url)
 
 
+# Databases that exist on every PostgreSQL cluster, used when we need a connection
+# for cluster-level work (creating or dropping some *other* database).
+_MAINTENANCE_DATABASES = ("postgres", "template1")
+
+
+def maintenance_url(url: URL, exclude: str = None) -> URL:
+    """A URL for a database that is safe to connect to for cluster-level work.
+
+    Never leave the database unset for this. libpq falls back to ``PGDATABASE``
+    (and ``macrostrat.core.config``, among others, exports one), so a URL with no
+    database silently targets whatever database that names — which either is not
+    the cluster you meant or does not exist there, surfacing as a confusing
+    "database ... does not exist" for a database nobody mentioned.
+
+    ``exclude`` names a database that must not be connected to — normally the one
+    about to be dropped or copied. Defaults to ``url``'s own database.
+    """
+    exclude = exclude if exclude is not None else url.database
+    for candidate in _MAINTENANCE_DATABASES:
+        if candidate != exclude:
+            return url.set(database=candidate)
+    # Both maintenance databases excluded shouldn't happen, but stay well-defined.
+    return url.set(database=_MAINTENANCE_DATABASES[-1])
+
+
+def _maintenance_engine(url: URL, exclude: str = None) -> Engine:
+    """An AUTOCOMMIT engine against a maintenance database on ``url``'s cluster."""
+    exclude = exclude if exclude is not None else url.database
+    last_error = None
+    for candidate in _MAINTENANCE_DATABASES:
+        if candidate == exclude:
+            continue
+        engine = create_engine(
+            url.set(database=candidate),
+            execution_options={"isolation_level": "AUTOCOMMIT"},
+        )
+        try:
+            with engine.connect():
+                return engine
+        except OperationalError as err:  # pragma: no cover - cluster-specific
+            last_error = err
+            engine.dispose()
+    raise last_error
+
+
 def _force_drop_postgresql_database(url):
     # Check if we can force-drop and do so if we can
     database_name = url.database
-    user_url = url._replace(database=None)
-    user_engine = create_engine(
-        user_url, execution_options={"isolation_level": "AUTOCOMMIT"}
-    )
+    user_engine = _maintenance_engine(url, exclude=database_name)
     # Get postgresql version from engine
     major_version = 0
     with allow_shutdown(user_engine) as conn:
@@ -195,6 +237,48 @@ def get_database_url(_input: DatabaseInput) -> URL:
         raise ValueError(f"Invalid input type: {_input}")
 
 
+def copy_database_settings(source: DatabaseInput, target: DatabaseInput):
+    """Copy database-level settings (``ALTER DATABASE ... SET ...``) between databases.
+
+    ``CREATE DATABASE ... TEMPLATE`` copies schema and data but *not*
+    ``pg_db_role_setting``, so a copy can behave differently from the database it
+    was cloned from. PostGIS is the common case: ``CREATE EXTENSION
+    postgis_topology`` sets a database-level ``search_path`` including ``topology``,
+    and without it a clone resolves topogeometry columns and topology-referencing
+    views differently from its source — enough to make a schema diff between two
+    otherwise identical databases report drift.
+
+    Only cluster-wide (roleless) settings are copied; per-role overrides are left
+    alone. Values are replayed as Postgres stored them, which is already valid
+    ``SET`` syntax.
+    """
+    source_url = get_database_url(source)
+    target_url = get_database_url(target)
+
+    engine = _maintenance_engine(source_url, exclude=target_url.database)
+    try:
+        with engine.connect() as conn:
+            settings = list(
+                conn.execute(
+                    text(
+                        "SELECT unnest(setconfig) FROM pg_db_role_setting"
+                        " WHERE setdatabase = ("
+                        "   SELECT oid FROM pg_database WHERE datname = :database)"
+                        "   AND setrole = 0"
+                    ),
+                    {"database": source_url.database},
+                ).scalars()
+            )
+            quoted_target = '"' + target_url.database.replace('"', '""') + '"'
+            for setting in settings:
+                key, _, value = setting.partition("=")
+                conn.execute(
+                    text(f"ALTER DATABASE {quoted_target} SET {key} = {value}")
+                )
+    finally:
+        engine.dispose()
+
+
 @contextmanager
 def template_database(
     _input: DatabaseInput,
@@ -202,25 +286,41 @@ def template_database(
     name: str = None,
     force_drop=True,
     close_source_connections=False,
+    copy_settings=True,
 ):
-    """Create a temporary template database using an existing database as a template."""
+    """Create a temporary database copied from an existing one.
+
+    ``close_source_connections`` evicts sessions on the source first: PostgreSQL
+    refuses to copy a template that anything else is connected to. The eviction
+    runs from a *maintenance* database, because a connection to the source is
+    itself a session on the source and so cannot clear the last one.
+
+    ``copy_settings`` replays the source's database-level settings onto the copy
+    (see :func:`copy_database_settings`); pass ``False`` for a copy of the schema
+    and data alone.
+    """
 
     url = get_database_url(_input)
-    if close_source_connections:
-        engine = create_engine(_input)
-        close_all_connections(engine)
-        engine.dispose()
-
     db_name = url.database
+
     template_db_name = name
     if name is None:
         uid = str(uuid4())[:8]
         template_db_name = db_name + "_template_" + uid
-    # Close connection to the database so we can create a new one based on the template
     new_db_url = url.set(database=template_db_name)
+
+    if close_source_connections:
+        engine = _maintenance_engine(url, exclude=db_name)
+        try:
+            close_all_connections(engine, database=db_name)
+        finally:
+            engine.dispose()
+
     with temporary_database(
         new_db_url, drop=True, exists_ok=False, template=db_name, force_drop=force_drop
     ) as engine:
+        if copy_settings:
+            copy_database_settings(url, new_db_url)
         yield engine
 
 
