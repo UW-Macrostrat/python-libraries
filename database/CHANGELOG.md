@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.6.1] - 2026-08-28
+
+- Fix `template_database(close_source_connections=True)` leaving the source
+  unusable: evicting its sessions kills the caller's pooled connections too, so
+  they are now discarded (`discard_stale_connections`) and the next use reconnects.
+
 ## [4.6.0] - 2026-08-28
 
 - Add `copy_settings` to `template_database` (default on): replay the source's

@@ -279,6 +279,30 @@ def copy_database_settings(source: DatabaseInput, target: DatabaseInput):
         engine.dispose()
 
 
+def discard_stale_connections(_input: DatabaseInput):
+    """Release connections the caller holds to a database whose sessions were evicted.
+
+    Terminating a database's backends does not tell the client: the caller's pool
+    and session keep handing out sockets the server has already closed, and the
+    next query fails with ``AdminShutdown`` instead of transparently reconnecting.
+    Clearing them makes the reconnect automatic.
+
+    Only meaningful for a ``Database`` or ``Engine``; a URL holds no connections.
+    """
+    from .core import Database
+
+    # `close()`/`dispose()` try to talk to the server (a rollback, a graceful
+    # close), which fails on a socket the backend has already dropped. Invalidate
+    # and abandon instead: no SQL is emitted, and the next use dials afresh.
+    if isinstance(_input, Database):
+        # `Database.session` is a scoped_session, which doesn't proxy invalidate();
+        # call it to get the Session underneath.
+        _input.session().invalidate()
+        _input.engine.dispose(close=False)
+    elif isinstance(_input, Engine):
+        _input.dispose(close=False)
+
+
 @contextmanager
 def template_database(
     _input: DatabaseInput,
@@ -293,7 +317,9 @@ def template_database(
     ``close_source_connections`` evicts sessions on the source first: PostgreSQL
     refuses to copy a template that anything else is connected to. The eviction
     runs from a *maintenance* database, because a connection to the source is
-    itself a session on the source and so cannot clear the last one.
+    itself a session on the source and so cannot clear the last one. When a
+    ``Database`` or ``Engine`` is passed, its now-dead pooled connections are
+    discarded so the source keeps working afterwards.
 
     ``copy_settings`` replays the source's database-level settings onto the copy
     (see :func:`copy_database_settings`); pass ``False`` for a copy of the schema
@@ -315,6 +341,9 @@ def template_database(
             close_all_connections(engine, database=db_name)
         finally:
             engine.dispose()
+        # The eviction above is thorough — it takes the caller's connections too.
+        # Clear them so the source stays usable instead of raising AdminShutdown.
+        discard_stale_connections(_input)
 
     with temporary_database(
         new_db_url, drop=True, exists_ok=False, template=db_name, force_drop=force_drop

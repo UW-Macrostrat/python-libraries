@@ -6,6 +6,7 @@ from pytest import mark
 from sqlalchemy import create_engine, text
 from sqlalchemy_utils import database_exists
 
+from macrostrat.database import Database
 from macrostrat.database.query import run_query
 from macrostrat.database.utils import (
     create_database,
@@ -97,5 +98,30 @@ def test_template_database_copies_database_settings(database_url):
         ) as clone:
             with clone.connect() as conn:
                 assert "topology" not in conn.execute(text("show search_path")).scalar()
+    finally:
+        drop_database(source_url, force=True, allow_missing=True)
+
+
+def test_source_database_survives_being_cloned(database_url):
+    """Cloning must not leave the source unusable.
+
+    `close_source_connections` evicts the source's sessions, which takes the
+    caller's own connections with them. Without discarding the dead pool, the next
+    query through the source raises AdminShutdown — which is how a session-scoped
+    source fixture breaks every test that runs after the first clone.
+    """
+    source_url = database_url.set(database="temp_test_clone_source")
+    create_database(source_url, exists_ok=True)
+    try:
+        source = Database(source_url)
+        assert source.run_query("SELECT 1").scalar() == 1
+
+        with template_database(source, close_source_connections=True) as clone_engine:
+            with clone_engine.connect() as conn:
+                assert run_query(conn, "SELECT 1").scalar() == 1
+
+        # The source is still usable, reconnecting transparently.
+        assert source.run_query("SELECT 1").scalar() == 1
+        source.engine.dispose()
     finally:
         drop_database(source_url, force=True, allow_missing=True)
