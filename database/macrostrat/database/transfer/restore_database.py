@@ -8,7 +8,7 @@ from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
 
-from .stream_utils import print_stdout, print_stream_progress
+from .stream_utils import print_stderr, print_stdout, print_stream_progress
 from .utils import _create_command, _create_database_if_not_exists
 
 console = Console()
@@ -23,6 +23,7 @@ async def pg_restore(
     command_prefix: Optional[list] = None,
     args: list = [],
     postgres_container: str = "postgres:15",
+    stdin=asyncio.subprocess.PIPE,
 ):
     # Pipe file to pg_restore, mimicking
 
@@ -46,13 +47,18 @@ async def pg_restore(
 
     return await asyncio.create_subprocess_exec(
         *_cmd,
-        stdin=asyncio.subprocess.PIPE,
+        stdin=stdin,
         stderr=asyncio.subprocess.PIPE,
         limit=1024 * 1024 * 1,  # 1 MB windows
     )
 
 
-async def pg_restore_from_file(dumpfile: Path, engine: Engine, **kwargs):
+async def pg_restore_from_file(dumpfile: Path | None, engine: Engine, **kwargs):
+    if dumpfile is None:
+        proc = await pg_restore(engine, stdin=None, **kwargs)
+        await asyncio.gather(print_stderr(proc.stderr), proc.wait())
+        return
+
     proc = await pg_restore(engine, **kwargs)
     # Open dump file as an async stream
     async with aiofiles.open(dumpfile, mode="rb") as source:

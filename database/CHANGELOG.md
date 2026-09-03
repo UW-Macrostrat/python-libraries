@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add `database-transfer`, a basic dump/restore CLI that supports `-` for
+  standard output and input, respectively.
+
 ## [4.6.1] - 2026-08-28
 
 - Fix `template_database(close_source_connections=True)` leaving the source

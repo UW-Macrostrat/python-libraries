@@ -25,6 +25,9 @@ dependencies = [
     "psycopg2>=2.9.11,<3",
 ]
 
+[project.scripts]
+database-transfer = "macrostrat.database.transfer.cli:cli"
+
 [dependency-groups]
 dev = ["macrostrat.utils"]
 
