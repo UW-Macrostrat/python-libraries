@@ -7,7 +7,7 @@ from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
 
-from .stream_utils import print_stdout, print_stream_progress
+from .stream_utils import print_stderr, print_stdout, print_stream_progress
 from .utils import _create_command
 
 log = get_logger(__name__)
@@ -61,4 +61,4 @@ async def pg_dump_to_file(engine: Engine, dumpfile: Path | None, **kwargs):
 
 
 async def _monitor_stderr(proc):
-    await asyncio.gather(print_stdout(proc.stderr), proc.wait())
+    await asyncio.gather(print_stderr(proc.stderr), proc.wait())

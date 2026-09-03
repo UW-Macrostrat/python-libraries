@@ -75,6 +75,13 @@ async def print_stdout(stream: asyncio.StreamReader):
         console.print(line.decode("utf-8"), style="dim")
 
 
+async def print_stderr(stream: asyncio.StreamReader):
+    async for line in stream:
+        log.info(line)
+        sys.stderr.buffer.write(line)
+        sys.stderr.buffer.flush()
+
+
 class DecodingStreamReader(asyncio.StreamReader):
     """A StreamReader that decompresses gzip files (if compressed)"""
 

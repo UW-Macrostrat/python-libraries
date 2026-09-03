@@ -8,7 +8,7 @@ from sqlalchemy.engine import Engine
 
 from macrostrat.utils import get_logger
 
-from .stream_utils import print_stdout, print_stream_progress
+from .stream_utils import print_stderr, print_stdout, print_stream_progress
 from .utils import _create_command, _create_database_if_not_exists
 
 console = Console()
@@ -56,7 +56,7 @@ async def pg_restore(
 async def pg_restore_from_file(dumpfile: Path | None, engine: Engine, **kwargs):
     if dumpfile is None:
         proc = await pg_restore(engine, stdin=None, **kwargs)
-        await asyncio.gather(print_stdout(proc.stderr), proc.wait())
+        await asyncio.gather(print_stderr(proc.stderr), proc.wait())
         return
 
     proc = await pg_restore(engine, **kwargs)
